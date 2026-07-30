@@ -34,4 +34,7 @@ python3 -m http.server 8080
 
 ## 規則
 
+**這三份 JSON 一律寫在 `main`（`clay-kart/`），不是寫在自己的 worktree。**
+在 worktree 更新的話儀表板讀不到 —— 見 [../loop/README.md](../loop/README.md) 開頭。
+
 **不要中途打斷正在跑的 builder。** 要停就等該輪 commit 完再停。

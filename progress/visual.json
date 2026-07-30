@@ -2,11 +2,11 @@
   "tool": "claude-code",
   "worktree": "../ck-visual",
   "branch": "feat/visual",
-  "updated": "2026-07-30T00:00:00Z",
+  "updated": "2026-07-30T14:00:00Z",
   "wave": "W1",
   "round": 0,
-  "element": null,
+  "element": "minimal-render",
   "status": "idle",
   "last_verdict": null,
-  "note": "等待 W1 步驟 3：最小可用渲染、一台方塊車"
+  "note": "已解除封鎖。取代 src/render/renderer.ts 的 stub。W1 只要方塊車能動 60fps，材質是 W3 的事"
 }

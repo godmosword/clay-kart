@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-07-30T00:00:00Z",
+  "updated": "2026-07-30T14:00:00Z",
   "wave": "W1",
   "round": 0,
-  "element": null,
-  "status": "idle",
+  "element": "project-skeleton",
+  "status": "done",
   "last_verdict": null,
-  "note": "等待 W1 步驟 2：專案骨架、build pipeline、dev server"
+  "note": "vite 8 + ts 7 + three 0.185。typecheck / build / dev 皆通。技術棧與三條硬性約束見 ck-plumb/ARCHITECTURE.md"
 }

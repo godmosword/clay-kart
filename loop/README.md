@@ -6,6 +6,30 @@
 
 ---
 
+## ⚠️ 寫在哪裡（最容易搞錯的一點）
+
+每個 worktree 都有一份 `loop/` 和 `progress/` 的拷貝，但**它們是各分支獨立的檔案**。
+在自己的 worktree 更新 `progress/physics.json`，`main` 上的儀表板永遠看不到，
+三方協調狀態會各自漂移。
+
+**規則：**
+
+| 內容 | 寫在哪 | 分支 |
+|---|---|---|
+| 程式碼 | 自己的 worktree（`../ck-*`） | 自己的 feature 分支 |
+| `loop/round-{N}/*`、`progress/*.json`、`BACKLOG.md`、`budget.json` | **`clay-kart/`** | **`main`** |
+
+```bash
+# 每輪結束，回 main 更新協調狀態
+cd ../clay-kart
+# 編輯 progress/physics.json、loop/budget.json、loop/round-{N}/VERDICT.json
+git add progress loop && git commit -m "R{N} {element}: 協調狀態"
+```
+
+程式碼的 commit 留在自己分支，協調狀態的 commit 進 main。兩者不混。
+
+---
+
 ## 檔案
 
 | 檔案 | 誰寫 | 誰讀 |
