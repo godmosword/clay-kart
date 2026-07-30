@@ -13,7 +13,8 @@
     "steering-grip": { "cap": 250000, "spent": 0, "bar": "BAR-FEEL §5" },
     "collision-response": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §6" },
     "airborne-landing": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §7" },
-    "input-feedback": { "cap": 100000, "spent": 0, "bar": "BAR-FEEL §8" }
+    "input-feedback": { "cap": 100000, "spent": 0, "bar": "BAR-FEEL §8" },
+    "ai-opponents": { "cap": 300000, "spent": 0, "bar": "BAR-FEEL §6 + 行為指標待補" }
   },
   "W3": {
     "$comment": "Opus + ultracode，單位成本遠高於 W2。cap 較低是刻意的。",
@@ -27,7 +28,8 @@
     "drift-sparks": { "cap": 150000, "spent": 0 },
     "item-boxes": { "cap": 120000, "spent": 0 },
     "shadows-contact": { "cap": 180000, "spent": 0 },
-    "water-hazard": { "cap": 120000, "spent": 0 },
-    "ui-hud": { "cap": 120000, "spent": 0 }
+    "water-sea": { "cap": 120000, "spent": 0 },
+    "ui-hud": { "cap": 120000, "spent": 0 },
+    "audio": { "cap": 100000, "spent": 0, "$comment": "沿用 podcast 既有資產，成本低" }
   }
 }

@@ -24,24 +24,41 @@
 
 ## 待裁決
 
-### BAR-VISUAL §5 未完成
-- **輪次**：R0（bootstrap）
-- **現況**：`BAR-VISUAL.md §5` 各元件美學條款空白
-- **目標**：12 元件各有材質/色彩/比例條款與一句「一眼判斷」檢查句
-- **阻擋**：缺 Art Bible、`refs/clay/` 12 張參考圖、`refs/lighting/neutral-3point.json`
-- **影響**：W3 loop 無法啟動。W1/W2 不受影響
-- **來源**：Lead bootstrap
+### BAR-VISUAL §5.1–§5.12 個別元件條款未寫
+- **輪次**：R0
+- **現況**：§5.0 全元件共通條款已從 Art Bible v5 填妥，個別元件條款空白
+- **目標**：12 元件各有材質細節、色彩、比例條款與一句「一眼判斷」檢查句
+- **影響**：**不擋 W3 啟動。** LOOP-OPS §5 規定先把 12 元件做到「堪用」再 loop，
+  §5.0 足以支撐堪用階段。個別條款在進入 loop 前補，屆時有實際產出可對照，會寫得更準
+- **狀態**：已排入 W3 loop 前
+
+### BAR-FEEL 缺 AI 對手的行為指標
+- **輪次**：R0
+- **現況**：`ai-opponents` 已排入 W2 第 8 順位，但只有碰撞（§6）有指標
+- **目標**：超車決策、橡皮筋強度、難度分級的可量測窗口
+- **影響**：不擋前七個元件。進入 `ai-opponents` 前必須補
 - **狀態**：待裁決
 
-### git 全域身分為佔位值
-- **輪次**：R0（bootstrap）
-- **現況**：全域 `user.name` = `你的名稱`，`user.email` = `your-github-username@users.noreply.github.com`
-- **處置**：已設 repo-local 身分為 `godmosword.eth / godmosword@gmail.com`
-- **來源**：Lead bootstrap
-- **狀態**：待確認是否為期望值
+### 文件標點全半形不一致
+- **輪次**：R0
+- **現況**：`BAR-FEEL.md` / `LOOP-OPS.md` 用全形（，：（）），
+  `CHARACTERS.md` / `BAR-PERF.md` / `BAR-VISUAL.md` 用半形
+- **影響**：純觀感。三個工具都讀得懂，不影響任何驗收
+- **狀態**：待裁決（建議留給每波結束的 smoothing pass 一併處理）
 
 ---
 
 ## 已裁決
 
-（無）
+### ~~BAR-VISUAL §5 未完成，W3 被封鎖~~ — **判斷錯誤，已撤回**
+- **原判斷（R0 bootstrap）**：缺 Art Bible，W3 無法啟動
+- **實際**：`podcast-website/docs/UNIVERSE-ART-BIBLE.md` 已是 v5，
+  含黃金樣本（`car-park.png`，標為最高權威）、黏土材質、燈光、配色全部齊備。
+  `GAMEKIT-ART-BIBLE.md` 另有調色盤與技術錨點，但那是**像素風產品線，不適用**
+- **處置**：已複製定義層進 `refs/clay/`（14 張）與 `BAR-VISUAL §5.0`。W3 未被封鎖
+- **教訓**：bootstrap 時假設素材不存在而沒有實際去看上游 repo。
+  下次寫「被 X 封鎖」之前先確認 X 是否真的不存在
+
+### ~~git 全域身分為佔位值~~ — 已處置
+- 已設 repo-local 身分為 `godmosword.eth / godmosword@gmail.com`
+- 若非期望值請自行改，不影響任何驗收
