@@ -38,6 +38,9 @@
 
 ## worktree
 
+四個分支都已推上 `origin`。協調檔案寫在 `main`，程式碼寫在自己的 feature 分支，
+遠端衝突規則見 [loop/README.md](loop/README.md)。
+
 | 目錄 | 分支 | 工具 | 可寫範圍 |
 |---|---|---|---|
 | `../ck-physics` | `feat/physics` | Codex | `src/physics/`, `src/ai/`, `tools/telemetry/`, `tools/validate/` |
