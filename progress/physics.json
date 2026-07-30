@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-07-30T14:00:00Z",
+  "updated": "2026-07-30T14:30:00Z",
   "wave": "W1",
   "round": 0,
   "element": "physics-loop",
-  "status": "idle",
+  "status": "done",
   "last_verdict": null,
-  "note": "已解除封鎖。取代 src/physics/world.ts 的 stub，實作 SimWorld。不得 import three、不得碰 DOM"
+  "note": "W1 完成：固定 120Hz 車輛物理、加速/煞車/倒車/轉向、重力落地、封閉環狀賽道邊界碰撞與 3 圈計時。commit 35cfeef；typecheck/build、headless deterministic smoke test 通過。"
 }
