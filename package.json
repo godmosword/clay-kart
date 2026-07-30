@@ -1,0 +1,22 @@
+{
+  "name": "clay-kart",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "progress": "python3 -m http.server 8080"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/three": "^0.185.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0"
+  }
+}
