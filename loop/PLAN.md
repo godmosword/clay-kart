@@ -7,16 +7,28 @@
 
 ## 目標
 
-黏土風格卡丁車競速遊戲。三工具協作，預算型停止（LOOP-OPS §6）。
+黏土風格卡丁車競速遊戲。素材來源為 `podcast-website` 的定義層（**複製，不共用檔案**，
+兩 repo 保持獨立）。三工具協作，預算型停止（LOOP-OPS §6）。
+
+## 四份 bar
+
+| 文件 | 驗什麼 | critic |
+|---|---|---|
+| `BAR-FEEL.md` | 手感（模擬層） | Python，零成本 |
+| `BAR-PERF.md` | 幀率、載入、記憶體、抽格 | Python，零成本 |
+| `BAR-VISUAL.md` | 黏土美術 | Codex 盲測 A/B，**付費** |
+| `CHARACTERS.md` | 角色規格、IP 界線 | 人工 + IP 自檢 |
+
+**只有 `BAR-VISUAL` 需要 LLM。** 其餘三份全是確定性程式檢查。
 
 ## 波次總覽
 
 | Wave | 目標 | 驗收 | 是否跑 loop |
 |---|---|---|---|
-| W1 | 可玩骨架 | 能開、不卡、不崩 | ✗ |
-| W2 | 手感 | `BAR-FEEL.md` 全項 PASS 或撞預算 | ✓（critic 免費） |
-| W3 | 視覺 | `BAR-VISUAL.md` 12 元件 ≥ 4 分 | ✓（critic 付費，節制） |
-| W4 | 內容 | 道具、音效、AI 對手 | 待定 |
+| W1 | 可玩骨架 | 一台車、一條封閉賽道、圈數計時、能開不卡 | ✗ |
+| W2 | 手感 | `BAR-FEEL` 全項 PASS（4.5 為硬門檻）+ `BAR-PERF §8` | ✓（critic 免費） |
+| W3 | 視覺 | `BAR-VISUAL` 12 元件 ≥ 4 分 + 音效 | ✓（critic 付費，節制） |
+| W4 | 內容 | 道具系統、其餘五位車手、更多賽道 | 待定 |
 
 ---
 
@@ -26,11 +38,15 @@
 
 | # | 工具 | 工作 | 完成條件 |
 |---|---|---|---|
-| 1 | Codex | 固定 tick 物理迴圈、碰撞、賽道 collider | 120Hz 固定步長，車能動、能撞牆、不穿透 |
-| 2 | Cursor | 專案骨架、build pipeline、dev server | `npm run dev` 起得來，`npm run build` 過 |
-| 3 | Claude Code (Sonnet) | 最小可用渲染、一台方塊車 | 畫面上看得到車在動，60fps |
+| 1 | ~~Cursor~~ | ~~專案骨架、build pipeline、dev server~~ | ✅ **已完成**，見 `../ck-plumb/ARCHITECTURE.md` |
+| 2 | Codex | 固定 tick 物理迴圈、碰撞、**封閉賽道 collider**、**圈數計時** | 120Hz 固定步長；車能動、能撞牆、不穿透；能跑完一圈並記錄圈速 |
+| 3 | Claude Code (Sonnet) | 最小可用渲染、一台方塊車、追尾相機 | 畫面上看得到車在動，60fps |
 
-**W1 明確不做：** 漂移、道具、AI、音效、任何材質工作。
+> 順序已修正。手冊 §5 把骨架排第 2，但骨架是另外兩者的前提——沒有 build
+> 就沒有 `src/physics/` 可以放。骨架完成後 2 與 3 可並行。
+
+**W1 明確不做：** 漂移、道具、AI 對手、音效、任何材質工作、其餘五位車手。
+車手只做小紅賽車（`CHARACTERS.md §2`），而且 W1 階段就是個方塊。
 
 ---
 
@@ -40,7 +56,7 @@
 
 | # | 工具 | 工作 |
 |---|---|---|
-| 1 | Codex | telemetry + validate（LOOP-OPS §4.1），一次做完 |
+| 1 | Codex | telemetry + validate（LOOP-OPS §4.1）+ `perf-probe`（`BAR-PERF §7`），一次做完 |
 | 2 | Claude Code (Sonnet) | builder 輪次，反覆 |
 | 3 | Python | critic，零成本 |
 | 4 | Cursor | 套 diff、跑 replay |
@@ -53,26 +69,38 @@
 |---|---|---|---|
 | 1 | `sim-determinism` | §2 | 150k |
 | 2 | `acceleration-curve` | §3 | 200k |
-| 3 | `drift-miniturbo` | §4 | 400k |
+| 3 | `drift-miniturbo` | §4 ★ | 400k |
 | 4 | `steering-grip` | §5 | 250k |
 | 5 | `collision-response` | §6 | 200k |
 | 6 | `airborne-landing` | §7 | 150k |
 | 7 | `input-feedback` | §8 | 100k |
+| 8 | `ai-opponents` | §6 + 行為指標待補 | 300k |
 
 **`sim-determinism` 必須第一個 PASS 並凍結。** §2 沒過的話後面所有數值都不可信。
 
+**`drift-miniturbo` 的 4.5 是硬門檻。** 撞 cap 不得跳過，由 Lead 裁決加碼——
+這是 `BAR-FEEL` 唯一不適用預算型停止的指標。
+
+**`ai-opponents` 排最後**，因為它的碰撞手感依賴 §6 已定案。行為指標（超車決策、
+橡皮筋強度）在進入該元件前由 Lead 補進 `BAR-FEEL`。
+
 ---
 
-## W3 — 視覺
+## W3 — 視覺與音效
 
-**前置封鎖：** `BAR-VISUAL.md §5` 未完成前不得啟動 loop。見該文件 §7。
+**前置已解除。** `BAR-VISUAL.md §5.0` 已從 Art Bible v5 填妥，`refs/clay/` 14 張參考圖已備妥，
+黃金樣本 `refs/clay/car-park.png` 為最高權威。§5.1–§5.12 的個別條款在進入 loop 前補即可。
 
 | # | 工具 | 工作 |
 |---|---|---|
-| 1 | claude.ai 對話 | 從 Art Bible 產出 `BAR-VISUAL.md §5` |
-| 2 | Cursor | contact sheet 生成腳本（12 格 + 隨機打亂 + key 另存） |
-| 3 | Claude Code (Opus + ultracode) | 視覺 builder |
-| 4 | Codex | 盲測 A/B critic，一次評 12 項 |
+| 1 | Cursor | contact sheet 生成腳本（12 格 + 隨機打亂 + key 另存到 critic 讀不到的位置） |
+| 2 | Claude Code (Opus + ultracode) | 視覺 builder |
+| 3 | Codex | 盲測 A/B critic，一次評 12 項 |
+| 4 | Claude Code (Sonnet) | 音效接線，沿用 podcast 既有音訊資產 |
+
+**音效在 W3，不是 W4。** 來源見 `CHARACTERS.md §7` —— 上游主題曲與 AI 語音可 100% 複用，
+是整個專案最省事的一塊。注意**不要**套用上游 `GAMEKIT-ART-BIBLE.md` 的 chiptune 規格，
+那是像素風產品線。
 
 ### 順序規則（重要）
 

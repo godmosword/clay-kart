@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-07-30T00:00:00Z",
+  "updated": "2026-07-30T14:00:00Z",
   "wave": "W1",
   "round": 0,
-  "element": null,
+  "element": "physics-loop",
   "status": "idle",
   "last_verdict": null,
-  "note": "等待 W1 步驟 1：固定 tick 物理迴圈、碰撞、賽道 collider"
+  "note": "已解除封鎖。取代 src/physics/world.ts 的 stub，實作 SimWorld。不得 import three、不得碰 DOM"
 }
