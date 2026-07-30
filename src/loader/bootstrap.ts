@@ -24,9 +24,47 @@ export interface SimWorld {
   snapshot(): SimSnapshot;
 }
 
+/**
+ * 唯讀快照。欄位刻意對齊 BAR-FEEL §1.2 的 telemetry frame schema ——
+ * ghost-replay 直接序列化這個結構，兩邊不要各定義一份。
+ */
 export interface SimSnapshot {
   tick: number;
-  kart: { pos: [number, number, number]; yaw: number };
+  /** 秒，= tick / TICK_HZ */
+  t: number;
+  kart: KartState;
+  lap: LapState;
+}
+
+export interface KartState {
+  pos: [number, number, number];
+  vel: [number, number, number];
+  /** norm(vel)，冗餘但方便驗證器 */
+  speed: number;
+  /** 弧度，[-π, π] */
+  yaw: number;
+  yawRate: number;
+  steerInput: number;
+  throttleInput: number;
+  driftState: 'none' | 'charging' | 'released';
+  /** [0, 1]，達 1 後不再累積 */
+  driftCharge: number;
+  driftTier: 0 | 1 | 2 | 3;
+  grounded: boolean;
+  surface: 'asphalt' | 'dirt' | 'grass' | 'boost';
+  /** 該 tick 的碰撞衝量，無碰撞為 0 */
+  collisionImpulse: number;
+}
+
+export interface LapState {
+  current: number;
+  total: number;
+  /** 本圈已用秒數 */
+  currentTime: number;
+  /** 最佳圈速，尚未完成任何一圈為 null */
+  bestTime: number | null;
+  /** 已完成圈數的時間，依序 */
+  splits: readonly number[];
 }
 
 /** Claude Code 實作。 */

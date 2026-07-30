@@ -41,6 +41,7 @@ class StubRenderer implements Renderer {
 
   draw(snap: SimSnapshot, alpha: number): void {
     const [x, y, z] = snap.kart.pos;
+    void snap.lap; // W1 stub 尚未畫 HUD；圈數由 src/ui/ 負責
     // alpha 只做視覺插值，絕不寫回模擬（ARCHITECTURE.md 約束二）
     const p = this.#prev;
     this.#kart.position.set(
