@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clay-kart.local/schema/verdict.schema.json",
+  "title": "VERDICT.json",
+  "description": "Critic 的唯一輸出。必須自我完備 — 下一輪 builder 在另一個工具裡，看不到任何前文。見 LOOP-OPS.md §3。",
+  "type": "object",
+  "required": [
+    "round",
+    "wave",
+    "element",
+    "verdict",
+    "bar_ref",
+    "checks",
+    "artifacts",
+    "next_owner",
+    "tokens_spent_on_element",
+    "budget_remaining"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "round": { "type": "integer", "minimum": 0 },
+    "wave": { "enum": ["W1", "W2", "W3", "W4"] },
+    "element": { "type": "string", "minLength": 1 },
+    "verdict": { "enum": ["PASS", "FAIL", "BUDGET_EXHAUSTED"] },
+    "bar_ref": {
+      "type": "string",
+      "description": "例：'BAR-FEEL.md §4'"
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "metric", "actual", "window", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "metric": { "type": "string" },
+          "actual": { "type": ["number", "boolean"] },
+          "window": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              { "type": "boolean" }
+            ]
+          },
+          "status": { "enum": ["PASS", "FAIL"] }
+        }
+      }
+    },
+    "largest_gap": {
+      "type": ["object", "null"],
+      "required": ["id", "delta", "priority_rank"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "delta": {
+          "type": "string",
+          "description": "人類可讀的落差描述。禁止包含實作建議。"
+        },
+        "priority_rank": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "next_owner": {
+      "enum": ["claude-code", "codex", "cursor", "lead"]
+    },
+    "tokens_spent_on_element": { "type": "integer", "minimum": 0 },
+    "budget_remaining": { "type": "integer" }
+  },
+  "allOf": [
+    {
+      "$comment": "verdict 為 FAIL 時必須有 largest_gap",
+      "if": { "properties": { "verdict": { "const": "FAIL" } } },
+      "then": {
+        "required": ["largest_gap"],
+        "properties": { "largest_gap": { "type": "object" } }
+      }
+    },
+    {
+      "$comment": "verdict 為 PASS 時 largest_gap 必須為 null 或缺席",
+      "if": { "properties": { "verdict": { "const": "PASS" } } },
+      "then": { "properties": { "largest_gap": { "type": "null" } } }
+    }
+  ]
+}

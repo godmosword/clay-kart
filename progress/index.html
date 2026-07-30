@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>clay-kart · progress</title>
+<style>
+  :root {
+    --bg: #14120f; --panel: #1e1b17; --line: #322d26;
+    --fg: #ede7dd; --dim: #9a8f80;
+    --ok: #7fb069; --fail: #d1655a; --busy: #d9a441; --idle: #5d5548;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f1ea; --panel: #fffdf9; --line: #e0d8cb;
+      --fg: #2a251e; --dim: #7a7062;
+      --ok: #4f7f38; --fail: #b04338; --busy: #a97812; --idle: #c4bbab;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 1.25rem;
+    background: var(--bg); color: var(--fg);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  }
+  h1 { font-size: 1.15rem; margin: 0 0 .25rem; letter-spacing: .02em; }
+  .sub { color: var(--dim); font-size: .82rem; margin-bottom: 1.25rem; }
+  section { margin-bottom: 1.75rem; }
+  h2 {
+    font-size: .74rem; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--dim); margin: 0 0 .6rem; font-weight: 600;
+  }
+  .grid { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 9px; padding: .8rem .9rem;
+  }
+  .card-top { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+  .tool { font-weight: 600; font-size: .95rem; }
+  .badge {
+    font-size: .65rem; text-transform: uppercase; letter-spacing: .07em;
+    padding: .16rem .45rem; border-radius: 4px; color: #14120f; font-weight: 700;
+    background: var(--idle); white-space: nowrap;
+  }
+  .badge[data-s="building"] { background: var(--busy); }
+  .badge[data-s="awaiting-critic"] { background: var(--busy); }
+  .badge[data-s="blocked"] { background: var(--fail); color: #fff; }
+  .badge[data-s="done"] { background: var(--ok); }
+  .meta { color: var(--dim); font-size: .78rem; margin-top: .45rem; }
+  .note { font-size: .82rem; margin-top: .35rem; }
+  .bars { display: grid; gap: .45rem; }
+  .bar-row { display: grid; grid-template-columns: minmax(120px, 1.4fr) 3fr minmax(90px, auto); gap: .6rem; align-items: center; font-size: .8rem; }
+  .bar-name { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .fill { height: 100%; background: var(--ok); border-radius: 4px; }
+  .fill.warn { background: var(--busy); }
+  .fill.over { background: var(--fail); }
+  .bar-num { color: var(--dim); font-variant-numeric: tabular-nums; text-align: right; font-size: .74rem; }
+  .wave-row { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .wave {
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: .35rem .7rem; font-size: .8rem; background: var(--panel);
+  }
+  .wave.active { border-color: var(--busy); color: var(--busy); font-weight: 600; }
+  .wave.done { border-color: var(--ok); color: var(--ok); }
+  .empty {
+    border: 1px dashed var(--line); border-radius: 8px;
+    padding: 1rem; color: var(--dim); font-size: .82rem;
+  }
+  .err {
+    border: 1px solid var(--fail); border-radius: 8px; padding: .85rem 1rem;
+    color: var(--fail); font-size: .84rem;
+  }
+  .err code { background: rgba(127,127,127,.14); padding: .1rem .3rem; border-radius: 3px; }
+  footer { color: var(--dim); font-size: .72rem; border-top: 1px solid var(--line); padding-top: .8rem; }
+</style>
+</head>
+<body>
+
+<h1>clay-kart</h1>
+<div class="sub">三工具協作 Gauntlet Loop · <span id="stamp">載入中…</span></div>
+
+<div id="fatal"></div>
+
+<section>
+  <h2>Wave</h2>
+  <div class="wave-row" id="waves"></div>
+</section>
+
+<section>
+  <h2>工具狀態</h2>
+  <div class="grid" id="tools"></div>
+</section>
+
+<section>
+  <h2>預算消耗</h2>
+  <div id="budget"></div>
+</section>
+
+<section>
+  <h2>W2 telemetry 曲線</h2>
+  <div class="empty">等 <code>tools/telemetry/ghost-replay</code> 產出第一份 telemetry JSON。</div>
+</section>
+
+<section>
+  <h2>W3 contact sheet 時間軸</h2>
+  <div class="empty">等 W3 第一張 contact sheet。<code>BAR-VISUAL.md §5</code> 未完成前不啟動。</div>
+</section>
+
+<footer>
+  30 秒自動刷新。<strong>不要中途打斷正在跑的 builder</strong> —— 要停就等該輪 commit 完再停。
+</footer>
+
+<script>
+const FILES = ['physics.json', 'visual.json', 'plumb.json'];
+const LABEL = { 'claude-code': 'Claude Code', 'codex': 'Codex', 'cursor': 'Cursor' };
+
+async function getJSON(p) {
+  const r = await fetch(p + '?t=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error(p + ' → HTTP ' + r.status);
+  return r.json();
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function renderWaves(states) {
+  const box = document.getElementById('waves');
+  box.replaceChildren();
+  const current = states.map(s => s.wave).filter(Boolean).sort()[0] || 'W1';
+  for (const w of ['W1', 'W2', 'W3', 'W4']) {
+    const n = el('div', 'wave', w + ' · ' + ({ W1: '骨架', W2: '手感', W3: '視覺', W4: '內容' })[w]);
+    if (w === current) n.classList.add('active');
+    else if (w < current) n.classList.add('done');
+    box.appendChild(n);
+  }
+}
+
+function renderTools(states) {
+  const box = document.getElementById('tools');
+  box.replaceChildren();
+  for (const s of states) {
+    const c = el('div', 'card');
+    const top = el('div', 'card-top');
+    top.append(el('div', 'tool', LABEL[s.tool] || s.tool));
+    const b = el('span', 'badge', s.status || 'idle');
+    b.dataset.s = s.status || 'idle';
+    top.append(b);
+    c.append(top);
+
+    const bits = [s.wave, 'R' + (s.round ?? 0), s.element || '—'];
+    if (s.last_verdict) bits.push(s.last_verdict);
+    c.append(el('div', 'meta', bits.join(' · ')));
+    if (s.note) c.append(el('div', 'note', s.note));
+    c.append(el('div', 'meta', s.branch + ' · ' + (s.updated ? s.updated.replace('T', ' ').replace('Z', '') : '—')));
+    box.append(c);
+  }
+}
+
+function renderBudget(budget) {
+  const box = document.getElementById('budget');
+  box.replaceChildren();
+  for (const wave of ['W2', 'W3']) {
+    const group = budget[wave];
+    if (!group) continue;
+    box.append(el('h2', null, wave));
+    const bars = el('div', 'bars');
+    for (const [name, v] of Object.entries(group)) {
+      if (name.startsWith('$') || !v || typeof v !== 'object' || v.cap == null) continue;
+      const pct = Math.min(100, (v.spent / v.cap) * 100);
+      const row = el('div', 'bar-row');
+      row.append(el('div', 'bar-name', name));
+      const track = el('div', 'track');
+      const fill = el('div', 'fill');
+      fill.style.width = pct + '%';
+      if (pct >= 100) fill.classList.add('over');
+      else if (pct >= 75) fill.classList.add('warn');
+      track.append(fill);
+      row.append(track);
+      row.append(el('div', 'bar-num', Math.round(v.spent / 1000) + 'k / ' + Math.round(v.cap / 1000) + 'k'));
+      bars.append(row);
+    }
+    box.append(bars);
+  }
+}
+
+async function refresh() {
+  const fatal = document.getElementById('fatal');
+  try {
+    const [budget, ...states] = await Promise.all([
+      getJSON('../loop/budget.json'),
+      ...FILES.map(getJSON)
+    ]);
+    fatal.replaceChildren();
+    renderWaves(states);
+    renderTools(states);
+    renderBudget(budget);
+    document.getElementById('stamp').textContent = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+  } catch (e) {
+    const box = el('div', 'err');
+    box.append(el('strong', null, '讀取失敗：'));
+    box.append(document.createTextNode(' ' + e.message));
+    const hint = el('div');
+    hint.style.marginTop = '.5rem';
+    hint.innerHTML = '<code>file://</code> 下 fetch 會被 CORS 擋掉，且 <code>budget.json</code> 在上層目錄。'
+      + '請從 repo 根目錄起靜態伺服器：<br><code>python3 -m http.server 8080</code> '
+      + '然後開 <code>http://localhost:8080/progress/</code>';
+    box.append(hint);
+    fatal.replaceChildren(box);
+  }
+}
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

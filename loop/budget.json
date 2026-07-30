@@ -1,0 +1,33 @@
+{
+  "$comment": "Builder 每輪結束後更新 spent。撞到 cap 見 LOOP-OPS.md §6。單位為 token。",
+  "W1": {
+    "$comment": "W1 不跑 loop，不設 cap。達成即進 W2。",
+    "physics-loop": { "cap": null, "spent": 0 },
+    "project-skeleton": { "cap": null, "spent": 0 },
+    "minimal-render": { "cap": null, "spent": 0 }
+  },
+  "W2": {
+    "sim-determinism": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §2" },
+    "acceleration-curve": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §3" },
+    "drift-miniturbo": { "cap": 400000, "spent": 0, "bar": "BAR-FEEL §4" },
+    "steering-grip": { "cap": 250000, "spent": 0, "bar": "BAR-FEEL §5" },
+    "collision-response": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §6" },
+    "airborne-landing": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §7" },
+    "input-feedback": { "cap": 100000, "spent": 0, "bar": "BAR-FEEL §8" }
+  },
+  "W3": {
+    "$comment": "Opus + ultracode，單位成本遠高於 W2。cap 較低是刻意的。",
+    "kart-body": { "cap": 250000, "spent": 0 },
+    "kart-wheels": { "cap": 150000, "spent": 0 },
+    "driver-character": { "cap": 250000, "spent": 0 },
+    "track-surface": { "cap": 200000, "spent": 0 },
+    "track-barriers": { "cap": 150000, "spent": 0 },
+    "foliage": { "cap": 150000, "spent": 0 },
+    "skybox-lighting": { "cap": 200000, "spent": 0 },
+    "drift-sparks": { "cap": 150000, "spent": 0 },
+    "item-boxes": { "cap": 120000, "spent": 0 },
+    "shadows-contact": { "cap": 180000, "spent": 0 },
+    "water-hazard": { "cap": 120000, "spent": 0 },
+    "ui-hud": { "cap": 120000, "spent": 0 }
+  }
+}

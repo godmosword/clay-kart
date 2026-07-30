@@ -1,0 +1,12 @@
+{
+  "tool": "claude-code",
+  "worktree": "../ck-visual",
+  "branch": "feat/visual",
+  "updated": "2026-07-30T00:00:00Z",
+  "wave": "W1",
+  "round": 0,
+  "element": null,
+  "status": "idle",
+  "last_verdict": null,
+  "note": "等待 W1 步驟 3：最小可用渲染、一台方塊車"
+}

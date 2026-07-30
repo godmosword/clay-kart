@@ -1,0 +1,12 @@
+{
+  "tool": "codex",
+  "worktree": "../ck-physics",
+  "branch": "feat/physics",
+  "updated": "2026-07-30T00:00:00Z",
+  "wave": "W1",
+  "round": 0,
+  "element": null,
+  "status": "idle",
+  "last_verdict": null,
+  "note": "等待 W1 步驟 1：固定 tick 物理迴圈、碰撞、賽道 collider"
+}
