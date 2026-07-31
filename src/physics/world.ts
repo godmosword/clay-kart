@@ -2,17 +2,14 @@
  * Deterministic W1 kart simulation.
  *
  * This module deliberately contains no rendering or browser dependencies.  The
- * track is an annular collider: the kart's centre is guided around its asphalt
- * lane when no steering input is supplied, while steering can move it toward
- * either boundary.  The guide is useful during W1 because the bootstrap has no
- * input device yet; callers can use setInput() for headless and future UI input.
+ * track is an annular collider.  The kart is integrated freely in world space;
+ * steering is the only source of yaw, so a released steering input really does
+ * settle to zero.  Callers can use setInput() for headless and future UI input.
  */
 import type { KartState, LapState, SimSnapshot, SimWorld } from '@loader/bootstrap';
+import { BASE_TOP_SPEED, CAR_LENGTH, CAR_WIDTH } from './constants.js';
 
-const TICK_HZ = 120;
-const TICK_DT = 1 / TICK_HZ;
 const TOTAL_LAPS = 3;
-const BASE_TOP_SPEED = 24;
 const REVERSE_TOP_SPEED = BASE_TOP_SPEED * 0.4;
 const ENGINE_ACCELERATION = 16.5;
 const COAST_DECELERATION = 5.2;
@@ -22,8 +19,6 @@ const JUMP_SPEED = 10;
 const TRACK_RADIUS = 30;
 const TRACK_CENTER_Z = 30;
 const TRACK_HALF_WIDTH = 6;
-const CAR_LENGTH = 2.4;
-const CAR_WIDTH = 1.4;
 const KART_BOUNDING_RADIUS = Math.hypot(CAR_LENGTH / 2, CAR_WIDTH / 2);
 const INNER_COLLISION_RADIUS = TRACK_RADIUS - TRACK_HALF_WIDTH + KART_BOUNDING_RADIUS;
 const OUTER_COLLISION_RADIUS = TRACK_RADIUS + TRACK_HALF_WIDTH - KART_BOUNDING_RADIUS;
@@ -67,14 +62,9 @@ function wrapAngle(angle: number): number {
   return wrapped < 0 ? wrapped + Math.PI * 2 : wrapped;
 }
 
-function yawForTrackAngle(angle: number): number {
-  // The track is x = R cos(a), z = C + R sin(a), so its forward tangent is
-  // (-sin(a), cos(a)) in the x/z plane.
-  return Math.atan2(-Math.sin(angle), Math.cos(angle));
-}
-
 class World implements PhysicsWorld {
   #tick = 0;
+  #fixedDt: number | null = null;
   #x = TRACK_RADIUS;
   #y = 0;
   #z = TRACK_CENTER_Z;
@@ -121,34 +111,33 @@ class World implements PhysicsWorld {
   }
 
   step(dt: number): void {
-    if (dt !== TICK_DT) {
-      throw new RangeError(`World.step() requires TICK_DT (${TICK_DT}), got ${dt}`);
+    if (!Number.isFinite(dt) || dt <= 0) {
+      throw new RangeError(`World.step() requires a positive fixed dt, got ${dt}`);
     }
+    if (this.#fixedDt === null) this.#fixedDt = dt;
+    if (dt !== this.#fixedDt) {
+      throw new RangeError(`World.step() requires a fixed dt (${this.#fixedDt}), got ${dt}`);
+    }
+    const fixedDt = this.#fixedDt;
 
     this.#tick += 1;
     this.#collisionImpulse = 0;
 
-    this.#stepVertical(TICK_DT);
+    this.#stepVertical(fixedDt);
 
     const oldForwardX = Math.sin(this.#yaw);
     const oldForwardZ = Math.cos(this.#yaw);
     const oldLongitudinalSpeed = this.#vx * oldForwardX + this.#vz * oldForwardZ;
-    this.#stepYaw(TICK_DT, oldLongitudinalSpeed);
-    this.#stepDrive(TICK_DT);
-    this.#stepPosition(TICK_DT);
-    this.#resolveTrackCollision();
+    this.#stepYaw(fixedDt, oldLongitudinalSpeed);
+    this.#stepDrive(fixedDt);
+    this.#stepPosition(fixedDt);
+    this.#resolveTrackCollision(fixedDt);
 
-    // The no-input path is an assisted W1 drive so the skeleton can be
-    // inspected without a controller.  Explicit steering opts out and gives
-    // the caller the full collider response.
-    if (Math.abs(this.#steer) < 0.0001 && this.#grounded) {
-      this.#followTrackCentreline();
-    }
-
-    this.#updateLapState();
+    this.#updateLapState(fixedDt);
   }
 
   snapshot(): SimSnapshot {
+    const fixedDt = this.#fixedDt ?? 0;
     const speed = Math.hypot(this.#vx, this.#vy, this.#vz);
     const kart: KartState = {
       pos: [this.#x, this.#y, this.#z],
@@ -167,7 +156,7 @@ class World implements PhysicsWorld {
     };
     const lapTime = this.#finished
       ? this.#splits[this.#splits.length - 1] ?? 0
-      : (this.#tick - this.#lapStartTick) / TICK_HZ;
+      : (this.#tick - this.#lapStartTick) * fixedDt;
     const lap: LapState = {
       current: this.#currentLap,
       total: TOTAL_LAPS,
@@ -175,7 +164,7 @@ class World implements PhysicsWorld {
       bestTime: this.#bestTime,
       splits: this.#splits.slice(),
     };
-    return { tick: this.#tick, t: this.#tick / TICK_HZ, kart, lap };
+    return { tick: this.#tick, t: this.#tick * fixedDt, kart, lap };
   }
 
   #stepVertical(dt: number): void {
@@ -201,11 +190,10 @@ class World implements PhysicsWorld {
   }
 
   #stepYaw(dt: number, longitudinalSpeed: number): void {
-    const trackRate = -longitudinalSpeed / TRACK_RADIUS;
     const speedRatio = clamp(Math.abs(longitudinalSpeed) / BASE_TOP_SPEED, 0, 1);
     const controlRatio = this.#grounded ? 1 : AIR_CONTROL_RATIO;
     const steeringRate = this.#steer * MAX_STEER_YAW_RATE * speedRatio * controlRatio;
-    this.#yawRate = trackRate + steeringRate;
+    this.#yawRate = steeringRate;
     this.#yaw = wrapAngle(this.#yaw + this.#yawRate * dt);
     if (this.#yaw > Math.PI) this.#yaw -= Math.PI * 2;
   }
@@ -215,8 +203,10 @@ class World implements PhysicsWorld {
     const forwardZ = Math.cos(this.#yaw);
     const lateralX = Math.cos(this.#yaw);
     const lateralZ = -Math.sin(this.#yaw);
+    const previousGroundSpeed = Math.hypot(this.#vx, this.#vz);
     let longitudinalSpeed = this.#vx * forwardX + this.#vz * forwardZ;
     const lateralSpeed = this.#vx * lateralX + this.#vz * lateralZ;
+    let targetGroundSpeed: number | null = null;
 
     if (this.#brake) {
       longitudinalSpeed = moveTowardZero(longitudinalSpeed, BRAKE_DECELERATION * dt);
@@ -226,11 +216,19 @@ class World implements PhysicsWorld {
         const reverseAcceleration = ENGINE_ACCELERATION * (1 - reverseRatio * reverseRatio);
         longitudinalSpeed -= reverseAcceleration * this.#throttle * dt;
         longitudinalSpeed = Math.max(-REVERSE_TOP_SPEED, longitudinalSpeed);
+        targetGroundSpeed = Math.min(
+          REVERSE_TOP_SPEED,
+          previousGroundSpeed + reverseAcceleration * this.#throttle * dt,
+        );
       } else {
         const forwardRatio = clamp(Math.max(0, longitudinalSpeed) / BASE_TOP_SPEED, 0, 1);
         const forwardAcceleration = ENGINE_ACCELERATION * (1 - forwardRatio * forwardRatio);
         longitudinalSpeed += forwardAcceleration * this.#throttle * dt;
         longitudinalSpeed = Math.min(BASE_TOP_SPEED, longitudinalSpeed);
+        targetGroundSpeed = Math.min(
+          BASE_TOP_SPEED,
+          previousGroundSpeed + forwardAcceleration * this.#throttle * dt,
+        );
       }
     } else {
       longitudinalSpeed = moveTowardZero(longitudinalSpeed, COAST_DECELERATION * dt);
@@ -239,6 +237,16 @@ class World implements PhysicsWorld {
     const lateralRetention = Math.max(0, 1 - LATERAL_GRIP * dt);
     this.#vx = forwardX * longitudinalSpeed + lateralX * lateralSpeed * lateralRetention;
     this.#vz = forwardZ * longitudinalSpeed + lateralZ * lateralSpeed * lateralRetention;
+
+    // Turning creates a small lateral component.  Keep engine acceleration
+    // tied to total ground speed so a valid racing line does not lose top speed
+    // merely because the velocity vector is no longer parallel to the kart.
+    const groundSpeed = Math.hypot(this.#vx, this.#vz);
+    if (targetGroundSpeed !== null && groundSpeed > 0) {
+      const scale = targetGroundSpeed / groundSpeed;
+      this.#vx *= scale;
+      this.#vz *= scale;
+    }
   }
 
   #stepPosition(dt: number): void {
@@ -246,7 +254,7 @@ class World implements PhysicsWorld {
     this.#z += this.#vz * dt;
   }
 
-  #resolveTrackCollision(): void {
+  #resolveTrackCollision(dt: number): void {
     const dx = this.#x;
     const dz = this.#z - TRACK_CENTER_Z;
     const radius = Math.hypot(dx, dz);
@@ -283,7 +291,7 @@ class World implements PhysicsWorld {
       this.#vz = tangentZ * tangentSpeed + normalZ * reflectedNormalSpeed;
       this.#collisionImpulse = Math.abs(towardBoundary - reflectedNormalSpeed);
     } else {
-      this.#collisionImpulse = penetration / TICK_DT;
+      this.#collisionImpulse = penetration / dt;
       // A penetrating pose with no outward velocity is still corrected above;
       // preserve its tangential motion rather than letting the wall trap it.
       this.#vx = tangentX * tangentSpeed + normalX * normalSpeed;
@@ -291,27 +299,7 @@ class World implements PhysicsWorld {
     }
   }
 
-  #followTrackCentreline(): void {
-    const dx = this.#x;
-    const dz = this.#z - TRACK_CENTER_Z;
-    const radius = Math.hypot(dx, dz);
-    if (radius < 0.000001) return;
-
-    const angle = Math.atan2(dz, dx);
-    const normalX = Math.cos(angle);
-    const normalZ = Math.sin(angle);
-    const tangentX = -normalZ;
-    const tangentZ = normalX;
-    const trackSpeed = this.#vx * tangentX + this.#vz * tangentZ;
-    this.#x = TRACK_RADIUS * normalX;
-    this.#z = TRACK_CENTER_Z + TRACK_RADIUS * normalZ;
-    this.#vx = tangentX * trackSpeed;
-    this.#vz = tangentZ * trackSpeed;
-    this.#yaw = yawForTrackAngle(angle);
-    this.#yawRate = -trackSpeed / TRACK_RADIUS;
-  }
-
-  #updateLapState(): void {
+  #updateLapState(dt: number): void {
     const angle = wrapAngle(Math.atan2(this.#z - TRACK_CENTER_Z, this.#x));
     const crossedStartLine = this.#hasLeftStartLine
       && this.#trackAngle >= START_LINE_RETURN_ANGLE
@@ -322,7 +310,7 @@ class World implements PhysicsWorld {
     }
 
     if (crossedStartLine && !this.#finished && this.#currentLap <= TOTAL_LAPS) {
-      const lapTime = (this.#tick - this.#lapStartTick) / TICK_HZ;
+      const lapTime = (this.#tick - this.#lapStartTick) * dt;
       this.#splits.push(lapTime);
       if (this.#bestTime === null || lapTime < this.#bestTime) {
         this.#bestTime = lapTime;
