@@ -6,11 +6,15 @@
  * 兩者在此處以介面接起來，見 src/loader/bootstrap.ts。
  */
 import { bootstrap } from '@loader/bootstrap';
+import { createPlayerInput } from '@ui/player-input';
 
 const mount = document.getElementById('app');
 if (!mount) throw new Error('找不到 #app 掛載點');
 
-bootstrap(mount).catch((err: unknown) => {
+const input = createPlayerInput(mount);
+
+bootstrap(mount, input).catch((err: unknown) => {
   console.error('[clay-kart] bootstrap 失敗', err);
   mount.textContent = '啟動失敗，見 console。';
+  input.dispose();
 });
