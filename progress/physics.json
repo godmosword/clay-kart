@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-07-31T02:00:00Z",
+  "updated": "2026-07-31T03:00:00Z",
   "wave": "W1",
-  "round": 1,
+  "round": 2,
   "element": "physics-loop",
-  "status": "done",
+  "status": "building",
   "last_verdict": "PASS",
-  "note": "R1 四項落差完成（commit 4f95c13）：移除隱含賽道曲率與中心線貼齊、loader dt 單一來源並鎖定固定步長、加入 tools/validate/w1-physics.mjs。typecheck/build、三次 byte-identical replay、碰撞/圈計時/§3 回歸均通過。"
+  "note": "R2 落差一完成（commit 888f580）：在 src/physics/constants.ts 公開 TRACK_GEOMETRY 與 TRACK_RADIUS/TRACK_CENTER_Z/TRACK_HALF_WIDTH，world 碰撞由同一來源推導；渲染器可從 @physics/constants 取得賽道本體幾何。node tools/validate/w1-physics.mjs、typecheck/build 通過。落差二待處理。"
 }
