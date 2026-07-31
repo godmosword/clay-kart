@@ -28,32 +28,38 @@ Babylon 內建物理較強，但我們本來就要自己寫決定性物理，用
 ## 約束二：固定步長，單向資料流
 
 ```
-input → world.step(TICK_DT) → snapshot() → renderer.draw(snap, alpha)
+InputSource.poll() → world.setInput() → world.step(TICK_DT) → snapshot() → renderer.draw(snap, alpha)
 ```
 
 - `step()` 的 dt 恆為 `TICK_DT`（1/120 s），不接受可變步長
+- `setInput()` 必須在每個 `step()` 之前恰好呼叫一次，取樣點在 tick 邊界不在動畫幀
 - `draw()` 的 `alpha` 只供視覺插值，**不得寫回模擬**
 - 渲染層對 snapshot 唯讀
+- `advance(world, ticks, poll)` 是共用的 tick 驅動函式——瀏覽器迴圈與
+  `tools/telemetry/ghost-replay` 都要用它，不要各自重寫，否則兩份實作
+  遲早漂移（症狀是手感在窗口邊緣震盪）
 
-介面定義在 [src/loader/bootstrap.ts](src/loader/bootstrap.ts)。
+介面定義在 [src/contract/sim.ts](src/contract/sim.ts)（**Lead 專屬**）。
+[src/loader/bootstrap.ts](src/loader/bootstrap.ts) 只保留執行迴圈，
+從 `@contract/sim` re-export 型別以維持既有 import 路徑不變。
 
 ## 約束三：寫入範圍
 
 | 路徑 | 工具 | 分支 |
 |---|---|---|
+| `src/contract/` | **Lead** | — |
 | `src/physics/`, `src/ai/`, `tools/` | Codex | `feat/physics` |
 | `src/render/`, `src/characters/`, `src/vfx/` | Claude Code | `feat/visual` |
 | `src/ui/`, `src/loader/`, `build/` | Cursor | `feat/plumb` |
 
 可讀全部，只能寫自己的。違反即 revert。
 
-## 目前缺口
+## 現況（2026-08-01 更新）
 
-`bootstrap.ts` 動態 import 兩個尚不存在的模組：
+W1 骨架已完成，`@physics/world` 與 `@render/renderer` 皆已由各自工具實作
+（不再是 stub）。`npm run typecheck`、`npm run build` 皆 exit 0。
 
-- `@physics/world` → `createWorld(): SimWorld` — **Codex 待實作**
-- `@render/renderer` → `createRenderer(mount): Renderer` — **Claude Code 待實作**
-
-兩者到位前 `npm run dev` 會在 console 報 bootstrap 失敗，這是預期行為。
-`npm run typecheck` 與 `npm run build` 在缺口存在時也會失敗 —— 這是刻意的，
-讓「還沒接上」是一個編譯期事實，而不是執行期才發現。
+當初留這節是為了說明一個設計不變量：兩個模組缺任何一個，
+`typecheck`／`build` 就該失敗——讓「還沒接上」是編譯期事實，
+不是執行期才發現。這條不變量現在仍然成立（拔掉任一實作重新試就知道），
+只是目前兩者都已到位，缺口本身不存在了。

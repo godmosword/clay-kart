@@ -24,6 +24,33 @@
 
 ## 待裁決
 
+### W2 觀察：SimSnapshot 目前只支援單車
+- **輪次**：R2 架構審查發現
+- **現況**：`SimSnapshot.kart` 是單數欄位，不是陣列
+- **目標**：`BAR-FEEL §7`／`loop/PLAN.md` W2 第 8 元件 `ai-opponents` 需要多車
+- **落差**：AI 對手需要跑同一份物理，`kart: KartState` 撐不住
+- **為什麼不現在改**：`ai-opponents` 排在 W2 優先序最後，中間七個元件
+  （sim-determinism 到 input-feedback）都是在單車 shape 上調物理數值。
+  把 `kart` 包成 `karts: readonly KartState[]` 是純結構包裝，不牽動物理邏輯，
+  現在做跟等到 `ai-opponents` 開工前做，成本一樣——沒有隨時間複利的代價
+- **狀態**：已排入，觸發點＝`ai-opponents` 元件開工前
+
+### 外部架構審查的三項欄位建議 —— 已核實，兩項採納一項駁回
+- **輪次**：R2 架構審查
+- **收到的建議**：`SimSnapshot` 該有 `topSpeedRatio`、`boostActive`、`boostSource`；
+  `surface`／`state` 的 enum 值域跟 `BAR-FEEL §1.2` 不一致（含 `spinout`）
+- **核實過程**：對整份 `BAR-FEEL.md` 執行 `grep -in spin`，零筆命中；
+  比對 §1.2 的 `surface` 值域（`asphalt|dirt|grass|boost`）與 `KartState.surface`，
+  **逐字相同**；§1.2 沒有任何 `state`（非 `drift_state`）欄位
+- **結論**：`surface`／`state`／`spinout` 的不一致**不存在於這個 repo**，
+  審查描述的內容對應不到任何實際檔案，判定為 fabricated，未採納，
+  `BAR-FEEL.md` 未改動
+- **`topSpeedRatio`**：未採納。`speed / BASE_TOP_SPEED` 在 validator 端就能算，
+  不必存進 telemetry，加了是多一份要保持同步的冗餘資料
+- **`boostActive`/`boostSource`**：未採納。對應道具箱加速，屬 W4 範圍，
+  `BAR-FEEL` 目前沒有任何相關窗口定義，現在加等於臆測未規格化的東西
+- **狀態**：已裁決，不採納，記錄於此避免同樣的建議被重新提出時要重查一次
+
 ### W2 觀察：穩態轉彎完全不損速
 - **輪次**：R1 審查發現
 - **現況**：直線與全鎖轉向的穩態速度都是 24.00，保留率 `1.0000`。
@@ -64,6 +91,31 @@
 ---
 
 ## 已裁決
+
+### ~~契約缺輸入路徑、歸屬混在 Cursor 目錄、tick 迴圈可能被重寫兩次~~ — 已修
+- **輪次**：R2 架構審查
+- **核實**：`bootstrap.ts:84` 的 `const world: SimWorld = createWorld()` 把型別窄化，
+  `SimWorld` 沒宣告 `setInput`，Cursor 就算想接線也過不了 typecheck——比審查原本說的
+  「完全沒有路徑」更精確：Codex 在 R1 已經做出 `setInput()` 且驗證過決定性，
+  缺的是契約沒把它收進來
+- **處置**：
+  1. 新增 `src/contract/sim.ts`（Lead 專屬），`SimWorld` 正式納入 `setInput`
+  2. `bootstrap.ts` 瘦身為純執行迴圈，型別從 `@contract/sim` re-export，
+     `src/physics/world.ts`／`src/render/renderer.ts` 零改動（結構化型別，驗證過 build 通過）
+  3. 新增共用 `advance(world, ticks, poll)`，瀏覽器迴圈與未來的 ghost-replay
+     共用同一份 tick 驅動邏輯，避免兩份實作漂移（症狀是手感在窗口邊緣震盪）
+  4. `bootstrap()` 新增 `InputSource` 參數，預設 no-op，Cursor 只需實作
+     `poll(tick): WorldInput` 並在 `main.ts` 傳入——`TASK-cursor.md` 已同步更新，
+     原本的「兩個型別／契約問題」章節已解決，三條硬性約束簡化為兩條
+  5. `ARCHITECTURE.md`「目前缺口」章節是過期內容（寫著 `@physics/world`／
+     `@render/renderer` 待實作，但兩者 R1/R2 已完成），已更新為現況並修正約束二/三
+  6. `LOOP-OPS.md` §2 補一筆實作偏離，說明 `src/contract/` 為何不屬於
+     手冊原本三方寫入範圍表的任何一格
+- **拒絕的部分**：審查建議把 `step(dt)` 改成 `step(dt, input)`，
+  會強迫 Codex 重寫並重新驗證 R1 已通過的 `setInput()` 設計，
+  换來的架構純度提升不值得那個成本——兩種呼叫慣例在「輸入於 tick 邊界進入」
+  這件事上是等價的，維持既有可行、已驗證的設計
+- **驗證**：main 上 `typecheck`／`build` exit 0，`tools/validate/w1-physics.mjs` 仍 PASS
 
 ### ~~輸入來源沒有接線，車不可操控~~ — 已指派
 - **原記錄（R1）**：`setInput()` 無呼叫端，Lead 拆 W1 時沒指派歸屬
