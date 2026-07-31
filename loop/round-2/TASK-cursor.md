@@ -16,56 +16,53 @@
 
 ## 落差 — 車子無法操控
 
-**現況：** `src/physics/world.ts` 匯出 `setInput(input: WorldInput)`，
-但全 repo 沒有任何呼叫端。`src/loader/bootstrap.ts` 的主迴圈只呼叫 `step()` 與 `snapshot()`。
-車子以預設 `throttle = 1, steer = 0` 自己跑。
+**現況（已更新，2026-08-01）：** 一份獨立的架構審查發現 `SimWorld` 契約沒有
+`setInput` 的合法路徑，`bootstrap.ts` 的 `const world: SimWorld` 型別窄化後
+連呼叫都無法 typecheck。Lead 已經修好這個契約洞，**不需要你處理**：
+
+- `src/contract/sim.ts`（新檔案，Lead 專屬）現在的 `SimWorld` 介面正式包含
+  `setInput(input: WorldInput): void`
+- `bootstrap()` 現在簽名是 `bootstrap(mount, inputSource?: InputSource)`，
+  `InputSource` 只有一個方法：`poll(tickIndex: number): WorldInput`
+- 主迴圈已經在每個 `step()` 之前呼叫 `inputSource.poll()` 並餵給 `setInput()`，
+  用的是共用的 `advance(world, ticks, poll)`（也在 `src/contract/sim.ts`）
+- 沒有傳 `inputSource` 時預設 no-op（`poll: () => ({})`），行為與現在完全一樣
+  （車子維持 `throttle=1, steer=0` 直行），不會改變任何既有驗證結果
+
+**你要做的縮小成：** 實作一個真正讀鍵盤／觸控的 `InputSource`，
+在 `src/main.ts` 建立它並傳給 `bootstrap(mount, yourInputSource)`。
 
 **目標：** `loop/PLAN.md` 的 W1 完成條件是「**可玩**骨架」。玩家要能實際駕駛。
 
-**落差：** 目前沒有任何輸入來源。
+---
+
+## 兩個約束（已被契約保證，你只需要遵守介面）
+
+### 約束一：不要繞過 InputSource 直接呼叫 setInput
+
+`poll(tickIndex)` 每個 tick 恰好被呼叫一次、在 `step()` 之前——這是 `advance()`
+保證的，不是你要自己確保的事。你只要把「讀鍵盤/觸控的當下狀態」寫進 `poll()`
+回傳的 `WorldInput` 裡，取樣時機已經對了。
+
+**不要**在鍵盤事件監聽器裡直接呼叫 `world.setInput()`——那樣會在動畫幀而非
+tick 邊界取樣，決定性就沒了。`poll()` 應該只讀一個你自己維護的「目前按鍵狀態」
+物件，不做任何有副作用的事。
+
+### 約束二：可被固定序列取代
+
+`InputSource` 只是一個介面。你的鍵盤/觸控實作是一種 `InputSource`；
+W2 的 ghost-replay 會用讀 fixture JSON 的另一種 `InputSource`（那是 Codex 的事，
+不需要你先做什麼特別的事來「支援」它——介面天生就支援，只要你別讓鍵盤讀取邏輯
+跟 `poll()` 的回傳值耦合成「只能從真實 DOM 事件觸發」）。
 
 ---
 
-## 三個硬性約束
+## 一個型別問題你仍要處理
 
-這三條不是風格建議。違反其中任何一條，W2 的整套驗收會垮。
-
-### 約束一：輸入必須可被錄製與重播取代
-
-W2 的 `tools/telemetry/ghost-replay`（`CODEX.md §5`）要在 **Node 裡 headless 重播**
-一份固定輸入序列，且**同輸入跑三次輸出必須 byte-identical**。
-
-所以輸入不能是「鍵盤事件直接呼叫 `setInput`」這種寫死的形式。
-必須讓「即時鍵盤／觸控」與「錄好的固定序列」是可互換的兩種來源。
-
-**這是本輪最重要的一條。** 做錯的話 W2 開場第一件事就得回頭重做。
-
-### 約束二：輸入取樣點在固定 tick，不在動畫幀
-
-主迴圈是固定步長 accumulator：一個動畫幀可能跑 0 個、1 個或多個 `step()`。
-若在動畫幀取樣輸入，同一份操作在不同幀率下會產生不同的模擬結果，決定性就沒了。
-
-輸入必須在每個 `step()` 之前、以每 tick 一次的方式進入模擬。
-
-### 約束三：不得破壞既有的固定步長契約
-
-`src/loader/bootstrap.ts` 目前的 accumulator 與 `MAX_TICKS_PER_FRAME` 保護不要動。
-`world.step()` 會鎖定它收到的第一個 `dt`，之後傳不同值會拋 `RangeError`。
-
----
-
-## 兩個型別／契約問題
-
-**1.** `bootstrap.ts:84` 目前是：
-
-```ts
-const world: SimWorld = createWorld();
-```
-
-`SimWorld` 沒有 `setInput`，那在 `PhysicsWorld` 上。這行在你的範圍內，自己處理。
-
-**2.** `WorldInput` 的欄位是 optional，**未提供的欄位保留前值**。
-這對「按住」語意是方便的，對「錄製重播」則需要想清楚每 tick 要送什麼。
+`WorldInput` 的欄位是 optional，**未提供的欄位保留前值**。
+這對「按住」語意是方便的（`poll()` 回傳 `{}` 就是「維持前一個 tick 的輸入」），
+但代表你維護按鍵狀態時，放開某鍵要明確送 `steer: 0` 或 `throttle: 0`，
+不能只是「不再送這個欄位」——那不會歸零，會維持上一次的值。
 
 ---
 
@@ -97,12 +94,13 @@ const world: SimWorld = createWorld();
 
 - [ ] 鍵盤可駕駛：加速、煞車、轉向、倒車、跳躍
 - [ ] 觸控可駕駛（iPad Safari）
-- [ ] 輸入來源可被固定序列取代，且該路徑不需要瀏覽器
-- [ ] 同一份固定輸入序列跑三次，模擬輸出 byte-identical
-- [ ] 主迴圈仍是固定步長，`MAX_TICKS_PER_FRAME` 保護仍在
+- [ ] 你的 `InputSource` 實作只讀狀態、不繞過 `poll()` 直接呼叫 `setInput`
+- [ ] 放開按鍵會正確歸零（不是停止傳送該欄位）
+- [ ] 主迴圈仍是固定步長，`MAX_TICKS_PER_FRAME` 保護仍在（你不需要動 `bootstrap.ts` 的迴圈本體）
 - [ ] `npm run typecheck`、`npm run build` 皆 exit 0
 - [ ] `npm run dev` 起得來，車子能被玩家開完三圈
-- [ ] harness 可用 npm script 執行且仍 PASS
+- [ ] harness 可用 npm script 執行且仍 PASS（`node tools/validate/w1-physics.mjs` 目前已 PASS，
+      確認你的改動沒有破壞它——它直接呼叫 `world.setInput()`，不經過 `InputSource`）
 
 ## 不要做
 

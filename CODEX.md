@@ -57,21 +57,37 @@
 
 ## §3 你要實作的介面
 
-定義在 `src/loader/bootstrap.ts`（唯讀，那是 Cursor 的範圍）。
+定義在 `src/contract/sim.ts`（**唯讀，Lead 專屬**，一旦穩定即列入 `FROZEN.md`）。
+`src/loader/bootstrap.ts`（Cursor 的範圍）從那裡 re-export，import 路徑不變。
+
 `SimSnapshot` 的欄位**刻意對齊 `BAR-FEEL.md §1.2` 的 telemetry frame schema** ——
 ghost-replay 直接序列化這個結構，不要另外定義一份。
 
 ```ts
+export interface WorldInput {
+  throttle?: number;  // 未提供的欄位保留前值
+  steer?: number;
+  brake?: boolean;
+  reverse?: boolean;
+  jump?: boolean;
+}
+
 export interface SimWorld {
-  step(dt: number): void;     // dt 恆為 TICK_DT
-  snapshot(): SimSnapshot;    // 唯讀快照
+  setInput(input: WorldInput): void;  // 每個 step() 之前恰好呼叫一次
+  step(dt: number): void;             // dt 恆為 TICK_DT
+  snapshot(): SimSnapshot;            // 唯讀快照，每次呼叫回傳新物件
 }
 ```
 
 `export function createWorld(): SimWorld` 於 `src/physics/world.ts`。
 現在那裡有一個 stub（等速直線前進），**取代它**。
 
-需要擴充 `SimSnapshot` 時：**不要自己改 `src/loader/`**。
+**§5 的 ghost-replay 要用 `src/contract/sim.ts` 匯出的 `advance(world, ticks, poll)`
+驅動 tick，不要自己重寫迴圈。** 瀏覽器路徑（`bootstrap.ts`）已經在用它。
+兩邊各寫一份 tick 驅動邏輯，遲早會漂移，症狀是「手感在窗口邊緣震盪」——
+那種 bug 長得像數值問題，實際是驅動邏輯不一致，很難查。
+
+需要擴充 `SimSnapshot` 時：**不要自己改 `src/contract/`**。
 寫進 `loop/BACKLOG.md` 說明需要哪個欄位與為什麼，由 Lead 處理。
 
 ---

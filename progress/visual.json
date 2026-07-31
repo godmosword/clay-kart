@@ -2,11 +2,11 @@
   "tool": "claude-code",
   "worktree": "../ck-visual",
   "branch": "feat/visual",
-  "updated": "2026-07-31T03:00:00Z",
+  "updated": "2026-07-31T02:30:00Z",
   "wave": "W1",
   "round": 2,
   "element": "minimal-render",
-  "status": "idle",
+  "status": "done",
   "last_verdict": null,
-  "note": "R2 任務已開：loop/round-2/TASK-visual.md。追尾相機 12-18°、賽道幾何從 @physics 取得不得硬編。用 Sonnet，不要開 Opus/ultracode。"
+  "note": "R2 完成（commit b4a64fb）：賽道從 @physics/constants 的 TRACK_GEOMETRY 取得、追尾相機 14.7°（BAR-VISUAL §0.5 規格內）、yaw 最短路徑插值、圈數 HUD。typecheck/build 通過，headless 截圖確認構圖正確。附帶修正 Lead 疏漏：main 先前從未真正併入 feat/physics 的程式碼，已於本輪補上（f8aee33）。"
 }

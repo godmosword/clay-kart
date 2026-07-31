@@ -55,6 +55,13 @@ git worktree add ../ck-plumb   -b feat/plumb
 
 **跨界規則：** 任何工具都可以**讀**其他 worktree，但只能**寫**自己的範圍。違反即在 review 時 revert。
 
+> **實作偏離（R2 架構審查後新增）：** `src/contract/` 是 **Lead 專屬**，不屬於上表任何一方。
+> 原因：Codex 與 Claude Code 共同實作的介面契約（`SimWorld`／`KartState`／`Renderer` 等）
+> 原本內嵌在 `src/loader/bootstrap.ts`，但那個目錄屬 Cursor 的可寫範圍——設計契約放在
+> 被要求「不做設計決策」的工具的可寫目錄裡，directory-based 的權限表無法對單一檔案內
+> 「哪幾行是誰的」做區分，是真實的結構性問題，不是理論疑慮。拆出 `src/contract/` 後，
+> `src/loader/bootstrap.ts` 只保留執行迴圈，`src/contract/sim.ts` 一旦穩定即列入 `FROZEN.md`。
+
 ### 共享協定目錄（在 main 上，三方都讀）
 
 ```
