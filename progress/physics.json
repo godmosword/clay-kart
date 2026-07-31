@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-07-30T14:00:00Z",
+  "updated": "2026-07-31T01:30:00Z",
   "wave": "W1",
-  "round": 0,
+  "round": 1,
   "element": "physics-loop",
-  "status": "idle",
-  "last_verdict": null,
-  "note": "已解除封鎖。取代 src/physics/world.ts 的 stub，實作 SimWorld。不得 import three、不得碰 DOM"
+  "status": "building",
+  "last_verdict": "PASS",
+  "note": "W1 判 PASS（commit 35cfeef，聲明全部經 Lead 獨立驗證屬實）。但檔案不進 FROZEN：R1 需修四項落差，見 loop/round-1/TASK.md。兩項 HIGH 會讓 BAR-FEEL §5 整節與 §4.5 基準線不可信。"
 }
