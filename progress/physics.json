@@ -8,5 +8,5 @@
   "element": "physics-loop",
   "status": "building",
   "last_verdict": "PASS",
-  "note": "R2 落差一完成（commit 888f580）：在 src/physics/constants.ts 公開 TRACK_GEOMETRY 與 TRACK_RADIUS/TRACK_CENTER_Z/TRACK_HALF_WIDTH，world 碰撞由同一來源推導；渲染器可從 @physics/constants 取得賽道本體幾何。node tools/validate/w1-physics.mjs、typecheck/build 通過。落差二待處理。"
+  "note": "R2 落差一完成（commit 888f580）：在 src/physics/constants.ts 公開 TRACK_GEOMETRY 與 TRACK_RADIUS/TRACK_CENTER_Z/TRACK_HALF_WIDTH，world 碰撞由同一來源推導；渲染器可從 @physics/constants 取得賽道本體幾何。node tools/validate/w1-physics.mjs、typecheck/build 通過。落差二待處理。 [R2 架構審查後補丁：src/contract/sim.ts 拆出，setInput 進入 SimWorld 正式契約，詳見 loop/BACKLOG.md]"
 }
