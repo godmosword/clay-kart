@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-07-31T03:00:00Z",
+  "updated": "2026-07-31T22:08:18Z",
   "wave": "W1",
   "round": 2,
   "element": "input-wiring",
-  "status": "idle",
+  "status": "done",
   "last_verdict": null,
-  "note": "R2 任務已開：loop/round-2/TASK-cursor.md。輸入接線，三條硬性約束以 W2 的 ghost-replay 決定性為前提。 [R2 架構審查後補丁：src/contract/sim.ts 拆出，setInput 進入 SimWorld 正式契約，詳見 loop/BACKLOG.md]"
+  "note": "R2：實作 src/ui/player-input.ts（鍵盤+觸控 InputSource），main.ts 傳入 bootstrap；package.json 加 test script。typecheck/build/npm test 皆 PASS。"
 }
