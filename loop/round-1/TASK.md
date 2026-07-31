@@ -29,7 +29,21 @@
 與 §4.5 的基準線都不可信，而那正是 W2 要花最多輪次調的東西。
 
 證據：`loop/round-1/artifacts/lead-audit.mjs` 與 `lead-audit-output.txt`。
-那支腳本可獨立執行（`world.ts` 對 bootstrap 只有 type-only import）。
+
+重跑方式（`world.ts` 對 bootstrap 只有 type-only import，因此可獨立轉譯執行；
+下面的 TS2307 是路徑別名解析警告，不影響 emit）：
+
+```bash
+cd ../ck-physics
+npx tsc src/physics/world.ts --ignoreConfig --outDir /tmp/ckrev \
+  --module esnext --target es2022 --moduleResolution bundler --skipLibCheck
+mv /tmp/ckrev/world.js /tmp/ckrev/world.mjs
+cp loop/round-1/artifacts/lead-audit.mjs /tmp/ckrev/
+cd /tmp/ckrev && node lead-audit.mjs
+```
+
+**這支腳本是 Lead 的臨時工具，不是專案資產** —— 它存在只是為了讓你看到落差的證據。
+落差四要求的是你自己的、進版控的測試，不是把這支搬進 `tools/`。
 
 ---
 
