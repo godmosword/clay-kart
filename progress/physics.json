@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-07-31T01:30:00Z",
+  "updated": "2026-07-31T02:00:00Z",
   "wave": "W1",
   "round": 1,
   "element": "physics-loop",
-  "status": "building",
+  "status": "done",
   "last_verdict": "PASS",
-  "note": "W1 判 PASS（commit 35cfeef，聲明全部經 Lead 獨立驗證屬實）。但檔案不進 FROZEN：R1 需修四項落差，見 loop/round-1/TASK.md。兩項 HIGH 會讓 BAR-FEEL §5 整節與 §4.5 基準線不可信。"
+  "note": "R1 四項落差完成（commit 4f95c13）：移除隱含賽道曲率與中心線貼齊、loader dt 單一來源並鎖定固定步長、加入 tools/validate/w1-physics.mjs。typecheck/build、三次 byte-identical replay、碰撞/圈計時/§3 回歸均通過。"
 }
