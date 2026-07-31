@@ -7,7 +7,15 @@
  * settle to zero.  Callers can use setInput() for headless and future UI input.
  */
 import type { KartState, LapState, SimSnapshot, SimWorld } from '@loader/bootstrap';
-import { BASE_TOP_SPEED, CAR_LENGTH, CAR_WIDTH } from './constants.js';
+import {
+  BASE_TOP_SPEED,
+  CAR_LENGTH,
+  CAR_WIDTH,
+  TRACK_CENTER_Z,
+  TRACK_GEOMETRY,
+  TRACK_HALF_WIDTH,
+  TRACK_RADIUS,
+} from './constants.js';
 
 const TOTAL_LAPS = 3;
 const REVERSE_TOP_SPEED = BASE_TOP_SPEED * 0.4;
@@ -16,9 +24,6 @@ const COAST_DECELERATION = 5.2;
 const BRAKE_DECELERATION = 24;
 const GRAVITY = 30;
 const JUMP_SPEED = 10;
-const TRACK_RADIUS = 30;
-const TRACK_CENTER_Z = 30;
-const TRACK_HALF_WIDTH = 6;
 const KART_BOUNDING_RADIUS = Math.hypot(CAR_LENGTH / 2, CAR_WIDTH / 2);
 const INNER_COLLISION_RADIUS = TRACK_RADIUS - TRACK_HALF_WIDTH + KART_BOUNDING_RADIUS;
 const OUTER_COLLISION_RADIUS = TRACK_RADIUS + TRACK_HALF_WIDTH - KART_BOUNDING_RADIUS;
@@ -65,7 +70,7 @@ function wrapAngle(angle: number): number {
 class World implements PhysicsWorld {
   #tick = 0;
   #fixedDt: number | null = null;
-  #x = TRACK_RADIUS;
+  #x = TRACK_GEOMETRY.centerX + TRACK_RADIUS;
   #y = 0;
   #z = TRACK_CENTER_Z;
   #vx = 0;
@@ -255,7 +260,7 @@ class World implements PhysicsWorld {
   }
 
   #resolveTrackCollision(dt: number): void {
-    const dx = this.#x;
+    const dx = this.#x - TRACK_GEOMETRY.centerX;
     const dz = this.#z - TRACK_CENTER_Z;
     const radius = Math.hypot(dx, dz);
     if (radius === 0) return;
@@ -278,7 +283,7 @@ class World implements PhysicsWorld {
     }
 
     const penetration = Math.abs(radius - boundary);
-    this.#x = normalX * boundary;
+    this.#x = TRACK_GEOMETRY.centerX + normalX * boundary;
     this.#z = TRACK_CENTER_Z + normalZ * boundary;
 
     const tangentSpeed = this.#vx * tangentX + this.#vz * tangentZ;
@@ -300,7 +305,7 @@ class World implements PhysicsWorld {
   }
 
   #updateLapState(dt: number): void {
-    const angle = wrapAngle(Math.atan2(this.#z - TRACK_CENTER_Z, this.#x));
+    const angle = wrapAngle(Math.atan2(this.#z - TRACK_CENTER_Z, this.#x - TRACK_GEOMETRY.centerX));
     const crossedStartLine = this.#hasLeftStartLine
       && this.#trackAngle >= START_LINE_RETURN_ANGLE
       && angle <= START_LINE_CROSS_ANGLE;
