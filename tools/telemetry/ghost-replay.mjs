@@ -122,13 +122,20 @@ const steeringCalibration = await replayOnce((input, tick) => {
   }
   return input;
 });
-const steeringRadiusSamples = steeringCalibration.frames.map((frame) => ({
-  speed: frame.speed,
-  yaw_rate: frame.yaw_rate,
-  steer_input: frame.steer_input,
-  grounded: frame.grounded,
-  collision_impulse: frame.collision_impulse,
-}));
+const steeringRadiusSamples = steeringCalibration.frames
+  .filter((frame) => (
+    Math.abs(frame.steer_input) >= 0.8
+    && frame.grounded
+    && frame.collision_impulse <= 0
+    && Math.abs(frame.yaw_rate) > 1e-9
+  ))
+  .map((frame) => ({
+    speed: frame.speed,
+    yaw_rate: frame.yaw_rate,
+    steer_input: frame.steer_input,
+    grounded: frame.grounded,
+    collision_impulse: frame.collision_impulse,
+  }));
 const releaseEvent = driftReplays[0].events.find((event) => event.type === 'miniturbo_release' && event.data?.tier === 2);
 if (!releaseEvent) throw new Error('fixture did not produce a tier-2 miniturbo release');
 const releaseTick = releaseEvent.tick;
