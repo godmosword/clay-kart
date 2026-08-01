@@ -32,7 +32,11 @@ const AIR_CONTROL_RATIO = 0.3;
 const STEER_RISE_TIME_CONSTANT = 0.03;
 const STEER_RELEASE_TIME_CONSTANT = 0.07;
 const LATERAL_GRIP = 14;
-const WALL_BOUNCE = 0.15;
+const WALL_BOUNCE = 0.07;
+const WALL_DEFAULT_BOUNCE = 0.15;
+const WALL_GRAZING_BOUNCE = 0.35;
+const WALL_HEAD_ON_ANGLE_DEG = 15;
+const WALL_GRAZING_ANGLE_DEG = 30;
 const DRIFT_ENTRY_SPEED = 10.5;
 const DRIFT_TIER1_TIME = 0.85;
 const DRIFT_TIER2_TIME = 2.0;
@@ -160,7 +164,7 @@ class World implements PhysicsWorld {
     this.#stepYaw(fixedDt, oldLongitudinalSpeed);
     this.#stepDrive(fixedDt);
     this.#stepPosition(fixedDt);
-    this.#resolveTrackCollision(fixedDt);
+    this.#resolveTrackCollision();
 
     this.#updateLapState(fixedDt);
   }
@@ -367,7 +371,7 @@ class World implements PhysicsWorld {
     }
   }
 
-  #resolveTrackCollision(dt: number): void {
+  #resolveTrackCollision(): void {
     const dx = this.#x - TRACK_GEOMETRY.centerX;
     const dz = this.#z - TRACK_CENTER_Z;
     const radius = Math.hypot(dx, dz);
@@ -390,23 +394,35 @@ class World implements PhysicsWorld {
       return;
     }
 
-    const penetration = Math.abs(radius - boundary);
     this.#x = TRACK_GEOMETRY.centerX + normalX * boundary;
     this.#z = TRACK_CENTER_Z + normalZ * boundary;
 
     const tangentSpeed = this.#vx * tangentX + this.#vz * tangentZ;
     const normalSpeed = this.#vx * normalX + this.#vz * normalZ;
     if (towardBoundary > 0) {
+      const incidenceAngleDeg = Math.atan2(Math.abs(tangentSpeed), towardBoundary) * 180 / Math.PI;
+      const grazingBlend = clamp(
+        (incidenceAngleDeg - WALL_HEAD_ON_ANGLE_DEG)
+          / (WALL_GRAZING_ANGLE_DEG - WALL_HEAD_ON_ANGLE_DEG),
+        0,
+        1,
+      );
+      const grazingBounce = WALL_BOUNCE + (WALL_GRAZING_BOUNCE - WALL_BOUNCE) * grazingBlend;
+      const defaultBlend = clamp((incidenceAngleDeg - WALL_GRAZING_ANGLE_DEG) / 15, 0, 1);
+      const wallBounce = grazingBounce * (1 - defaultBlend)
+        + WALL_DEFAULT_BOUNCE * defaultBlend;
       const reflectedNormalSpeed = radius > boundary
-        ? -towardBoundary * WALL_BOUNCE
-        : towardBoundary * WALL_BOUNCE;
+        ? -towardBoundary * wallBounce
+        : towardBoundary * wallBounce;
       this.#vx = tangentX * tangentSpeed + normalX * reflectedNormalSpeed;
       this.#vz = tangentZ * tangentSpeed + normalZ * reflectedNormalSpeed;
       this.#collisionImpulse = Math.abs(towardBoundary - reflectedNormalSpeed);
     } else {
-      this.#collisionImpulse = penetration / dt;
-      // A penetrating pose with no outward velocity is still corrected above;
-      // preserve its tangential motion rather than letting the wall trap it.
+      // A penetrating pose with no outward velocity is a positional correction,
+      // not a new impact. Keep the velocity and leave collisionImpulse at zero
+      // so telemetry does not report a stationary wall contact as a hit every
+      // tick.
+      this.#collisionImpulse = 0;
       this.#vx = tangentX * tangentSpeed + normalX * normalSpeed;
       this.#vz = tangentZ * tangentSpeed + normalZ * normalSpeed;
     }
