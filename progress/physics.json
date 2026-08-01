@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T13:45:52Z",
+  "updated": "2026-08-01T10:00:00Z",
   "wave": "W2",
-  "round": 7,
-  "element": "collision-response",
-  "status": "done",
+  "round": 9,
+  "element": "airborne-landing",
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R7 完成 telemetry 與 collision-response 校準：collision event 記錄前後速度、ground speed、wall normal、入射角、phase 與 recovery definition/time；新增 30° 與 head-on deterministic probes。6.1=0.5882、6.2=0.1959、6.3=0.2792 PASS；4.5=1.5191、5.2=8.4592、5.3=0.1833、5.7=5.0456、5.8=6.9162、5.9=true、7.1=0.3258 未退化。6.4 因單車架構跳過；6.5=289，已做衝量語意修正但仍 FAIL，根因記入 BACKLOG。程式碼 commit 1c6a63f。"
+  "note": "R7 獨立驗證：6.1/6.2/6.3 全部真量測（獨立確定性 probe，非硬編碼），三次 byte-identical，pytest 7/7，全指標掃描零退化，首次未超支。R8（Cursor 漂移按鍵）已用真瀏覽器 CDP 驗證真的能觸發漂移，已合併。轉 airborne-landing：7.3/7.4/7.5 三項都讀從沒被填入的 landing 事件欄位，7.5 目前的 PASS 是預設值巧合，非真測。附帶提出結構性問題：現行單一跳躍高度下『大角度落地』沒有天然的產生機制，需要 Codex 自行判斷方向。R9 任務已開。"
 }
