@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T04:00:00Z",
+  "updated": "2026-08-01T04:13:00Z",
   "wave": "W2",
   "round": 4,
   "element": "drift-miniturbo",
-  "status": "idle",
+  "status": "done",
   "last_verdict": "FAIL",
-  "note": "R3 telemetry/validator 經 Lead 獨立驗證屬實：ghost-replay 三次獨立 process byte-identical，feel.py §2/§3.1-3.4 皆 PASS，largest_gap=4.5（W1 無漂移，屬實）。pytest 5 函式實測覆蓋全部 39 個 WINDOWS 邊界。發現兩個非阻斷問題記入 BACKLOG（fixture 缺 reverse 段、perf-probe §4 防抽格檢查為寫死常數）。R4 任務已開：loop/round-4/TASK.md，修 4.5。已補上 WorldInput.drift 契約缺口與 BAR-FEEL §4 輸入機制規格，Codex 開工前不會卡在設計缺口上。"
+  "note": "R4 完成：physics commits 1ea2e3c, 85e8f01 已推送。driftState/charge/tier 狀態機、tier2 mini-turbo、ghost replay 基準線與 fixture reverse 段已加入；§4.5=1.5156 車長（PASS），§3.5=0.4000（PASS），§3.1–3.5 全部 PASS，ghost 三次 byte-identical。feel validator 整體仍為 FAIL，最大剩餘差距為本 fixture 未覆蓋 tier3 的 §4.4；本輪目標 §4.5 已完成。"
 }
