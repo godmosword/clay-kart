@@ -32,6 +32,22 @@
 - **來源**：`loop/round-6/VERDICT.json`、`src/physics/world.ts`
 - **狀態**：待裁決
 
+### W2 的 budget.json cap 系統性低估，需整體重估
+- **輪次**：R6 收尾發現
+- **現況**：W2 目前完成的兩個元件都大幅超支——`drift-miniturbo` 花
+  626134（cap 400000，+56%），`steering-grip` 花 625276（cap 250000，
+  +150%）。兩者的**絕對**超支金額相近（+226134、+375276），不是單一
+  元件估算錯，是 bootstrap 時整組 cap 估算的方法就偏低
+- **影響**：`collision-response`（cap 200000）、`airborne-landing`
+  （150000）、`input-feedback`（100000）、`ai-opponents`（300000）
+  很可能也會用同樣的幅度超支。繼續要求 builder「控制在 cap 內」
+  沒有意義，只會逼它們在還沒達標時就喊停
+- **處置**：R7 起先不對 builder 要求控制在 cap 內，如實記錄 token 用量。
+  等 W2 全部元件跑完一輪，用實際花費重新估算 W3 的 cap（W3 用 Opus +
+  ultracode，單位成本又跟 W2 不同，不能直接套 W2 的超支比例）
+- **狀態**：待裁決——是否要現在就把剩餘 W2 元件的 cap 統一調高，
+  或等真的撞到再說
+
 ### 外部提案「BAR-FEEL v2」——駁回整份，只採納一項（5.7/5.8/5.9）
 - **輪次**：R6 開工前
 - **收到的內容**：一份格式完整、論證詳細的文件，主張整份改寫 `BAR-FEEL §4/§5`
@@ -142,7 +158,7 @@
 - **狀態**：已裁決，機制已生效
 
 ### W2 觀察：SimSnapshot 目前只支援單車
-- **輪次**：R2 架構審查發現
+- **輪次**：R2 架構審查發現，R7 追加一個依賴方
 - **現況**：`SimSnapshot.kart` 是單數欄位，不是陣列
 - **目標**：`BAR-FEEL §7`／`loop/PLAN.md` W2 第 8 元件 `ai-opponents` 需要多車
 - **落差**：AI 對手需要跑同一份物理，`kart: KartState` 撐不住
@@ -150,6 +166,9 @@
   （sim-determinism 到 input-feedback）都是在單車 shape 上調物理數值。
   把 `kart` 包成 `karts: readonly KartState[]` 是純結構包裝，不牽動物理邏輯，
   現在做跟等到 `ai-opponents` 開工前做，成本一樣——沒有隨時間複利的代價
+- **新增依賴（R7）**：`BAR-FEEL §6.4 kart_kart_impulse_symmetry`（車對車碰撞
+  對稱性）也卡在這個限制上——沒有第二台車可以撞。`collision-response`
+  元件（R7）已指示跳過 6.4，不強求
 - **狀態**：已排入，觸發點＝`ai-opponents` 元件開工前
 
 ### 外部架構審查的三項欄位建議 —— 已核實，兩項採納一項駁回

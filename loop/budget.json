@@ -1,5 +1,5 @@
 {
-  "$comment": "Builder 每輪結束後更新 spent。撞到 cap 見 LOOP-OPS.md §6。單位為 token。",
+  "$comment": "Builder 每輪結束後更新 spent。撞到 cap 見 LOOP-OPS.md §6。單位為 token。W2 前兩個完成的元件皆大幅超支（drift-miniturbo +56%、steering-grip +150%），cap 估算系統性偏低，見 loop/BACKLOG.md 的整體重估項目，未逐項調高剩餘 cap 前不要求 builder 硬控在 cap 內。",
   "W1": {
     "$comment": "W1 不跑 loop，不設 cap。達成即進 W2。",
     "physics-loop": { "cap": null, "spent": 0 },
@@ -10,8 +10,8 @@
     "sim-determinism": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §2" },
     "acceleration-curve": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §3" },
     "drift-miniturbo": { "cap": 400000, "spent": 626134, "bar": "BAR-FEEL §4", "$comment": "R5 收尾：4.5 硬門檻達標，超支 56%，轉 steering-grip。4.4/4.6/4.7/4.10 記在 BACKLOG，未強制解決" },
-    "steering-grip": { "cap": 250000, "spent": 625276, "bar": "BAR-FEEL §5", "$comment": "R6 完成 steering-grip；實際 token 使用超過 cap，剩餘記為 0" },
-    "collision-response": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §6" },
+    "steering-grip": { "cap": 250000, "spent": 625276, "bar": "BAR-FEEL §5", "$comment": "R6 完成，超支150%。核心目標 5.2/5.3/5.7/5.8/5.9 全 PASS，全指標掃描零退化，是至今最乾淨的一輪" },
+    "collision-response": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §6", "$comment": "R7 開工。6.4 需要多車架構，本輪不強求；6.1-6.3 需先補 telemetry 才能量測" },
     "airborne-landing": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §7" },
     "input-feedback": { "cap": 100000, "spent": 0, "bar": "BAR-FEEL §8" },
     "ai-opponents": { "cap": 300000, "spent": 0, "bar": "BAR-FEEL §6 + 行為指標待補" }

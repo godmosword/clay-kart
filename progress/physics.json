@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T13:26:20Z",
+  "updated": "2026-08-01T08:00:00Z",
   "wave": "W2",
-  "round": 6,
-  "element": "steering-grip",
-  "status": "done",
+  "round": 7,
+  "element": "collision-response",
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R6 完成：steering-grip 加入轉向輸入慣性與速度相關全舵角抓地；feel.py 補 5.7/5.8/5.9 並將 5.2 改名。5.2=8.7179、5.7=5.0862、5.8=6.9259、5.9=true，4.5=1.5191、4.9=1.4544、7.1=0.3258 均 PASS。5.5/5.6 因目前賽道只有 asphalt 已寫入 BACKLOG；整體 verdict 仍因既有 4.4/4.6/4.7 等缺口為 FAIL。程式碼 commits d30721d、3375c96。"
+  "note": "R6 獨立驗證：全指標掃描零意外退化，至今最乾淨的一輪。5.2/5.3/5.7/5.8/5.9 全部獨立重算一致，三次獨立 process byte-identical，pytest 6/6，schema 通過。轉 collision-response：6.1/6.2/6.3 非物理問題，是 telemetry 從沒記錄碰撞前後速度資料；6.4 需要多車架構，本輪不強求；6.5 是真落差（177→285→291 持續惡化）。R7 任務已開。另記：W2 兩元件皆超支（+56%/+150%），cap 估算系統性偏低，已記入 BACKLOG。"
 }
