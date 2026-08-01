@@ -44,11 +44,14 @@ WINDOWS: tuple[tuple[str, str, float | bool, float | bool, int], ...] = (
     ("4.9", "drift_yaw_rate_ratio", 1.25, 1.60, 7),
     ("4.10", "drift_speed_retention", 0.88, 0.97, 7),
     ("5.1", "steer_response_lag_ms", 0.0, 50.0, 5),
-    ("5.2", "min_turn_radius_u", 7.0, 9.5, 5),
+    ("5.2", "turn_radius_at_95pct_u", 7.0, 9.5, 5),
     ("5.3", "yaw_settle_time_s", 0.15, 0.35, 5),
     ("5.4", "yaw_overshoot_ratio", 0.0, 0.12, 5),
     ("5.5", "grass_speed_penalty", 0.55, 0.70, 5),
     ("5.6", "dirt_speed_penalty", 0.80, 0.90, 5),
+    ("5.7", "turn_radius_at_30pct_u", 3.5, 5.5, 5),
+    ("5.8", "turn_radius_at_60pct_u", 5.5, 7.5, 5),
+    ("5.9", "turn_radius_monotonic", True, True, 5),
     ("6.1", "wall_speed_retention", 0.55, 0.75, 6),
     ("6.2", "wall_head_on_retention", 0.05, 0.20, 6),
     ("6.3", "collision_recovery_time_s", 0.20, 0.45, 6),
@@ -265,11 +268,32 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
                 post_sign = [abs(_finite(frame.get("yaw_rate"))) for frame in after_window if _finite(frame.get("yaw_rate")) * _finite(previous.get("yaw_rate")) < 0]
                 overshoots.append(max(post_sign, default=0.0) / before)
 
-    turn_radii = [
-        _speed(frame) / abs(_finite(frame.get("yaw_rate")))
-        for frame in frames
-        if _speed(frame) >= top_speed * 0.95 and abs(_finite(frame.get("yaw_rate"))) > 1e-9
-    ]
+    calibration_samples = meta.get("steering_radius_samples")
+    radius_frames = calibration_samples if isinstance(calibration_samples, list) else frames
+
+    def turn_radius_at_speed(target_ratio: float) -> float:
+        low = top_speed * max(0.0, target_ratio - 0.05)
+        high = top_speed * min(1.0, target_ratio + 0.05)
+        candidates = [
+            _speed(frame) / abs(_finite(frame.get("yaw_rate")))
+            for frame in radius_frames
+            if low <= _speed(frame) <= high
+            and abs(_finite(frame.get("steer_input"))) >= 0.8
+            and abs(_finite(frame.get("yaw_rate"))) > 1e-9
+            and frame.get("grounded", True)
+            and _finite(frame.get("collision_impulse")) <= 1e-9
+        ]
+        return statistics.median(candidates) if candidates else 0.0
+
+    turn_radius_30 = turn_radius_at_speed(0.30)
+    turn_radius_60 = turn_radius_at_speed(0.60)
+    turn_radius_95 = turn_radius_at_speed(0.95)
+    turn_radius_monotonic = (
+        turn_radius_30 > 0
+        and turn_radius_60 > 0
+        and turn_radius_95 > 0
+        and turn_radius_30 < turn_radius_60 < turn_radius_95
+    )
 
     asphalt = [_speed(frame) for frame in frames if frame.get("surface") == "asphalt"]
     grass = [_speed(frame) for frame in frames if frame.get("surface") == "grass"]
@@ -328,11 +352,14 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
         "drift_yaw_rate_ratio": yaw_ratio,
         "drift_speed_retention": speed_retention,
         "steer_response_lag_ms": statistics.median(response_lags) if response_lags else 0.0,
-        "min_turn_radius_u": min(turn_radii, default=0.0),
+        "turn_radius_at_95pct_u": turn_radius_95,
         "yaw_settle_time_s": min(settle_times, default=0.0),
         "yaw_overshoot_ratio": max(overshoots, default=0.0),
         "grass_speed_penalty": grass_penalty,
         "dirt_speed_penalty": dirt_penalty,
+        "turn_radius_at_30pct_u": turn_radius_30,
+        "turn_radius_at_60pct_u": turn_radius_60,
+        "turn_radius_monotonic": turn_radius_monotonic,
         "wall_speed_retention": wall_retention,
         "wall_head_on_retention": head_on_retention,
         "collision_recovery_time_s": recovery_time,

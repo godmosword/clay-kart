@@ -109,6 +109,26 @@ async function replayOnce(inputTransform = (input) => input) {
 
 const driftReplays = await Promise.all([replayOnce(), replayOnce(), replayOnce()]);
 const baseline = await replayOnce((input) => ({ ...input, drift: false }));
+// Keep the gameplay fixture focused on the cross-section used by §2–§4 and
+// §7.  The speed-radius checks need a sustained full-lock sweep, so collect
+// that diagnostic series in a separate deterministic replay and attach only
+// its scalar samples to telemetry metadata.
+const steeringCalibration = await replayOnce((input, tick) => {
+  if (tick >= 731 && tick < 1100) {
+    return { throttle: 1, steer: -1, brake: false, reverse: false, drift: false, jump: false };
+  }
+  if (tick >= 1100 && tick < 6000) {
+    return { throttle: 1, steer: -1, brake: true, reverse: false, drift: false, jump: false };
+  }
+  return input;
+});
+const steeringRadiusSamples = steeringCalibration.frames.map((frame) => ({
+  speed: frame.speed,
+  yaw_rate: frame.yaw_rate,
+  steer_input: frame.steer_input,
+  grounded: frame.grounded,
+  collision_impulse: frame.collision_impulse,
+}));
 const releaseEvent = driftReplays[0].events.find((event) => event.type === 'miniturbo_release' && event.data?.tier === 2);
 if (!releaseEvent) throw new Error('fixture did not produce a tier-2 miniturbo release');
 const releaseTick = releaseEvent.tick;
@@ -145,6 +165,7 @@ const driftSpeedRetention = driftSpeedMean / baselineSpeedMean;
 for (const replay of driftReplays) {
   replay.meta.baselines = baselines;
   replay.meta.drift_speed_retention = driftSpeedRetention;
+  replay.meta.steering_radius_samples = steeringRadiusSamples;
 }
 const replays = driftReplays;
 const serialized = replays.map((replay) => JSON.stringify(replay, null, 2) + '\n');

@@ -29,6 +29,8 @@ const INNER_COLLISION_RADIUS = TRACK_RADIUS - TRACK_HALF_WIDTH + KART_BOUNDING_R
 const OUTER_COLLISION_RADIUS = TRACK_RADIUS + TRACK_HALF_WIDTH - KART_BOUNDING_RADIUS;
 const MAX_STEER_YAW_RATE = 2.7;
 const AIR_CONTROL_RATIO = 0.3;
+const STEER_RISE_TIME_CONSTANT = 0.03;
+const STEER_RELEASE_TIME_CONSTANT = 0.07;
 const LATERAL_GRIP = 14;
 const WALL_BOUNCE = 0.15;
 const DRIFT_ENTRY_SPEED = 10.5;
@@ -95,6 +97,7 @@ class World implements PhysicsWorld {
   #brake = false;
   #reverse = false;
   #driftHeld = false;
+  #steerCommand = 0;
   #jumpHeld = false;
   #jumpQueued = false;
 
@@ -281,9 +284,24 @@ class World implements PhysicsWorld {
 
   #stepYaw(dt: number, longitudinalSpeed: number): void {
     const speedRatio = clamp(Math.abs(longitudinalSpeed) / BASE_TOP_SPEED, 0, 1);
+    const sameDirection = this.#steer === 0
+      || this.#steerCommand === 0
+      || Math.sign(this.#steer) === Math.sign(this.#steerCommand);
+    const releasingSteer = sameDirection && Math.abs(this.#steer) < Math.abs(this.#steerCommand);
+    const timeConstant = releasingSteer
+      ? STEER_RELEASE_TIME_CONSTANT
+      : STEER_RISE_TIME_CONSTANT;
+    const response = 1 - Math.exp(-dt / timeConstant);
+    this.#steerCommand += (this.#steer - this.#steerCommand) * response;
     const controlRatio = this.#grounded ? 1 : AIR_CONTROL_RATIO;
     const driftRatio = this.#driftState === 'charging' ? DRIFT_YAW_RATE_RATIO : 1;
-    const steeringRate = this.#steer * MAX_STEER_YAW_RATE * speedRatio * controlRatio * driftRatio;
+    const driftSteering = this.#driftState !== 'none';
+    const steeringInput = driftSteering ? this.#steer : this.#steerCommand;
+    const steerMagnitude = Math.abs(steeringInput);
+    const speedCurveBlend = clamp((steerMagnitude - 0.25) / 0.75, 0, 1);
+    const speedFactor = speedRatio * (1 - speedCurveBlend)
+      + Math.sqrt(speedRatio) * speedCurveBlend;
+    const steeringRate = steeringInput * MAX_STEER_YAW_RATE * speedFactor * controlRatio * driftRatio;
     this.#yawRate = steeringRate;
     this.#yaw = wrapAngle(this.#yaw + this.#yawRate * dt);
     if (this.#yaw > Math.PI) this.#yaw -= Math.PI * 2;
