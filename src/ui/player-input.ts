@@ -8,7 +8,7 @@
  */
 import type { InputSource, WorldInput } from '@loader/bootstrap';
 
-type Action = 'throttle' | 'brake' | 'steerLeft' | 'steerRight' | 'reverse' | 'jump';
+type Action = 'throttle' | 'brake' | 'steerLeft' | 'steerRight' | 'reverse' | 'jump' | 'drift';
 
 const KEY_TO_ACTION: Readonly<Record<string, Action>> = {
   ArrowUp: 'throttle',
@@ -23,11 +23,16 @@ const KEY_TO_ACTION: Readonly<Record<string, Action>> = {
   ShiftRight: 'reverse',
   KeyR: 'reverse',
   Space: 'jump',
+  // Ctrl：可與 WASD／方向鍵同按，滿足 drift && |steer|>0 進入條件
+  ControlLeft: 'drift',
+  ControlRight: 'drift',
 };
 
 const TOUCH_BUTTONS: ReadonlyArray<{ action: Action; label: string; zone: 'left' | 'right' }> = [
+  // 左區：轉向 + 漂移（漂移必須搭配轉向，放同側方便幼童拇指同按）
   { action: 'steerLeft', label: '←', zone: 'left' },
   { action: 'steerRight', label: '→', zone: 'left' },
+  { action: 'drift', label: '漂', zone: 'left' },
   { action: 'jump', label: '跳', zone: 'right' },
   { action: 'reverse', label: '倒', zone: 'right' },
   { action: 'brake', label: '煞', zone: 'right' },
@@ -93,6 +98,7 @@ export function createPlayerInput(mount: HTMLElement): PlayerInput {
         brake: held.has('brake'),
         reverse: held.has('reverse'),
         jump: held.has('jump'),
+        drift: held.has('drift'),
       };
     },
     dispose(): void {
@@ -129,7 +135,9 @@ function buildTouchOverlay(
   const left = document.createElement('div');
   const right = document.createElement('div');
   for (const el of [left, right]) {
-    el.style.cssText = 'display:flex;gap:10px;pointer-events:none;flex-wrap:wrap;';
+    // 按鈕加大間距，避免 3–7 歲誤觸相鄰鍵
+    el.style.cssText =
+      'display:flex;gap:14px;pointer-events:none;flex-wrap:wrap;max-width:260px;';
   }
 
   for (const { action, label, zone } of TOUCH_BUTTONS) {
@@ -139,9 +147,9 @@ function buildTouchOverlay(
     btn.setAttribute('aria-label', action);
     btn.style.cssText = [
       'pointer-events:auto',
-      'width:72px',
-      'height:72px',
-      'font-size:22px',
+      'width:80px',
+      'height:80px',
+      'font-size:24px',
       'font-weight:700',
       'border:2px solid rgba(0,0,0,0.35)',
       'border-radius:12px',
