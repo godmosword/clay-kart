@@ -31,6 +31,14 @@ const MAX_STEER_YAW_RATE = 2.7;
 const AIR_CONTROL_RATIO = 0.3;
 const LATERAL_GRIP = 14;
 const WALL_BOUNCE = 0.15;
+const DRIFT_ENTRY_SPEED = 10.5;
+const DRIFT_TIER1_TIME = 0.85;
+const DRIFT_TIER2_TIME = 2.0;
+const DRIFT_TIER3_TIME = 3.5;
+const DRIFT_YAW_RATE_RATIO = 1.4;
+const DRIFT_SPEED_RETENTION = 0.93;
+const MINI_TURBO_DURATION = 1.05;
+const MINI_TURBO_GAIN_BY_TIER = [0, 0.85, 2.4, 3.4] as const;
 const START_LINE_LEAVE_ANGLE = 0.25;
 const START_LINE_RETURN_ANGLE = Math.PI * 1.75;
 const START_LINE_CROSS_ANGLE = Math.PI * 0.25;
@@ -44,6 +52,8 @@ export interface WorldInput {
   brake?: boolean;
   /** Reverses the drive direction while throttle is held. */
   reverse?: boolean;
+  /** Enters/maintains drift while held; release triggers mini-turbo. */
+  drift?: boolean;
   /** One-shot jump request; W1 has no jump button in the loader yet. */
   jump?: boolean;
 }
@@ -85,8 +95,17 @@ class World implements PhysicsWorld {
   #steer = 0;
   #brake = false;
   #reverse = false;
+  #driftHeld = false;
   #jumpHeld = false;
   #jumpQueued = false;
+
+  #driftState: KartState['driftState'] = 'none';
+  #driftCharge = 0;
+  #driftTier: KartState['driftTier'] = 0;
+  #driftTime = 0;
+  #releaseTimer = 0;
+  #boostSpeed = 0;
+  #driftRetentionPending = false;
 
   #trackAngle = 0;
   #hasLeftStartLine = false;
@@ -109,6 +128,9 @@ class World implements PhysicsWorld {
     if (input.reverse !== undefined) {
       this.#reverse = input.reverse;
     }
+    if (input.drift !== undefined) {
+      this.#driftHeld = input.drift;
+    }
     if (input.jump !== undefined) {
       if (input.jump && !this.#jumpHeld) this.#jumpQueued = true;
       this.#jumpHeld = input.jump;
@@ -128,6 +150,7 @@ class World implements PhysicsWorld {
     this.#tick += 1;
     this.#collisionImpulse = 0;
 
+    this.#stepDriftState(fixedDt);
     this.#stepVertical(fixedDt);
 
     const oldForwardX = Math.sin(this.#yaw);
@@ -152,9 +175,9 @@ class World implements PhysicsWorld {
       yawRate: this.#yawRate,
       steerInput: this.#steer,
       throttleInput: this.#throttle,
-      driftState: 'none',
-      driftCharge: 0,
-      driftTier: 0,
+      driftState: this.#driftState,
+      driftCharge: this.#driftCharge,
+      driftTier: this.#driftTier,
       grounded: this.#grounded,
       surface: 'asphalt',
       collisionImpulse: this.#collisionImpulse,
@@ -170,6 +193,74 @@ class World implements PhysicsWorld {
       splits: this.#splits.slice(),
     };
     return { tick: this.#tick, t: this.#tick * fixedDt, kart, lap };
+  }
+
+  #stepDriftState(dt: number): void {
+    if (this.#driftState === 'none') {
+      const speed = Math.hypot(this.#vx, this.#vz);
+      if (this.#driftHeld && Math.abs(this.#steer) > 0.0001 && speed >= DRIFT_ENTRY_SPEED) {
+        this.#driftState = 'charging';
+        this.#driftTime = 0;
+        this.#driftCharge = 0;
+        this.#driftTier = 0;
+        this.#driftRetentionPending = true;
+      }
+      return;
+    }
+
+    if (this.#driftState === 'charging') {
+      if (!this.#driftHeld || Math.abs(this.#steer) <= 0.0001) {
+        if (this.#driftTier > 0) {
+          this.#releaseDrift();
+        } else {
+          this.#cancelDrift();
+        }
+        return;
+      }
+
+      this.#driftTime += dt;
+      this.#driftCharge = clamp(this.#driftTime / DRIFT_TIER3_TIME, 0, 1);
+      this.#driftTier = this.#driftTime >= DRIFT_TIER3_TIME
+        ? 3
+        : this.#driftTime >= DRIFT_TIER2_TIME
+          ? 2
+          : this.#driftTime >= DRIFT_TIER1_TIME
+            ? 1
+            : 0;
+      return;
+    }
+
+    this.#releaseTimer = Math.max(0, this.#releaseTimer - dt);
+    if (this.#releaseTimer === 0) {
+      this.#driftState = 'none';
+      this.#driftCharge = 0;
+      this.#driftTier = 0;
+      this.#driftTime = 0;
+      this.#boostSpeed = 0;
+      this.#driftRetentionPending = false;
+    }
+  }
+
+  #cancelDrift(): void {
+    this.#driftState = 'none';
+    this.#driftCharge = 0;
+    this.#driftTier = 0;
+    this.#driftTime = 0;
+    this.#driftRetentionPending = false;
+  }
+
+  #releaseDrift(): void {
+    const tier = this.#driftTier;
+    const releaseDuration = tier === 1
+      ? 0.8
+      : tier === 2
+        ? MINI_TURBO_DURATION
+        : 1.3;
+    this.#driftState = 'released';
+    this.#driftCharge = 1;
+    this.#releaseTimer = releaseDuration;
+    this.#boostSpeed = (MINI_TURBO_GAIN_BY_TIER[tier] * CAR_LENGTH) / releaseDuration;
+    this.#driftRetentionPending = false;
   }
 
   #stepVertical(dt: number): void {
@@ -197,7 +288,8 @@ class World implements PhysicsWorld {
   #stepYaw(dt: number, longitudinalSpeed: number): void {
     const speedRatio = clamp(Math.abs(longitudinalSpeed) / BASE_TOP_SPEED, 0, 1);
     const controlRatio = this.#grounded ? 1 : AIR_CONTROL_RATIO;
-    const steeringRate = this.#steer * MAX_STEER_YAW_RATE * speedRatio * controlRatio;
+    const driftRatio = this.#driftState === 'charging' ? DRIFT_YAW_RATE_RATIO : 1;
+    const steeringRate = this.#steer * MAX_STEER_YAW_RATE * speedRatio * controlRatio * driftRatio;
     this.#yawRate = steeringRate;
     this.#yaw = wrapAngle(this.#yaw + this.#yawRate * dt);
     if (this.#yaw > Math.PI) this.#yaw -= Math.PI * 2;
@@ -252,11 +344,22 @@ class World implements PhysicsWorld {
       this.#vx *= scale;
       this.#vz *= scale;
     }
+
+    if (this.#driftState === 'charging' && this.#driftRetentionPending && groundSpeed > 0) {
+      const scale = DRIFT_SPEED_RETENTION;
+      this.#vx *= scale;
+      this.#vz *= scale;
+      this.#driftRetentionPending = false;
+    }
   }
 
   #stepPosition(dt: number): void {
     this.#x += this.#vx * dt;
     this.#z += this.#vz * dt;
+    if (this.#driftState === 'released' && this.#releaseTimer > 0) {
+      this.#x += Math.sin(this.#yaw) * this.#boostSpeed * dt;
+      this.#z += Math.cos(this.#yaw) * this.#boostSpeed * dt;
+    }
   }
 
   #resolveTrackCollision(dt: number): void {

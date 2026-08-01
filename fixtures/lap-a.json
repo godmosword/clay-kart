@@ -8,9 +8,10 @@
       "end_tick": 360,
       "input": {
         "throttle": 1,
-        "steer": -0.3,
+        "steer": -0.2,
         "brake": false,
         "reverse": false,
+        "drift": true,
         "jump": false
       }
     },
@@ -18,10 +19,11 @@
       "start_tick": 360,
       "end_tick": 480,
       "input": {
-        "throttle": 0,
-        "steer": -0.3,
+        "throttle": 1,
+        "steer": -0.2,
         "brake": false,
         "reverse": false,
+        "drift": false,
         "jump": false
       }
     },
@@ -33,17 +35,55 @@
         "steer": -0.3,
         "brake": false,
         "reverse": false,
+        "drift": false,
         "jump": true
       }
     },
     {
       "start_tick": 481,
-      "end_tick": 7200,
+      "end_tick": 720,
       "input": {
         "throttle": 1,
         "steer": -0.3,
         "brake": false,
         "reverse": false,
+        "drift": false,
+        "jump": false
+      }
+    },
+    {
+      "start_tick": 720,
+      "end_tick": 6000,
+      "input": {
+        "throttle": 0,
+        "steer": 0,
+        "brake": true,
+        "reverse": false,
+        "drift": false,
+        "jump": false
+      }
+    },
+    {
+      "start_tick": 6000,
+      "end_tick": 6480,
+      "input": {
+        "throttle": 1,
+        "steer": -0.001,
+        "brake": false,
+        "reverse": true,
+        "drift": false,
+        "jump": false
+      }
+    },
+    {
+      "start_tick": 6480,
+      "end_tick": 7200,
+      "input": {
+        "throttle": 0,
+        "steer": 0,
+        "brake": true,
+        "reverse": false,
+        "drift": false,
         "jump": false
       }
     }
