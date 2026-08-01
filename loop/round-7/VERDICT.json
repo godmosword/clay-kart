@@ -429,6 +429,6 @@
     "loop/round-7/artifacts/lap-a.json"
   ],
   "next_owner": "claude-code",
-  "tokens_spent_on_element": 138928,
-  "budget_remaining": 61072
+  "tokens_spent_on_element": 144842,
+  "budget_remaining": 55158
 }
