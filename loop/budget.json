@@ -10,7 +10,7 @@
     "sim-determinism": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §2" },
     "acceleration-curve": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §3" },
     "drift-miniturbo": { "cap": 400000, "spent": 626134, "bar": "BAR-FEEL §4", "$comment": "R5 收尾：4.5 硬門檻達標，超支 56%，轉 steering-grip。4.4/4.6/4.7/4.10 記在 BACKLOG，未強制解決" },
-    "steering-grip": { "cap": 250000, "spent": 620702, "bar": "BAR-FEEL §5", "$comment": "R6 完成 steering-grip；實際 token 使用超過 cap，剩餘記為 0" },
+    "steering-grip": { "cap": 250000, "spent": 625276, "bar": "BAR-FEEL §5", "$comment": "R6 完成 steering-grip；實際 token 使用超過 cap，剩餘記為 0" },
     "collision-response": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §6" },
     "airborne-landing": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §7" },
     "input-feedback": { "cap": 100000, "spent": 0, "bar": "BAR-FEEL §8" },
