@@ -56,10 +56,16 @@
 
 | # | 工具 | 工作 |
 |---|---|---|
-| 1 | Codex | telemetry + validate（LOOP-OPS §4.1）+ `perf-probe`（`BAR-PERF §7`），一次做完 |
-| 2 | Claude Code (Sonnet) | builder 輪次，反覆 |
+| 1 | Codex | telemetry + validate（LOOP-OPS §4.1）+ `perf-probe`（`BAR-PERF §7`），一次做完 ✅ R3 已完成 |
+| 2 | **Codex** | builder 輪次，反覆 |
 | 3 | Python | critic，零成本 |
 | 4 | Cursor | 套 diff、跑 replay |
+
+> **修正（R3 收尾）：** 原表第 2 項寫「Claude Code (Sonnet)」，是 `LOOP-OPS.md §1`
+> 通用範本的殘留，跟本專案實際的寫入範圍表衝突——手感調校要改的是
+> `src/physics/world.ts`，那是 Codex 的專屬寫入範圍（`ARCHITECTURE.md` 約束三），
+> 不是 Claude Code 能碰的。builder 輪次改指派給 Codex；Claude Code 在 W2
+> 沒有任務，除非之後某個元件真的需要碰 `src/render/`（目前沒有）。
 
 ### 元件與順序
 

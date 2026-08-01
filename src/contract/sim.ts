@@ -30,6 +30,12 @@ export interface WorldInput {
   reverse?: boolean;
   /** One-shot 跳躍請求。 */
   jump?: boolean;
+  /**
+   * 按住以進入/維持漂移，放開以釋放 mini-turbo。BAR-FEEL §4 的機制細節見
+   * 該節新增的「輸入機制」小節——bar 只定義了結果指標，觸發方式原本沒寫，
+   * 這是 R4 之前補上的契約缺口。
+   */
+  drift?: boolean;
 }
 
 /** Codex 實作。純資料，不得 import three、不得碰 DOM。 */

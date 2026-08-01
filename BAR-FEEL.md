@@ -126,6 +126,20 @@
 | 4.9 | `drift_yaw_rate_ratio` | `[1.25, 1.60]` | 漂移中 yaw_rate / 正常轉向 yaw_rate |
 | 4.10 | `drift_speed_retention` | `[0.88, 0.97]` | 漂移中速度 / 直線同時刻速度 |
 
+**輸入機制（R4 前補上，原本只定結果指標沒定觸發方式）：** `WorldInput.drift`
+按住進入/維持，放開釋放。
+
+- 進入條件：`drift` 為 true 且 `abs(steer) > 0`（不轉向不算漂移）且
+  `speed >= drift_entry_min_speed_us`（4.1）——不滿足時 `driftState` 停在 `none`
+- 維持期間：`driftState` 依累積時長走 `charging`，`driftTier` 依 4.2/4.3/4.4
+  的時間門檻遞增，`driftCharge` 線性累積到 1（達 1 後不再增加，見 §1.2 定義）
+- 釋放：`drift` 由 true 變 false 時，若當下 `driftTier > 0`，給予對應
+  tier 的位移增益（4.5/4.6/4.7 車身數）與 `driftState` 短暫轉 `released`
+  持續 `miniturbo_duration_tier2_s`（4.8，其餘 tier 由你決定合理縮放），
+  之後回到 `none`
+- 提早放開（`driftTier` 仍是 0）：直接回到 `none`，不給任何增益
+- 漂移中轉向手感由 4.9/4.10 定義（yaw 更靈敏、速度小幅流失但不到失速）
+
 **設計意圖：** 4.5 是整個 W2 的心臟，也是「賽車遊戲好不好玩」的唯一真正判準。滿意度來自「**一個彎道內**肉眼可見拉開一個明確身位」——低於 1.5 車身感覺沒用，高於 2.5 車身則不漂移的玩法完全不可行。
 
 **★ 4.5 的特殊地位：** 這是本文件唯一一個「單獨 FAIL 就退回整波」的指標。其餘全部 PASS 而 4.5 FAIL 時，W2 仍不得結束、不得進 W3、相關檔案不得進 `FROZEN.md`。撞到 `budget.json` 的 cap 也不例外——4.5 未達標時由 Lead 裁決是否加碼，**不適用** LOOP-OPS §6 的「強制進入下一個元件」。
