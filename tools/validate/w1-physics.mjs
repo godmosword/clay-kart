@@ -24,10 +24,12 @@ if (!modulePath) {
   modulePath = resolve(assetDir, worldChunks[0]);
 }
 
-const { createWorld } = await import(pathToFileURL(resolve(modulePath)).href);
+const { createWorld, TRACK_GEOMETRY } = await import(pathToFileURL(resolve(modulePath)).href);
+if (TRACK_GEOMETRY === undefined) {
+  throw new Error('physics module must export TRACK_GEOMETRY from @physics/constants');
+}
 const DT = 1 / 120;
-const TRACK_RADIUS = 30;
-const TRACK_HALF_WIDTH = 6;
+const { centerX, centerZ, radius: TRACK_RADIUS, halfWidth: TRACK_HALF_WIDTH } = TRACK_GEOMETRY;
 const KART_BOUNDING_RADIUS = Math.hypot(1.2, 0.7);
 const INNER_BOUNDARY = TRACK_RADIUS - TRACK_HALF_WIDTH + KART_BOUNDING_RADIUS;
 const OUTER_BOUNDARY = TRACK_RADIUS + TRACK_HALF_WIDTH - KART_BOUNDING_RADIUS;
@@ -97,7 +99,7 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
     const snapshot = world.snapshot();
     const [x, y, z] = snapshot.kart.pos;
     assert([x, y, z, snapshot.kart.speed, snapshot.kart.yaw].every(Number.isFinite), `non-finite frame ${tick + 1}`);
-    const radius = Math.hypot(x, z - TRACK_RADIUS);
+    const radius = Math.hypot(x - centerX, z - centerZ);
     maxPenetration = Math.max(
       maxPenetration,
       Math.max(0, radius - OUTER_BOUNDARY),
@@ -108,7 +110,7 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
     }
   }
   assert(touchedWall, 'zero-steer physical integration never reached a wall');
-  assert(Math.abs(Math.hypot(world.snapshot().kart.pos[0], world.snapshot().kart.pos[2] - TRACK_RADIUS) - TRACK_RADIUS) > 0.1, 'position is still snapped to centreline');
+  assert(Math.abs(Math.hypot(world.snapshot().kart.pos[0] - centerX, world.snapshot().kart.pos[2] - centerZ) - TRACK_RADIUS) > 0.1, 'position is still snapped to centreline');
   assert(maxPenetration <= 0.05, `wall penetration exceeded BAR-FEEL §2.3: ${maxPenetration}`);
 }
 

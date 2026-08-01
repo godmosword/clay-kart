@@ -1,0 +1,51 @@
+{
+  "fixture": "lap-a",
+  "seed": 20260730,
+  "ticks": 7200,
+  "input_segments": [
+    {
+      "start_tick": 0,
+      "end_tick": 360,
+      "input": {
+        "throttle": 1,
+        "steer": -0.3,
+        "brake": false,
+        "reverse": false,
+        "jump": false
+      }
+    },
+    {
+      "start_tick": 360,
+      "end_tick": 480,
+      "input": {
+        "throttle": 0,
+        "steer": -0.3,
+        "brake": false,
+        "reverse": false,
+        "jump": false
+      }
+    },
+    {
+      "start_tick": 480,
+      "end_tick": 481,
+      "input": {
+        "throttle": 1,
+        "steer": -0.3,
+        "brake": false,
+        "reverse": false,
+        "jump": true
+      }
+    },
+    {
+      "start_tick": 481,
+      "end_tick": 7200,
+      "input": {
+        "throttle": 1,
+        "steer": -0.3,
+        "brake": false,
+        "reverse": false,
+        "jump": false
+      }
+    }
+  ]
+}
