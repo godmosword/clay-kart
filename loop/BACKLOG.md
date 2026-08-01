@@ -24,6 +24,21 @@
 
 ## 待裁決
 
+### collision-response — 6.5 持續貼牆滑行仍被計為 wall stick
+- **輪次**：R7
+- **現況**：`wall_stick_frames=289`，目標 `[0, 3]`；主 replay 的碰撞段約 291 tick，速度大多仍在移動，末段才降到低速。
+- **已嘗試**：將 `collisionImpulse` 的純位置修正與真正速度衝量分離；6.5 由 291 降至 289，但持續向牆施壓的滑行仍形成長碰撞段。
+- **根因判斷**：現行單車環形 collider 沒有獨立的 wall-contact/sliding state，validator 只能從碰撞衝量連段判定，會把高速擦牆與卡牆混在一起；需後續決定接觸狀態或更精確的 stuck 定義。
+- **來源**：`src/physics/world.ts`、`loop/round-7/VERDICT.json`
+- **狀態**：待裁決
+
+### collision-response — 6.4 車對車衝量對稱性不可測
+- **輪次**：R7
+- **現況**：`kart_kart_impulse_symmetry=0`；`SimSnapshot.kart` 只有單車，ghost replay 沒有第二台車。
+- **處置**：本輪不以單車虛構對稱性數字；延後至 `ai-opponents` 多車架構落地後再測。
+- **來源**：R7 artifact meta `kart_kart_collision_coverage`、既有「SimSnapshot 目前只支援單車」條目
+- **狀態**：待裁決
+
 ### steering-grip — §5.5/5.6 缺少可測的草地／泥地表面
 - **輪次**：R6
 - **現況**：`src/physics/world.ts` 的 `snapshot()` 將 surface 固定為 `asphalt`，現行 `TRACK_GEOMETRY` 只有單一瀝青環；feel 實測 `grass_speed_penalty=0`、`dirt_speed_penalty=0`。
