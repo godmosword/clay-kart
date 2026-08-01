@@ -215,8 +215,19 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
     release_events = _events(doc, "miniturbo_release")
     collision_events = _events(doc, "collision")
     landing_events = _events(doc, "landing")
-    normal_yaw = [abs(_finite(frame.get("yaw_rate"))) for frame in frames if frame.get("drift_state") == "none"]
-    drift_yaw = [abs(_finite(frame.get("yaw_rate"))) for frame in frames if frame.get("drift_state") != "none"]
+    active_steer_frames = [
+        frame for frame in frames if abs(_finite(frame.get("steer_input"))) > 0.05
+    ]
+    normal_yaw = [
+        abs(_finite(frame.get("yaw_rate")))
+        for frame in active_steer_frames
+        if frame.get("drift_state") == "none"
+    ]
+    drift_yaw = [
+        abs(_finite(frame.get("yaw_rate")))
+        for frame in active_steer_frames
+        if frame.get("drift_state") != "none"
+    ]
     yaw_ratio = (statistics.fmean(drift_yaw) / statistics.fmean(normal_yaw)) if drift_yaw and normal_yaw and statistics.fmean(normal_yaw) > 0 else 0.0
 
     speed_retention = _finite(meta.get("drift_speed_retention"))
