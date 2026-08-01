@@ -3,7 +3,7 @@
     "fixture": "lap-a",
     "tick_hz": 120,
     "total_ticks": 7200,
-    "build_sha": "1ea2e3c257cc0f08e3035bd9e248b376c8dfa558",
+    "build_sha": "85e8f01300a0e343dfa0ef4bdd9a3077cd3da983",
     "seed": 20260730,
     "replay_byte_identical": true,
     "track_geometry": {
