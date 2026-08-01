@@ -2,11 +2,11 @@
   "tool": "claude-code",
   "worktree": "../ck-visual",
   "branch": "feat/visual",
-  "updated": "2026-07-31T02:30:00Z",
-  "wave": "W1",
-  "round": 2,
-  "element": "minimal-render",
-  "status": "done",
+  "updated": "2026-08-01T00:00:00Z",
+  "wave": "W2",
+  "round": 3,
+  "element": null,
+  "status": "idle",
   "last_verdict": null,
-  "note": "R2 完成（commit b4a64fb）：賽道從 @physics/constants 的 TRACK_GEOMETRY 取得、追尾相機 14.7°（BAR-VISUAL §0.5 規格內）、yaw 最短路徑插值、圈數 HUD。typecheck/build 通過，headless 截圖確認構圖正確。附帶修正 Lead 疏漏：main 先前從未真正併入 feat/physics 的程式碼，已於本輪補上（f8aee33）。 [R2 架構審查後補丁：src/contract/sim.ts 拆出，setInput 進入 SimWorld 正式契約，詳見 loop/BACKLOG.md]"
+  "note": "W1 完成，headless 截圖 + CDP 真實鍵盤驅動皆確認正確。main 已補併（4b2a0c9）。W2 開場只需 Codex 的 telemetry/validator，Claude Code 暫無任務，等 builder 輪次開始。"
 }

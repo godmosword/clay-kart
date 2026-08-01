@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-07-31T03:00:00Z",
-  "wave": "W1",
-  "round": 2,
-  "element": "physics-loop",
-  "status": "building",
-  "last_verdict": "PASS",
-  "note": "R2 落差一完成（commit 888f580）：在 src/physics/constants.ts 公開 TRACK_GEOMETRY 與 TRACK_RADIUS/TRACK_CENTER_Z/TRACK_HALF_WIDTH，world 碰撞由同一來源推導；渲染器可從 @physics/constants 取得賽道本體幾何。node tools/validate/w1-physics.mjs、typecheck/build 通過。落差二待處理。 [R2 架構審查後補丁：src/contract/sim.ts 拆出，setInput 進入 SimWorld 正式契約，詳見 loop/BACKLOG.md]"
+  "updated": "2026-08-01T00:00:00Z",
+  "wave": "W2",
+  "round": 3,
+  "element": "telemetry-validator",
+  "status": "idle",
+  "last_verdict": null,
+  "note": "W1 完成，經 Lead 獨立驗證（決定性、圈數計時、碰撞皆確認）。R3 任務已開：loop/round-3/TASK.md，ghost-replay + feel.py/perf.py，順帶修 R2 遺留的 w1-physics.mjs 座標巧合。"
 }

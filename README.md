@@ -9,8 +9,9 @@
 
 ## 現在在哪
 
-**W1 進行中。** 專案骨架已完成並驗證（vite + ts + three，typecheck/build/dev 皆通）。
-待 Codex 的物理迴圈與 Claude Code 的渲染。
+**W1 完成，W2 即將開始。** 一台車、一條封閉賽道、圈數計時、鍵盤/觸控可駕駛——
+全部經獨立驗證（不只是 typecheck/build，含用 CDP 對真實瀏覽器送鍵盤事件、
+直接讀取模擬內部狀態確認轉向真的改變 yaw）。四個 worktree 同步在同一個 commit。
 
 素材來源是 `podcast-website` 的定義層，**已複製、不共用檔案**，兩個 repo 完全獨立。
 
@@ -49,23 +50,17 @@
 
 任何工具都可以**讀**其他 worktree，但只能**寫**自己的範圍。違反即在 review 時 revert。
 
-## 下一步（W1 剩兩件，可並行）
-
-骨架已完成，另外兩件的寫入範圍不重疊：
+## 下一步（W2 開場，Codex 一份任務做完，其餘等它）
 
 ```bash
-# Codex — 物理
 cd ../ck-physics
-# 取代 src/physics/world.ts 的 stub。固定 tick 迴圈、碰撞、封閉賽道 collider、圈數計時。
-# 硬性約束：不得 import three、不得碰 DOM、不得讀 wall-clock、不得用未固定種子亂數
-
-# Claude Code (Sonnet，不要開 Opus)
-cd ../ck-visual
-# 取代 src/render/renderer.ts 的 stub。方塊車 + 追尾相機（BAR-VISUAL §0.5：離水平面 12–18°）
+# 讀 loop/round-3/TASK.md：telemetry + validator，W2 全波唯一需要做的基礎設施。
+# 做完之後 W2 的 critic 成本降為零（Python 判 PASS/FAIL，不用 LLM）。
 ```
 
-**W1 不跑 loop。** 完成條件：一台車、一條封閉賽道、圈數計時、能開不卡。達成即進 W2。
-這一波開 Opus 是純粹浪費。
+**這一波不要用 Opus。** 手感是數值調校不是創作，Sonnet 完全夠用，critic 免費，
+可以放心跑很多輪（`LOOP-OPS §5`）。Cursor 和 Claude Code 在 telemetry/validator
+做完前沒有 W2 的事可做。
 
 ## 監看
 

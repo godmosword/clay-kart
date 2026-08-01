@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-07-31T22:08:18Z",
-  "wave": "W1",
-  "round": 2,
-  "element": "input-wiring",
-  "status": "done",
+  "updated": "2026-08-01T00:00:00Z",
+  "wave": "W2",
+  "round": 3,
+  "element": null,
+  "status": "idle",
   "last_verdict": null,
-  "note": "R2：實作 src/ui/player-input.ts（鍵盤+觸控 InputSource），main.ts 傳入 bootstrap；package.json 加 test script。typecheck/build/npm test 皆 PASS。"
+  "note": "R2 完成並經 Lead 用 CDP 對真實瀏覽器送合成鍵盤事件驗證：油門/轉向/放開歸零皆對照模擬內部狀態確認無誤。main 已補併（3d7d5b9，此前遺漏未併，已修）。W2 開場無 Cursor 任務。"
 }

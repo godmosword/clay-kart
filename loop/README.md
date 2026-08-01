@@ -30,6 +30,31 @@ git push
 
 程式碼的 commit 留在自己分支，協調狀態的 commit 進 main。兩者不混。
 
+### ⚠️ 光更新 progress.json 不代表程式碼進了 main（真實發生過兩次的錯）
+
+`progress/*.json` 只是**狀態燈號**。builder 在自己分支 push 完程式碼，
+**Lead 必須另外把那個分支 merge 進 `main`**，兩件事分開發生，缺一個都會出事。
+
+只更新 progress.json、忘記 merge 程式碼的後果：`progress.json` 顯示
+`"status": "done"`，但其他 worktree（含 Lead 自己拿去測試的那個）讀到的
+還是舊程式碼——**驗證會通過，因為驗證的是錯的東西**。這件事在本專案
+發生過兩次（R1 物理程式碼、R2 渲染程式碼），第二次是靠實測時發現畫面
+缺了一塊才追出來，不是靠流程擋下來的。
+
+**每輪收尾前，Lead 執行這個檢查，不要用記的：**
+
+```bash
+cd ../clay-kart
+for b in feat/physics feat/visual feat/plumb; do
+  git merge-base --is-ancestor "origin/$b" HEAD \
+    && echo "  ✓ $b 已在 main 裡" \
+    || echo "  ⚠ $b 還沒併進 main：$(git log origin/$b --not HEAD --oneline | wc -l) 個 commit 待併"
+done
+```
+
+三個都要是 ✓，才算這輪真的收尾。不是三個 ✓ 就 `git merge origin/<branch> --no-edit`，
+驗證 build，push，再繼續。
+
 ### 遠端衝突規則
 
 `origin` = https://github.com/godmosword/clay-kart
