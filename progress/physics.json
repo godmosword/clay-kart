@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T06:00:00Z",
+  "updated": "2026-08-01T07:00:00Z",
   "wave": "W2",
   "round": 6,
   "element": "steering-grip",
   "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R5 獨立驗證：7.1=0.3115/4.9=1.4567/4.10=1.0073 全部重算一致，三次獨立 process byte-identical，pytest 6/6，schema 通過（Codex 環境缺 jsonschema 我補做）。4.10 深挖出真根因：DRIFT_SPEED_RETENTION 只在進場扣一次速度，充能期間被持續加速吃掉，物理面缺持續損速機制。決定：4.5 硬門檻達標，drift-miniturbo 收尾（超支56%），轉 steering-grip。額外發現 5.2 min_turn_radius 不是fixture問題——掃過steer全範圍，yawRate在-0.6見頂後打死方向盤反而下降，非單調，已附完整數據表。R6任務已開。"
+  "note": "R6 任務書更新：BAR-FEEL §5 新增 5.7/5.8/5.9（三點測速+單調性），5.2 更名 turn_radius_at_95pct_u。來源是一份外部提案，Lead 逐項核實後駁回整份（兩個可查證的具體數字宣稱，一個被工作程式碼推翻，一個錯 2.6 倍），只採納這一項定性診斷確認為真的部分。feel.py 需要跟著補新指標。§4/施工順序/預算皆未變動。"
 }
