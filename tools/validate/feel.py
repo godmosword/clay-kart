@@ -144,6 +144,61 @@ def _event_value(events: list[dict[str, Any]], key: str, default: float = 0.0) -
     return statistics.fmean(values) if values else default
 
 
+def _collision_events(doc: dict[str, Any]) -> list[dict[str, Any]]:
+    events = _events(doc, "collision")
+    probes = _meta(doc).get("collision_probes", [])
+    if not isinstance(probes, list):
+        return events
+    for probe in probes:
+        if not isinstance(probe, dict) or not isinstance(probe.get("events"), list):
+            continue
+        probe_name = probe.get("name")
+        for event in probe["events"]:
+            if not isinstance(event, dict) or event.get("type") != "collision":
+                continue
+            data = event.get("data", {})
+            data = dict(data) if isinstance(data, dict) else {}
+            data["probe"] = probe_name
+            events.append({**event, "data": data})
+    return events
+
+
+def _collision_metric(
+    events: list[dict[str, Any]],
+    key: str,
+    *,
+    angle_low: float | None = None,
+    angle_high: float | None = None,
+    first_impact_per_source: bool = False,
+    probe_name: str | None = None,
+) -> float:
+    values = []
+    seen_sources: set[Any] = set()
+    for event in events:
+        data = event.get("data", {})
+        if not isinstance(data, dict) or data.get("phase") != "impact":
+            continue
+        if probe_name is not None and data.get("probe") != probe_name:
+            continue
+        source = data.get("probe", "fixture")
+        if first_impact_per_source and source in seen_sources:
+            continue
+        if first_impact_per_source:
+            seen_sources.add(source)
+        angle = _finite(data.get("normal_angle_deg"), math.inf)
+        if angle_low is not None and angle < angle_low:
+            continue
+        if angle_high is not None and angle > angle_high:
+            continue
+        raw = data.get(key)
+        if raw is None:
+            continue
+        value = _finite(raw, math.nan)
+        if math.isfinite(value):
+            values.append(value)
+    return statistics.median(values) if values else 0.0
+
+
 def _nan_inf_frames(frames: list[dict[str, Any]]) -> int:
     count = 0
     for frame in frames:
@@ -216,7 +271,7 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
             charge_times[tier] = _finite(charged.get("t")) - _finite(frames[drift_start].get("t")) if charged else 0.0
 
     release_events = _events(doc, "miniturbo_release")
-    collision_events = _events(doc, "collision")
+    collision_events = _collision_events(doc)
     landing_events = _events(doc, "landing")
     active_steer_frames = [
         frame for frame in frames if abs(_finite(frame.get("steer_input"))) > 0.05
@@ -311,9 +366,27 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
             max_stick = max(max_stick, current_stick)
         else:
             current_stick = 0
-    wall_retention = _event_value(collision_events, "wall_speed_retention")
-    head_on_retention = _event_value(collision_events, "head_on_retention")
-    recovery_time = _event_value(collision_events, "recovery_time_s")
+    # The telemetry records the angle between incoming ground velocity and the
+    # wall normal: 0° is head-on, 90° is tangent.  Use a 20–40° band for the
+    # BAR's 30° wall scrape and <=15° for the head-on probe.
+    wall_retention = _collision_metric(
+        collision_events,
+        "wall_speed_retention",
+        angle_low=20.0,
+        angle_high=40.0,
+        probe_name="wall-30deg",
+    )
+    head_on_retention = _collision_metric(
+        collision_events,
+        "wall_speed_retention",
+        angle_high=15.0,
+        probe_name="wall-head-on",
+    )
+    recovery_time = _collision_metric(
+        collision_events,
+        "recovery_time_s",
+        first_impact_per_source=True,
+    )
     symmetry = _event_value(collision_events, "impulse_symmetry")
     airborne = [frame for frame in frames if not frame.get("grounded", True)]
     grounded = [frame for frame in frames if frame.get("grounded", True)]

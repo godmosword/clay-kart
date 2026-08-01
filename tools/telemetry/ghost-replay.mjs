@@ -36,6 +36,46 @@ function frameFromSnapshot(snapshot) {
   };
 }
 
+function groundSpeed(value) {
+  return Math.hypot(value.vel[0], value.vel[2]);
+}
+
+function collisionData(previousKart, currentKart) {
+  const dx = currentKart.pos[0] - TRACK_GEOMETRY.centerX;
+  const dz = currentKart.pos[2] - TRACK_GEOMETRY.centerZ;
+  const radialDistance = Math.hypot(dx, dz);
+  const radialX = radialDistance > 0 ? dx / radialDistance : 1;
+  const radialZ = radialDistance > 0 ? dz / radialDistance : 0;
+  const kartRadius = Math.hypot(CAR_LENGTH / 2, CAR_WIDTH / 2);
+  const innerBoundary = TRACK_GEOMETRY.radius - TRACK_GEOMETRY.halfWidth + kartRadius;
+  const outerBoundary = TRACK_GEOMETRY.radius + TRACK_GEOMETRY.halfWidth - kartRadius;
+  const isOuterWall = Math.abs(radialDistance - outerBoundary)
+    <= Math.abs(radialDistance - innerBoundary);
+  const wallNormal = isOuterWall
+    ? [radialX, radialZ]
+    : [-radialX, -radialZ];
+  const previousGroundSpeed = groundSpeed(previousKart);
+  const currentGroundSpeed = groundSpeed(currentKart);
+  const previousNormalSpeed = previousGroundSpeed > 0
+    ? (previousKart.vel[0] * wallNormal[0] + previousKart.vel[2] * wallNormal[1]) / previousGroundSpeed
+    : 0;
+  const normalAngle = previousGroundSpeed > 0
+    ? Math.acos(Math.max(-1, Math.min(1, previousNormalSpeed))) * 180 / Math.PI
+    : 90;
+  return {
+    wall: isOuterWall ? 'outer' : 'inner',
+    wall_normal: wallNormal,
+    normal_angle_deg: normalAngle,
+    pre_speed: previousKart.speed,
+    post_speed: currentKart.speed,
+    pre_ground_speed: previousGroundSpeed,
+    post_ground_speed: currentGroundSpeed,
+    wall_speed_retention: previousGroundSpeed > 0 ? currentGroundSpeed / previousGroundSpeed : 0,
+    pre_yaw_rate: previousKart.yawRate,
+    post_yaw_rate: currentKart.yawRate,
+  };
+}
+
 function eventsBetween(previous, current) {
   const events = [];
   const tick = current.tick;
@@ -49,7 +89,11 @@ function eventsBetween(previous, current) {
     events.push({
       tick,
       type: 'collision',
-      data: { impulse: current.kart.collisionImpulse },
+      data: {
+        impulse: current.kart.collisionImpulse,
+        phase: previous.kart.collisionImpulse > 0 ? 'contact' : 'impact',
+        ...collisionData(previous.kart, current.kart),
+      },
     });
   }
   if (previous.kart.driftState === 'none' && current.kart.driftState !== 'none') {
@@ -64,6 +108,42 @@ function eventsBetween(previous, current) {
   return events;
 }
 
+function annotateCollisionRecovery(events, frames) {
+  const collisionEvents = events.filter(
+    (event) => event.type === 'collision' && event.data?.phase === 'impact',
+  );
+  for (const event of collisionEvents) {
+    const impactIndex = frames.findIndex((frame) => frame.tick === event.tick);
+    if (impactIndex < 0) continue;
+    const reference = event.data;
+    const speedFloor = Number(reference.pre_ground_speed) * 0.5;
+    const preYawRate = Number(reference.pre_yaw_rate);
+    let recoveryFrame = null;
+    for (let index = impactIndex + 1; index < frames.length - 1; index += 1) {
+      const first = frames[index];
+      const second = frames[index + 1];
+      const expectedFirstYaw = preYawRate * Math.min(2, groundSpeed(first) / Math.max(speedFloor * 2, 1e-9));
+      const expectedSecondYaw = preYawRate * Math.min(2, groundSpeed(second) / Math.max(speedFloor * 2, 1e-9));
+      const firstControlled = first.grounded
+        && first.collision_impulse <= 0
+        && groundSpeed(first) >= speedFloor
+        && Math.abs(first.yaw_rate - expectedFirstYaw) <= Math.max(0.05, Math.abs(expectedFirstYaw) * 0.25);
+      const secondControlled = second.grounded
+        && second.collision_impulse <= 0
+        && groundSpeed(second) >= speedFloor
+        && Math.abs(second.yaw_rate - expectedSecondYaw) <= Math.max(0.05, Math.abs(expectedSecondYaw) * 0.25);
+      if (firstControlled && secondControlled) {
+        recoveryFrame = first;
+        break;
+      }
+    }
+    event.data.recovery_time_s = recoveryFrame
+      ? (recoveryFrame.t - (event.tick / TICK_HZ))
+      : null;
+    event.data.recovery_definition = 'first two consecutive grounded, collision-free frames above 50% pre-impact ground speed with yaw-rate error <= max(0.05, 25% expected)';
+  }
+}
+
 function addReleaseDurations(events, frames) {
   for (const event of events) {
     if (event.type !== 'miniturbo_release') continue;
@@ -74,50 +154,80 @@ function addReleaseDurations(events, frames) {
   }
 }
 
-async function replayOnce(inputTransform = (input) => input) {
+async function replayTicks(totalTicks, inputAtTick, fixtureName, seed) {
   const world = createWorld();
   const frames = [];
   const events = [];
   let previous = world.snapshot();
-  for (let tick = 0; tick < fixture.ticks; tick += 1) {
+  for (let tick = 0; tick < totalTicks; tick += 1) {
     // advance() owns the world.setInput() + world.step() ordering.
-    advance(world, 1, () => inputTransform(inputAt(fixture, tick), tick));
+    advance(world, 1, () => inputAtTick(tick));
     const current = world.snapshot();
     frames.push(frameFromSnapshot(current));
     events.push(...eventsBetween(previous, current));
     previous = current;
   }
   addReleaseDurations(events, frames);
+  annotateCollisionRecovery(events, frames);
 
   return {
     meta: {
-      fixture: fixture.fixture,
+      fixture: fixtureName,
       tick_hz: TICK_HZ,
-      total_ticks: fixture.ticks,
+      total_ticks: totalTicks,
       build_sha: buildSha(),
-      seed: fixture.seed,
+      seed,
       replay_byte_identical: true,
       track_geometry: { ...TRACK_GEOMETRY },
       car_length: CAR_LENGTH,
       car_width: CAR_WIDTH,
       base_top_speed: BASE_TOP_SPEED,
+      collision_recovery_definition: 'first two consecutive grounded, collision-free frames above 50% pre-impact ground speed with yaw-rate error <= max(0.05, 25% expected)',
+      kart_kart_collision_coverage: 'unavailable: SimSnapshot exposes one kart; deferred to ai-opponents',
     },
     frames,
     events,
   };
 }
 
+async function replayOnce(inputTransform = (input) => input) {
+  return replayTicks(
+    fixture.ticks,
+    (tick) => inputTransform(inputAt(fixture, tick), tick),
+    fixture.fixture,
+    fixture.seed,
+  );
+}
+
+async function collisionProbe(name, steer, ticks = 300) {
+  const replay = await replayTicks(
+    ticks,
+    () => ({ throttle: 1, steer, brake: false, reverse: false, drift: false, jump: false }),
+    `collision-${name}`,
+    `${fixture.seed}-${name}`,
+  );
+  return {
+    name,
+    steer,
+    events: replay.events.filter((event) => event.type === 'collision'),
+  };
+}
+
 const driftReplays = await Promise.all([replayOnce(), replayOnce(), replayOnce()]);
 const baseline = await replayOnce((input) => ({ ...input, drift: false }));
+const collisionProbes = await Promise.all([
+  collisionProbe('wall-30deg', -0.95),
+  collisionProbe('wall-head-on', 1),
+]);
 // Keep the gameplay fixture focused on the cross-section used by §2–§4 and
 // §7.  The speed-radius checks need a sustained full-lock sweep, so collect
 // that diagnostic series in a separate deterministic replay and attach only
 // its scalar samples to telemetry metadata.
 const steeringCalibration = await replayOnce((input, tick) => {
-  if (tick >= 731 && tick < 1100) {
+  if (tick >= 731 && tick < 1400) {
     return { throttle: 1, steer: -1, brake: false, reverse: false, drift: false, jump: false };
   }
-  if (tick >= 1100 && tick < 6000) {
+  if (tick >= 1400 && tick < 6000) {
     return { throttle: 1, steer: -1, brake: true, reverse: false, drift: false, jump: false };
   }
   return input;
@@ -173,6 +283,7 @@ for (const replay of driftReplays) {
   replay.meta.baselines = baselines;
   replay.meta.drift_speed_retention = driftSpeedRetention;
   replay.meta.steering_radius_samples = steeringRadiusSamples;
+  replay.meta.collision_probes = collisionProbes;
 }
 const replays = driftReplays;
 const serialized = replays.map((replay) => JSON.stringify(replay, null, 2) + '\n');

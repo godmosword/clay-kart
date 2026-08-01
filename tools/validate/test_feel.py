@@ -121,3 +121,63 @@ def test_drift_yaw_ratio_ignores_zero_steer_frames() -> None:
         "events": [],
     }
     assert calculate_metrics(telemetry)["drift_yaw_rate_ratio"] == 1.4
+
+
+def test_collision_metrics_use_angle_profiles_and_first_probe_impacts() -> None:
+    def frame(tick: int) -> dict:
+        return {
+            "t": tick / 120,
+            "tick": tick,
+            "pos": [30, 0, 30],
+            "vel": [0, 0, 12],
+            "speed": 12,
+            "yaw": 0,
+            "yaw_rate": 0,
+            "steer_input": 0,
+            "throttle_input": 1,
+            "drift_state": "none",
+            "grounded": True,
+            "surface": "asphalt",
+            "collision_impulse": 0,
+        }
+
+    def collision(tick: int, angle: float, retention: float, recovery: float | None) -> dict:
+        return {
+            "tick": tick,
+            "type": "collision",
+            "data": {
+                "phase": "impact",
+                "normal_angle_deg": angle,
+                "wall_speed_retention": retention,
+                "recovery_time_s": recovery,
+            },
+        }
+
+    telemetry = {
+        "meta": {
+            "tick_hz": 120,
+            "replay_byte_identical": True,
+            "collision_probes": [
+                {
+                    "name": "wall-30deg",
+                    "events": [
+                        collision(1, 30, 0.6, 0.1),
+                        collision(2, 35, 0.7, 0.01),
+                    ],
+                },
+                {
+                    "name": "wall-head-on",
+                    "events": [
+                        collision(3, 10, 0.15, 0.4),
+                        collision(4, 12, 0.2, None),
+                    ],
+                },
+            ],
+        },
+        "frames": [frame(1), frame(2)],
+        "events": [],
+    }
+    metrics = calculate_metrics(telemetry)
+    assert metrics["wall_speed_retention"] == 0.6499999999999999
+    assert metrics["wall_head_on_retention"] == 0.175
+    assert metrics["collision_recovery_time_s"] == 0.25
