@@ -24,10 +24,51 @@
 
 ## 待裁決
 
-### fixtures/lap-a.json 沒有 reverse 區段，§3.5 恆為 FAIL
-- **輪次**：R3 審查發現
-- **現況**：四個 input segment 全部 `"reverse": false`，車從沒真的倒車過。
-  `feel.py` 算出 `reverse_top_speed_ratio = 0.0`，恆低於窗口 `[0.30, 0.42]`
+### drift-miniturbo 的 4.4/4.6/4.7 很可能是 fixture 覆蓋率問題，不是物理
+- **輪次**：R4 審查發現
+- **現況**：fixture 的 drift 只連續維持 3.0s（tick 0–360），未達 tier3 門檻
+  3.5s，且全程只測了一次「充到 tier2 才放開」的釋放路徑，從沒測過提早在
+  tier1 就放開的情境
+- **目標**：`BAR-FEEL §4.4`（tier3 charge time）、`§4.6`（tier1 車身增益）、
+  `§4.7`（tier3 車身增益）
+- **落差**：三項目前皆 `actual=0`，FAIL——但這可能不代表物理沒做對，
+  只是這份 fixture 沒有測過那些路徑
+- **狀態**：待裁決——等 R5（修 7.1/4.9）穩定後，若要繼續啃 §4 剩餘項目，
+  下一步應該是擴充 fixture 測 tier1 提早釋放與 tier3 完整充能，而非動 world.ts
+
+### drift-miniturbo 預算已超支 14%（455678 / 400000）
+- **輪次**：R4
+- **現況**：`loop/budget.json` 的 `drift-miniturbo.spent = 455678`，
+  cap 為 400000
+- **說明**：`BAR-FEEL §4.5` 的停止規則是「撞 cap 且 4.5 未達標」才需要
+  找 Lead 裁決——這裡 4.5 已經過了，不觸發那條規則，但估算的 cap 明顯偏低
+- **狀態**：待裁決——R5 要求控制在小修正範圍，若之後還要繼續擴充 fixture
+  覆蓋 4.4/4.6/4.7，需要先加碼 cap 才能繼續，不能無限超支下去
+
+### 4.10 是硬編碼常數回填，不是真的量測（比 4.9 更嚴重）
+- **輪次**：R4 審查發現
+- **現況**：`tools/telemetry/ghost-replay.mjs:104` 直接把 `DRIFT_SPEED_RETENTION`
+  常數寫進 `meta.drift_speed_retention`，`feel.py` 讀到這個數字跟自己比較，
+  永遠 PASS，不管物理實際表現如何
+- **對照**：同一支腳本裡 `4.5`（`car_lengths_gained_tier2`）做得對——真的
+  另外跑一次 `drift:false` 基準線、用模擬出來的真實位置算位移差。`4.10`
+  應該用同一組 `driftReplays`/`baseline` 資料算速度比，而非回填常數
+- **嚴重性**：比 `4.9` 的驗證器缺陷更嚴重——`4.9` 是算法沒篩選好，至少
+  還是從真實 telemetry 算出來的；`4.10` 是完全沒有從 telemetry 算，
+  是同一種模式（`perf-probe.mjs` 那三個防抽格常數）但這次出現在
+  `BAR-FEEL` 核心管線
+- **狀態**：已排入 R5，優先於 4.9 的修正
+
+### drift-miniturbo 暫不進 FROZEN.md
+- **輪次**：R4
+- **現況**：`feel-validator` 整體仍 FAIL（largest_gap 現為 4.4）。核心指標
+  4.5 已 PASS 但只有 1.56% margin，且 4.9/7.1 這輪才發現問題，R5 還在修
+- **狀態**：R5 完成、§2/§3/4.5 確認不退化後再評估是否收進 FROZEN
+
+### ~~fixtures/lap-a.json 沒有 reverse 區段，§3.5 恆為 FAIL~~ — 已解決
+- **輪次**：R3 發現，R4 修正
+- **處置**：Codex 在 R4 加了 reverse 區段，`reverse_top_speed_ratio` 現為
+  `0.3999`，PASS。移到已裁決
 - **目標**：`BAR-FEEL §3.5`
 - **落差**：目前被 `largest_gap=4.5`（優先序更高）蓋住沒浮現，但 R1 審查時我
   用獨立腳本測過真實倒車行為是對的（實測比例 0.399，在窗口內）——這不是
