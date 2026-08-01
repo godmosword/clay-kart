@@ -90,3 +90,34 @@ def test_simulated_telemetry_calculates_fixed_dt_and_nan_metrics() -> None:
     assert metrics["tick_dt_variance"] == 0.0
     assert metrics["replay_byte_identical"] is True
     assert metrics["nan_or_inf_frames"] == 0.0
+
+
+def test_drift_yaw_ratio_ignores_zero_steer_frames() -> None:
+    def frame(tick: int, steer: float, drift_state: str, yaw_rate: float) -> dict:
+        return {
+            "t": tick / 120,
+            "tick": tick,
+            "pos": [30, 0, 30],
+            "vel": [0, 0, 12],
+            "speed": 12,
+            "yaw": 0,
+            "yaw_rate": yaw_rate,
+            "steer_input": steer,
+            "throttle_input": 1,
+            "drift_state": drift_state,
+            "grounded": True,
+            "surface": "asphalt",
+            "collision_impulse": 0,
+        }
+
+    telemetry = {
+        "meta": {"tick_hz": 120, "replay_byte_identical": True},
+        "frames": [
+            frame(1, 0.3, "none", 0.5),
+            frame(2, 0.0, "none", 0.0),
+            frame(3, 0.0, "none", 0.0),
+            frame(4, 0.3, "charging", 0.7),
+        ],
+        "events": [],
+    }
+    assert calculate_metrics(telemetry)["drift_yaw_rate_ratio"] == 1.4

@@ -101,7 +101,6 @@ async function replayOnce(inputTransform = (input) => input) {
       car_length: CAR_LENGTH,
       car_width: CAR_WIDTH,
       base_top_speed: BASE_TOP_SPEED,
-      drift_speed_retention: 0.93,
     },
     frames,
     events,
@@ -131,7 +130,22 @@ const baselines = {
     car_lengths_gained: (driftDistance - straightDistance) / CAR_LENGTH,
   },
 };
-for (const replay of driftReplays) replay.meta.baselines = baselines;
+const activeDriftFrames = driftReplays[0].frames.filter((frame) => frame.drift_state !== 'none');
+if (activeDriftFrames.length === 0) throw new Error('fixture did not produce drift frames');
+const driftStartTick = activeDriftFrames[0].tick;
+const driftEndTick = activeDriftFrames.at(-1).tick;
+const baselineWindowFrames = baseline.frames.filter(
+  (frame) => frame.tick >= driftStartTick && frame.tick <= driftEndTick,
+);
+const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+const driftSpeedMean = mean(activeDriftFrames.map((frame) => frame.speed));
+const baselineSpeedMean = mean(baselineWindowFrames.map((frame) => frame.speed));
+if (baselineSpeedMean <= 0) throw new Error('baseline drift window has no speed');
+const driftSpeedRetention = driftSpeedMean / baselineSpeedMean;
+for (const replay of driftReplays) {
+  replay.meta.baselines = baselines;
+  replay.meta.drift_speed_retention = driftSpeedRetention;
+}
 const replays = driftReplays;
 const serialized = replays.map((replay) => JSON.stringify(replay, null, 2) + '\n');
 if (!(serialized[0] === serialized[1] && serialized[1] === serialized[2])) {

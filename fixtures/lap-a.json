@@ -77,22 +77,10 @@
     },
     {
       "start_tick": 650,
-      "end_tick": 700,
+      "end_tick": 651,
       "input": {
         "throttle": 1,
-        "steer": 0,
-        "brake": true,
-        "reverse": false,
-        "drift": false,
-        "jump": false
-      }
-    },
-    {
-      "start_tick": 700,
-      "end_tick": 701,
-      "input": {
-        "throttle": 1,
-        "steer": 0,
+        "steer": -0.2,
         "brake": true,
         "reverse": false,
         "drift": false,
@@ -100,7 +88,19 @@
       }
     },
     {
-      "start_tick": 701,
+      "start_tick": 651,
+      "end_tick": 731,
+      "input": {
+        "throttle": 1,
+        "steer": -0.2,
+        "brake": true,
+        "reverse": false,
+        "drift": false,
+        "jump": false
+      }
+    },
+    {
+      "start_tick": 731,
       "end_tick": 6000,
       "input": {
         "throttle": 1,
