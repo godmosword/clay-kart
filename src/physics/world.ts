@@ -335,3 +335,6 @@ class World implements PhysicsWorld {
 export function createWorld(): PhysicsWorld {
   return new World();
 }
+
+// Public physics API for renderers and headless tooling.
+export { BASE_TOP_SPEED, CAR_LENGTH, CAR_WIDTH, TRACK_GEOMETRY } from './constants.js';

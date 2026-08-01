@@ -1,0 +1,108 @@
+#!/usr/bin/env node
+
+/** Deterministic headless replay: fixture -> BAR-FEEL telemetry JSON. */
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import {
+  buildSha,
+  inputAt,
+  loadSimulation,
+  readFixture,
+} from './runtime.mjs';
+
+const fixturePath = process.argv[2] ?? 'fixtures/lap-a.json';
+const outputPath = process.argv[3] ?? 'telemetry/lap-a.json';
+const fixture = await readFixture(fixturePath);
+const { createWorld, advance, BASE_TOP_SPEED, CAR_LENGTH, CAR_WIDTH, TRACK_GEOMETRY, TICK_HZ } = await loadSimulation();
+
+function frameFromSnapshot(snapshot) {
+  const kart = snapshot.kart;
+  return {
+    t: snapshot.t,
+    tick: snapshot.tick,
+    pos: [...kart.pos],
+    vel: [...kart.vel],
+    speed: kart.speed,
+    yaw: kart.yaw,
+    yaw_rate: kart.yawRate,
+    steer_input: kart.steerInput,
+    throttle_input: kart.throttleInput,
+    drift_state: kart.driftState,
+    drift_charge: kart.driftCharge,
+    drift_tier: kart.driftTier,
+    grounded: kart.grounded,
+    surface: kart.surface,
+    collision_impulse: kart.collisionImpulse,
+  };
+}
+
+function eventsBetween(previous, current) {
+  const events = [];
+  const tick = current.tick;
+  if (previous.kart.grounded && !current.kart.grounded) {
+    events.push({ tick, type: 'airborne_start', data: {} });
+  }
+  if (!previous.kart.grounded && current.kart.grounded) {
+    events.push({ tick, type: 'landing', data: {} });
+  }
+  if (current.kart.collisionImpulse > 0) {
+    events.push({
+      tick,
+      type: 'collision',
+      data: { impulse: current.kart.collisionImpulse },
+    });
+  }
+  if (previous.kart.driftState === 'none' && current.kart.driftState !== 'none') {
+    events.push({ tick, type: 'drift_start', data: {} });
+  }
+  if (current.kart.driftTier > previous.kart.driftTier) {
+    events.push({ tick, type: 'drift_tier_up', data: { tier: current.kart.driftTier } });
+  }
+  if (previous.kart.driftState !== 'none' && current.kart.driftState === 'none') {
+    events.push({ tick, type: 'miniturbo_release', data: { tier: previous.kart.driftTier } });
+  }
+  return events;
+}
+
+async function replayOnce() {
+  const world = createWorld();
+  const frames = [];
+  const events = [];
+  let previous = world.snapshot();
+  for (let tick = 0; tick < fixture.ticks; tick += 1) {
+    // advance() owns the world.setInput() + world.step() ordering.
+    advance(world, 1, () => inputAt(fixture, tick));
+    const current = world.snapshot();
+    frames.push(frameFromSnapshot(current));
+    events.push(...eventsBetween(previous, current));
+    previous = current;
+  }
+
+  return {
+    meta: {
+      fixture: fixture.fixture,
+      tick_hz: TICK_HZ,
+      total_ticks: fixture.ticks,
+      build_sha: buildSha(),
+      seed: fixture.seed,
+      replay_byte_identical: true,
+      track_geometry: { ...TRACK_GEOMETRY },
+      car_length: CAR_LENGTH,
+      car_width: CAR_WIDTH,
+      base_top_speed: BASE_TOP_SPEED,
+    },
+    frames,
+    events,
+  };
+}
+
+const replays = await Promise.all([replayOnce(), replayOnce(), replayOnce()]);
+const serialized = replays.map((replay) => JSON.stringify(replay, null, 2) + '\n');
+if (!(serialized[0] === serialized[1] && serialized[1] === serialized[2])) {
+  throw new Error('ghost replay is not byte-identical across three runs');
+}
+
+const output = resolve(outputPath);
+await mkdir(dirname(output), { recursive: true });
+await writeFile(output, serialized[0], 'utf8');
+console.log(`ghost-replay: PASS (${fixture.fixture}, ${fixture.ticks} ticks) -> ${output}`);
