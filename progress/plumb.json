@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-01T00:00:00Z",
+  "updated": "2026-08-01T09:00:00Z",
   "wave": "W2",
-  "round": 3,
-  "element": null,
+  "round": 8,
+  "element": "drift-input-binding",
   "status": "idle",
   "last_verdict": null,
-  "note": "R2 完成並經 Lead 用 CDP 對真實瀏覽器送合成鍵盤事件驗證：油門/轉向/放開歸零皆對照模擬內部狀態確認無誤。main 已補併（3d7d5b9，此前遺漏未併，已修）。W2 開場無 Cursor 任務。"
+  "note": "R8 任務已開：loop/round-8/TASK-cursor.md。發現 WorldInput.drift 從 R3 就存在，Codex 三輪超過 120 萬 token 調漂移手感，但 player-input.ts 從沒有 drift 鍵位/按鈕，玩家現在完全觸發不了漂移。順帶修 npm test 沒有自動 build 的 DX 問題。"
 }
