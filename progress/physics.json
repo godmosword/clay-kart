@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T07:00:00Z",
+  "updated": "2026-08-01T13:26:20Z",
   "wave": "W2",
   "round": 6,
   "element": "steering-grip",
-  "status": "idle",
+  "status": "done",
   "last_verdict": "FAIL",
-  "note": "R6 任務書更新：BAR-FEEL §5 新增 5.7/5.8/5.9（三點測速+單調性），5.2 更名 turn_radius_at_95pct_u。來源是一份外部提案，Lead 逐項核實後駁回整份（兩個可查證的具體數字宣稱，一個被工作程式碼推翻，一個錯 2.6 倍），只採納這一項定性診斷確認為真的部分。feel.py 需要跟著補新指標。§4/施工順序/預算皆未變動。"
+  "note": "R6 完成：steering-grip 加入轉向輸入慣性與速度相關全舵角抓地；feel.py 補 5.7/5.8/5.9 並將 5.2 改名。5.2=8.7179、5.7=5.0862、5.8=6.9259、5.9=true，4.5=1.5191、4.9=1.4544、7.1=0.3258 均 PASS。5.5/5.6 因目前賽道只有 asphalt 已寫入 BACKLOG；整體 verdict 仍因既有 4.4/4.6/4.7 等缺口為 FAIL。程式碼 commits d30721d、3375c96。"
 }

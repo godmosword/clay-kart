@@ -24,6 +24,14 @@
 
 ## 待裁決
 
+### steering-grip — §5.5/5.6 缺少可測的草地／泥地表面
+- **輪次**：R6
+- **現況**：`src/physics/world.ts` 的 `snapshot()` 將 surface 固定為 `asphalt`，現行 `TRACK_GEOMETRY` 只有單一瀝青環；feel 實測 `grass_speed_penalty=0`、`dirt_speed_penalty=0`。
+- **目標**：5.5 `[0.55, 0.70]`、5.6 `[0.80, 0.90]`
+- **處置**：本輪跳過，不虛構不存在的草地／泥地幾何；需之後的賽道內容與 surface 區域落地後再測，物理層再套用速度懲罰。
+- **來源**：`loop/round-6/VERDICT.json`、`src/physics/world.ts`
+- **狀態**：待裁決
+
 ### 外部提案「BAR-FEEL v2」——駁回整份，只採納一項（5.7/5.8/5.9）
 - **輪次**：R6 開工前
 - **收到的內容**：一份格式完整、論證詳細的文件，主張整份改寫 `BAR-FEEL §4/§5`
