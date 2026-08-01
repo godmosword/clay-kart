@@ -428,7 +428,9 @@ def main(argv: list[str] | None = None) -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(verdict, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"feel: {verdict['verdict']} (largest_gap={verdict['largest_gap']['id'] if verdict['largest_gap'] else 'none'}) -> {args.output}")
-    return 0 if verdict["verdict"] == "PASS" else 1
+    # A valid FAIL is a critic result, not a validator execution error.  The
+    # machine-readable verdict carries the PASS/FAIL decision for the loop.
+    return 0
 
 
 if __name__ == "__main__":
