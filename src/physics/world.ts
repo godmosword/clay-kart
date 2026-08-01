@@ -36,9 +36,8 @@ const DRIFT_TIER1_TIME = 0.85;
 const DRIFT_TIER2_TIME = 2.0;
 const DRIFT_TIER3_TIME = 3.5;
 const DRIFT_YAW_RATE_RATIO = 1.4;
-const DRIFT_SPEED_RETENTION = 0.93;
 const MINI_TURBO_DURATION = 1.05;
-const MINI_TURBO_GAIN_BY_TIER = [0, 0.85, 2.4, 3.4] as const;
+const MINI_TURBO_GAIN_BY_TIER = [0, 0.85, 2.5, 3.4] as const;
 const START_LINE_LEAVE_ANGLE = 0.25;
 const START_LINE_RETURN_ANGLE = Math.PI * 1.75;
 const START_LINE_CROSS_ANGLE = Math.PI * 0.25;
@@ -105,7 +104,6 @@ class World implements PhysicsWorld {
   #driftTime = 0;
   #releaseTimer = 0;
   #boostSpeed = 0;
-  #driftRetentionPending = false;
 
   #trackAngle = 0;
   #hasLeftStartLine = false;
@@ -203,7 +201,6 @@ class World implements PhysicsWorld {
         this.#driftTime = 0;
         this.#driftCharge = 0;
         this.#driftTier = 0;
-        this.#driftRetentionPending = true;
       }
       return;
     }
@@ -237,7 +234,6 @@ class World implements PhysicsWorld {
       this.#driftTier = 0;
       this.#driftTime = 0;
       this.#boostSpeed = 0;
-      this.#driftRetentionPending = false;
     }
   }
 
@@ -246,7 +242,6 @@ class World implements PhysicsWorld {
     this.#driftCharge = 0;
     this.#driftTier = 0;
     this.#driftTime = 0;
-    this.#driftRetentionPending = false;
   }
 
   #releaseDrift(): void {
@@ -260,7 +255,6 @@ class World implements PhysicsWorld {
     this.#driftCharge = 1;
     this.#releaseTimer = releaseDuration;
     this.#boostSpeed = (MINI_TURBO_GAIN_BY_TIER[tier] * CAR_LENGTH) / releaseDuration;
-    this.#driftRetentionPending = false;
   }
 
   #stepVertical(dt: number): void {
@@ -343,13 +337,6 @@ class World implements PhysicsWorld {
       const scale = targetGroundSpeed / groundSpeed;
       this.#vx *= scale;
       this.#vz *= scale;
-    }
-
-    if (this.#driftState === 'charging' && this.#driftRetentionPending && groundSpeed > 0) {
-      const scale = DRIFT_SPEED_RETENTION;
-      this.#vx *= scale;
-      this.#vz *= scale;
-      this.#driftRetentionPending = false;
     }
   }
 
