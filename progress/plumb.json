@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-01T09:00:00Z",
+  "updated": "2026-08-01T13:50:27Z",
   "wave": "W2",
   "round": 8,
   "element": "drift-input-binding",
-  "status": "idle",
+  "status": "done",
   "last_verdict": null,
-  "note": "R8 任務已開：loop/round-8/TASK-cursor.md。發現 WorldInput.drift 從 R3 就存在，Codex 三輪超過 120 萬 token 調漂移手感，但 player-input.ts 從沒有 drift 鍵位/按鈕，玩家現在完全觸發不了漂移。順帶修 npm test 沒有自動 build 的 DX 問題。"
+  "note": "R8：player-input 補 drift（Ctrl + 觸控「漂」），poll() 每次回傳 drift；npm test 改為先 build 再跑 harness。typecheck/test/build PASS；腳本驗證 Ctrl+轉向→drift:true 且 physics driftState=charging。"
 }
