@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T12:36:23Z",
+  "updated": "2026-08-01T06:00:00Z",
   "wave": "W2",
-  "round": 5,
-  "element": "drift-miniturbo",
-  "status": "done",
+  "round": 6,
+  "element": "steering-grip",
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R5 完成：physics commit de2ec80 已推送。跳躍 fixture 恢復空中 steering，7.1=0.3115 PASS；4.9 改為只統計主動 steering，1.4567 PASS；4.10 改為 drift/straight 同 tick 區間真實速度比，1.0073（可信 FAIL，不再硬編碼）。§4.5=1.5156 PASS，§3.1–3.5 全部 PASS，三次獨立 ghost process byte-identical。整體 verdict 仍因 fixture 未覆蓋 tier3 的 §4.4 而 FAIL；R5 不处理已知覆盖率问题。"
+  "note": "R5 獨立驗證：7.1=0.3115/4.9=1.4567/4.10=1.0073 全部重算一致，三次獨立 process byte-identical，pytest 6/6，schema 通過（Codex 環境缺 jsonschema 我補做）。4.10 深挖出真根因：DRIFT_SPEED_RETENTION 只在進場扣一次速度，充能期間被持續加速吃掉，物理面缺持續損速機制。決定：4.5 硬門檻達標，drift-miniturbo 收尾（超支56%），轉 steering-grip。額外發現 5.2 min_turn_radius 不是fixture問題——掃過steer全範圍，yawRate在-0.6見頂後打死方向盤反而下降，非單調，已附完整數據表。R6任務已開。"
 }
