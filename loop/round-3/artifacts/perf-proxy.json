@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "fixture": "lap-a",
+    "tick_hz": 120,
+    "total_ticks": 7200,
+    "build_sha": "86ad593b5e21c751a5e9ec203b9b3d1d551a0b9d",
+    "seed": 20260730,
+    "device": "proxy",
+    "device_note": "Node headless proxy; not a real iPad/Android measurement"
+  },
+  "metrics": {
+    "fps_p50": 773993.8080456356,
+    "fps_p05": 303859.00942047196,
+    "frame_time_p99_ms": 0.011213160000008122,
+    "long_frame_count": 0,
+    "gc_pause_max_ms": 0,
+    "first_interactive_s": 0,
+    "initial_bundle_kb_gz": 130.181640625,
+    "total_assets_mb": 0,
+    "time_to_first_render_s": 0,
+    "character_anim_hz": 12,
+    "vehicle_transform_hz": 60,
+    "camera_hz": 60,
+    "heap_peak_mb": 6.4599151611328125,
+    "heap_growth_per_lap_mb": 0.29421844482421877,
+    "draw_calls": 0,
+    "triangles_k": 0,
+    "texture_memory_mb": 0
+  }
+}

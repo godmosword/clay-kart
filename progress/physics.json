@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T00:00:00Z",
+  "updated": "2026-08-01T03:00:00Z",
   "wave": "W2",
   "round": 3,
   "element": "telemetry-validator",
-  "status": "idle",
-  "last_verdict": null,
-  "note": "W1 完成，經 Lead 獨立驗證（決定性、圈數計時、碰撞皆確認）。R3 任務已開：loop/round-3/TASK.md，ghost-replay + feel.py/perf.py，順帶修 R2 遺留的 w1-physics.mjs 座標巧合。"
+  "status": "done",
+  "last_verdict": "PASS",
+  "note": "R3 telemetry-validator 完成：ghost-replay 使用 src/contract/sim.ts 的 advance，三次 byte-identical；feel.py 39 checks、perf.py 17 checks、pytest 邊界測試與 schema 驗證通過。程式碼 commit 86ad593；目前 W1 基線的真實 feel VERDICT 為 FAIL largest_gap=4.5，perf proxy 為 FAIL largest_gap=2.1，供 W2 使用。"
 }
