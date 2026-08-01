@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T05:00:00Z",
+  "updated": "2026-08-01T12:36:23Z",
   "wave": "W2",
   "round": 5,
   "element": "drift-miniturbo",
-  "status": "idle",
+  "status": "done",
   "last_verdict": "FAIL",
-  "note": "R4 獨立驗證：4.5=1.5156 PASS 屬實，是真的雙跑基準線比對（非湊數字）。但深挖發現三個問題：7.1 從 PASS 退化成 FAIL（fixture 重排導致跳躍時 steer=0）、4.9=33.78 是 feel.py 分母未篩選轉向幅度所致（物理常數 1.4 本身在窗口中心）、4.10 是硬編碼常數回填從未真測。R5 任務已開，優先修 4.10 > 7.1/4.9，budget 已超支 14%（455678/400000）需控制小修範圍。"
+  "note": "R5 完成：physics commit de2ec80 已推送。跳躍 fixture 恢復空中 steering，7.1=0.3115 PASS；4.9 改為只統計主動 steering，1.4567 PASS；4.10 改為 drift/straight 同 tick 區間真實速度比，1.0073（可信 FAIL，不再硬編碼）。§4.5=1.5156 PASS，§3.1–3.5 全部 PASS，三次獨立 ghost process byte-identical。整體 verdict 仍因 fixture 未覆蓋 tier3 的 §4.4 而 FAIL；R5 不处理已知覆盖率问题。"
 }
