@@ -232,7 +232,19 @@
 - **處置（後續）**：已寫進 `loop/README.md` 一個 `git merge-base --is-ancestor` 檢查指令，
   每輪收尾前跑。**第一次實際使用就抓到第三次同一疏漏**（`feat/plumb` 的輸入接線
   也還沒併進 main）——證明這是機制而非我這輪剛好想起來，已修正並重新驗證同步
-- **狀態**：已裁決，機制已生效
+- **第四次發生（R11）**：Codex 回報「Physics commit：88c102d / Main commit：51685cc」，
+  聽起來像兩邊都同步了，但 `51685cc` 只含 `loop/BACKLOG.md`/`budget.json`/
+  `VERDICT.json`/artifact/`progress/physics.json` 這些紀錄檔——實際程式碼
+  （`88c102d`：`world.ts` 單車轉多車、kart-kart 碰撞、telemetry 消費端更新）
+  只在 `feat/physics`，從未進 `main`。跑 `merge-base --is-ancestor` 立刻抓到，
+  `npm run typecheck` 當場證實 main 是壞的（`src/contract/sim.ts` 要求
+  `karts[]`，`world.ts` 還是舊版單車）。獨立重跑過 `88c102d` 本身（typecheck/
+  build/pytest 全 PASS、ghost-replay 三次重新產生位元級相同、乾淨重新產生
+  的 telemetry 餵 `feel.py` 跟已提交 VERDICT.json 逐項零差異）確認程式碼本身
+  沒問題，純粹是這次的 merge 步驟被跳過，已手動補上（merge commit `66b4ff3`）
+- **狀態**：機制本身持續有效（兩次實際使用、兩次抓到），**但沒有阻止問題
+  發生**，只保證會被發現。是否要把「push 到 main」直接寫進 builder 每輪
+  TASK.md 的完成條件（而不是留給 Lead 收尾時才發現），待裁決
 
 ### W2 觀察：SimSnapshot 目前只支援單車
 - **輪次**：R2 架構審查發現，R7 追加一個依賴方，**R11 由 Lead 落地契約變更**

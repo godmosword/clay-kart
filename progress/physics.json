@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T05:45:04Z",
+  "updated": "2026-08-02T14:10:00Z",
   "wave": "W2",
   "round": 11,
   "element": "ai-opponents",
-  "status": "done",
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R11 第一階段完成：world.ts 由單車重構為 karts[]，createWorld({ aiOpponents }) 產生 N+1 台車、laps[] 對齊且 playerIndex=0；AI 僅 deterministic stationary placeholder，未做決策或 per-character 調校。新增等質量 kart-kart 圓形碰撞與事件層雙方 impulse，專用 probe tick 42 真量得 6.4=1.0 PASS。ghost 三次 byte-identical，單車 frames/events 與 R10 逐項相同，w1 regression、pytest 11/11、typecheck/build 通過。physics commit 88c102d 已推送；R11 overall feel-validator FAIL 的最大既有落差仍為 4.4。"
+  "note": "R11 獨立驗證：Lead 在 ck-physics worktree 對 88c102d 重跑 typecheck/build/pytest 全 PASS，ghost-replay 三次重新產生位元級相同，乾淨重新產生的 telemetry 餵 feel.py 獨立算出 42 項 checks 跟已提交 VERDICT.json 逐項零差異，6.4=1.0 PASS 核實為等質量對稱衝量公式的物理結果（tick 42 真實碰撞，impulse=3.4018582527577930，非湊數字）。R10 既有 7200 frames／398 events 逐位元相同，無回歸。發現：physics commit 88c102d 從未併入 main（只有 telemetry/BACKLOG/budget 紀錄檔併了），main 一度是壞的（typecheck 報缺 characterId），已由 Lead 手動 merge 補上（main commit 66b4ff3），這是同一類『程式碼漏併入 main』疏漏第四次發生，記入 BACKLOG。AI 決策邏輯與 per-character 調校仍未開工，等 Lead 補 BAR-FEEL 行為指標。overall feel-validator 最大既有落差仍為 4.4（非 R11 引入）。"
 }
