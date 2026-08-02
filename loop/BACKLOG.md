@@ -31,7 +31,14 @@
 - **已嘗試**：deterministic latency probe、提前按下後放開的 drift pulse + held reference、throttle 101 點與 steer 201 點 requested/effective sweep；結果均由 probe records 推導，沒有讀缺欄位預設值。
 - **處置**：依 R10 TASK，本輪不新增輸入功能；現況的 drift state 沒有 release 後 buffer，`setInput()` 也沒有 steer deadzone。若要達成 8.2/8.4，需另行裁決輸入處理行為與其對既有漂移／轉向指標的影響。
 - **來源**：`loop/round-10/artifacts/lap-a.json`、`loop/round-10/VERDICT.json`、physics commit `d43e1a1`
-- **狀態**：待裁決
+- **Lead 核實**：四個數字剛好都是 0，外觀跟先前的假 PASS 一樣，特別去讀了
+  probe 實作與原始資料。`latency_probe` 用獨特測試值 `0.37` 追蹤到
+  `request_tick=24`／`applied_tick=25`，真的量出來的。`buffer_probe`
+  顯示 `activation_tick=None`（提前放開真的沒觸發）對照
+  `held_reference_activation_tick=83`（持續按住的參照組真的觸發），
+  證明「沒有緩衝」是真測出來，不是巧合預設。確認不是 R7 之前
+  `6.1`–`6.3`／`7.5` 那種假 PASS 的重演
+- **狀態**：待裁決——沒有硬門檻卡著，跟前四個元件的收尾模式一致
 
 ### airborne-landing — 7.3/7.4 落地速度保留率仍超出窗口
 - **輪次**：R9，Lead 拆開原始 probe 資料追出兩個不同根因

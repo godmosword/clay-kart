@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T04:55:05Z",
+  "updated": "2026-08-02T06:00:00Z",
   "wave": "W2",
   "round": 10,
-  "element": "input-feedback",
-  "status": "done",
+  "element": null,
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R10 完成 §8 真實 input feedback probes：8.1 input_to_sim_latency_ticks=0 PASS（request tick 24 於 frame tick 25 生效）；8.2 input_buffer_window_ms=0 FAIL（held reference tick 83 達條件，但提前 release pulse 沒有 activation）；8.3 throttle_deadzone=0 PASS（101 點 requested/effective sweep）；8.4 steer_deadzone=0 FAIL（201 點 sweep）。本輪未新增 drift buffer 或 steer deadzone，已記入 BACKLOG；未碰既有物理常數。三次 ghost byte-identical，pytest 10/10，typecheck/build 通過。physics commit d43e1a1 已推送；R10 overall FAIL 的最大既有落差仍為 4.4。"
+  "note": "R10 獨立驗證：8.1-8.4 全部真量測，特別核對了『四個數字剛好都是0』沒有照單全收——讀了 probe 實作跟原始資料，latency_probe 用獨特測試值 0.37 追蹤真正生效的 tick，buffer_probe 對照脈衝按壓（未觸發）與持續按住（觸發於 tick 83）證明沒有緩衝是真測出來的。三次 byte-identical，pytest 10/10，regression 乾淨。7 個可獨立處理的 W2 元件皆已有真實 telemetry/調校，僅 ai-opponents 待多車架構與行為指標，屬 Lead 範圍。W2 單車部分暫告一段落，等 Lead 裁決下一步。"
 }
