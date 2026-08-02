@@ -270,14 +270,12 @@ def _ai_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
         elif name == "ai-difficulty-spread":
             metrics["difficulty_lap_time_spread_s"] = _finite(probe.get("spread_s"))
         elif name == "ai-rubberband":
-            # This is the live cap consumed by Kart.#stepDrive.  Keep the
-            # observed speed ratio in the artifact, but use the cap for the
-            # metric so a deterministic transient acceleration sample cannot
-            # under-report the designed maximum bonus.
-            configured = _finite(probe.get("configured_max_speed_ratio"), math.nan)
-            observed = _finite(probe.get("observed_max_speed_ratio"), math.nan)
-            metrics["rubberband_speed_bonus_ratio"] = (
-                configured if math.isfinite(configured) else observed
+            # 12.4 is a measurement window: report the maximum physical speed
+            # actually observed in the probe. The configured cap remains in
+            # the artifact as diagnostics, but must not substitute for the
+            # observed value when evaluating the contract.
+            metrics["rubberband_speed_bonus_ratio"] = _finite(
+                probe.get("observed_max_speed_ratio"), math.nan
             )
     return metrics
 

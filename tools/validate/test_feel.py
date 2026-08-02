@@ -385,4 +385,4 @@ def test_ai_metrics_use_named_deterministic_probe_records() -> None:
     assert metrics["ai_lap_completion"] is True
     assert metrics["ai_overtake_time_s"] == 4.0
     assert metrics["difficulty_lap_time_spread_s"] == 7.5
-    assert metrics["rubberband_speed_bonus_ratio"] == 1.1
+    assert metrics["rubberband_speed_bonus_ratio"] == 0.9
