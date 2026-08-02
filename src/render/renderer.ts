@@ -18,6 +18,9 @@ const CAMERA_FOLLOW_HEIGHT = 2.1;
 const CAMERA_LOOK_AHEAD = 4;
 
 const KART_HALF_HEIGHT = 0.4;
+/** 玩家車與 AI 對手用不同顏色純粹是為了場上分得清楚，不是角色美術——那是 W3 範圍。 */
+const PLAYER_COLOR = 0xd98f5a;
+const AI_COLOR = 0x5a86d9;
 
 /** 最短路徑角度插值，避免 yaw 跨越 ±π 時畫面瞬間反向。 */
 function lerpAngle(a: number, b: number, t: number): number {
@@ -41,11 +44,16 @@ class W1Renderer implements Renderer {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
   readonly #camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 1, 0.1, 500);
-  readonly #kart: THREE.Mesh;
   readonly #hud: HTMLDivElement;
 
-  #prevPos: [number, number, number] | null = null;
-  #prevYaw = 0;
+  /**
+   * 每台車一個 mesh，索引對齊 `snap.karts`。長度隨快照動態調整——
+   * `draw()` 第一次看到某個索引時才建立對應 mesh，數量由呼叫端的
+   * `createWorld()` options 決定，渲染層不假設固定車數。
+   */
+  #kartMeshes: THREE.Mesh[] = [];
+  #prevPos: Array<[number, number, number] | null> = [];
+  #prevYaw: number[] = [];
 
   constructor(mount: HTMLElement) {
     this.#renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -58,13 +66,6 @@ class W1Renderer implements Renderer {
     this.#buildGround();
     this.#buildTrack();
     this.#buildBoundaryWalls();
-
-    this.#kart = new THREE.Mesh(
-      new THREE.BoxGeometry(1.4, 0.8, 2.4),
-      new THREE.MeshLambertMaterial({ color: 0xd98f5a }),
-    );
-    this.#kart.position.y = KART_HALF_HEIGHT;
-    this.#scene.add(this.#kart);
 
     this.#hud = document.createElement('div');
     this.#hud.style.cssText = [
@@ -124,34 +125,67 @@ class W1Renderer implements Renderer {
     }
   }
 
-  draw(snap: SimSnapshot, alpha: number): void {
-    const [x, y, z] = snap.kart.pos;
-    const prev = this.#prevPos;
-
-    const ix = prev ? prev[0] + (x - prev[0]) * alpha : x;
-    const iy = prev ? prev[1] + (y - prev[1]) * alpha : y;
-    const iz = prev ? prev[2] + (z - prev[2]) * alpha : z;
-    const iyaw = lerpAngle(this.#prevYaw, snap.kart.yaw, alpha);
-
-    this.#kart.position.set(ix, iy + KART_HALF_HEIGHT, iz);
-    this.#kart.rotation.y = iyaw;
-    this.#prevPos = [x, y, z];
-    this.#prevYaw = snap.kart.yaw;
-
-    const [fx, fz] = forwardVector(iyaw);
-    this.#camera.position.set(
-      ix - fx * CAMERA_FOLLOW_DISTANCE,
-      iy + CAMERA_FOLLOW_HEIGHT,
-      iz - fz * CAMERA_FOLLOW_DISTANCE,
+  /** 索引 i 的車 mesh 若不存在就先建立——渲染層不預先假設車數。 */
+  #ensureKartMesh(i: number, isPlayer: boolean): THREE.Mesh {
+    let mesh = this.#kartMeshes[i];
+    if (mesh) return mesh;
+    mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 0.8, 2.4),
+      new THREE.MeshLambertMaterial({ color: isPlayer ? PLAYER_COLOR : AI_COLOR }),
     );
-    this.#camera.lookAt(ix + fx * CAMERA_LOOK_AHEAD, iy + KART_HALF_HEIGHT, iz + fz * CAMERA_LOOK_AHEAD);
+    mesh.position.y = KART_HALF_HEIGHT;
+    this.#scene.add(mesh);
+    this.#kartMeshes[i] = mesh;
+    return mesh;
+  }
+
+  draw(snap: SimSnapshot, alpha: number): void {
+    let playerIx = 0, playerIy = 0, playerIz = 0, playerIyaw = 0;
+
+    for (const [i, kart] of snap.karts.entries()) {
+      const mesh = this.#ensureKartMesh(i, i === snap.playerIndex);
+      const [x, y, z] = kart.pos;
+      const prev = this.#prevPos[i] ?? null;
+
+      const ix = prev ? prev[0] + (x - prev[0]) * alpha : x;
+      const iy = prev ? prev[1] + (y - prev[1]) * alpha : y;
+      const iz = prev ? prev[2] + (z - prev[2]) * alpha : z;
+      const iyaw = lerpAngle(this.#prevYaw[i] ?? kart.yaw, kart.yaw, alpha);
+
+      mesh.position.set(ix, iy + KART_HALF_HEIGHT, iz);
+      mesh.rotation.y = iyaw;
+      this.#prevPos[i] = [x, y, z];
+      this.#prevYaw[i] = kart.yaw;
+
+      if (i === snap.playerIndex) {
+        playerIx = ix;
+        playerIy = iy;
+        playerIz = iz;
+        playerIyaw = iyaw;
+      }
+    }
+
+    const [fx, fz] = forwardVector(playerIyaw);
+    this.#camera.position.set(
+      playerIx - fx * CAMERA_FOLLOW_DISTANCE,
+      playerIy + CAMERA_FOLLOW_HEIGHT,
+      playerIz - fz * CAMERA_FOLLOW_DISTANCE,
+    );
+    this.#camera.lookAt(
+      playerIx + fx * CAMERA_LOOK_AHEAD,
+      playerIy + KART_HALF_HEIGHT,
+      playerIz + fz * CAMERA_LOOK_AHEAD,
+    );
 
     this.#drawHud(snap);
     this.#renderer.render(this.#scene, this.#camera);
   }
 
   #drawHud(snap: SimSnapshot): void {
-    const { lap } = snap;
+    const lap = snap.laps[snap.playerIndex];
+    // playerIndex 保證落在 laps 範圍內（契約不變量，見 sim.ts）；
+    // 這個 guard 只是滿足 noUncheckedIndexedAccess，不是預期的執行路徑。
+    if (!lap) return;
     const lines = [
       `LAP ${Math.min(lap.current, lap.total)}/${lap.total}`,
       `TIME  ${formatTime(lap.currentTime)}`,

@@ -226,18 +226,31 @@
 - **狀態**：已裁決，機制已生效
 
 ### W2 觀察：SimSnapshot 目前只支援單車
-- **輪次**：R2 架構審查發現，R7 追加一個依賴方
-- **現況**：`SimSnapshot.kart` 是單數欄位，不是陣列
-- **目標**：`BAR-FEEL §7`／`loop/PLAN.md` W2 第 8 元件 `ai-opponents` 需要多車
-- **落差**：AI 對手需要跑同一份物理，`kart: KartState` 撐不住
-- **為什麼不現在改**：`ai-opponents` 排在 W2 優先序最後，中間七個元件
-  （sim-determinism 到 input-feedback）都是在單車 shape 上調物理數值。
-  把 `kart` 包成 `karts: readonly KartState[]` 是純結構包裝，不牽動物理邏輯，
-  現在做跟等到 `ai-opponents` 開工前做，成本一樣——沒有隨時間複利的代價
-- **新增依賴（R7）**：`BAR-FEEL §6.4 kart_kart_impulse_symmetry`（車對車碰撞
-  對稱性）也卡在這個限制上——沒有第二台車可以撞。`collision-response`
-  元件（R7）已指示跳過 6.4，不強求
-- **狀態**：已排入，觸發點＝`ai-opponents` 元件開工前
+- **輪次**：R2 架構審查發現，R7 追加一個依賴方，**R11 由 Lead 落地契約變更**
+- **現況（已變更）**：`src/contract/sim.ts` 的 `SimSnapshot` 從 `kart: KartState` /
+  `lap: LapState` 改為 `karts: readonly KartState[]` / `laps: readonly LapState[]` /
+  `playerIndex: number`（索引對齊）。新增 `KartState.characterId`（對齊
+  `CHARACTERS.md §2` 六人卡司的英文 slug）與 `WorldOptions`
+  （`playerCharacterId?`、`aiOpponents?: readonly AiOpponentConfig[]`）。
+  `setInput()` 語意不變，只控制 `playerIndex` 那台車；AI 對手輸入完全在
+  `step()` 內部決定，禁止 `Math.random()`，只能用 fixture 的 `seed` 衍生
+- **相容性保證**：`createWorld()` 不傳 `WorldOptions` 或 `aiOpponents` 傳空陣列＝
+  跟變更前完全一樣的單車行為，十輪累積的 telemetry 探針零改動即可繼續跑
+- **消費端影響（已用 `npm run typecheck` 逐一確認範圍）**：
+  - `src/render/renderer.ts`——**Lead 已改完**，多車繪製 + 玩家車決定相機/HUD，
+    typecheck/build 皆 exit 0
+  - `src/loader/bootstrap.ts`——零改動，只轉傳整個 `SimSnapshot`
+  - `src/physics/world.ts`、`tools/telemetry/ghost-replay.mjs`、
+    `tools/validate/w1-physics.mjs`——**待 Codex**，屬 R11 任務範圍
+    （見 `loop/round-11/TASK.md`），typecheck 目前對 `world.ts` 報兩個
+    預期中的錯誤（缺 `characterId`、`kart` 欄位已不存在），這是正常的
+    「還沒接上」編譯期訊號，不是回歸
+- **新增依賴（R7）**：`BAR-FEEL §6.4 kart_kart_impulse_symmetry` 現在有陣列可以
+  承載第二台車了，但**車對車碰撞物理本身還不存在**——`step()` 目前只算
+  牆面碰撞。R11 任務要求 Codex 設計並實作 kart-kart 碰撞（沿用
+  `collisionImpulse` 這個既有純量欄位，細節走 events，不擴大 `KartState`）
+- **狀態**：架構設計與渲染端已落地（R11 前置），物理端與 telemetry 消費端
+  的機械式更新＋新碰撞邏輯已開任務給 Codex（`loop/round-11/TASK.md`）
 
 ### 外部架構審查的三項欄位建議 —— 已核實，兩項採納一項駁回
 - **輪次**：R2 架構審查
@@ -279,11 +292,15 @@
 - **狀態**：已排入 W3 loop 前
 
 ### BAR-FEEL 缺 AI 對手的行為指標
-- **輪次**：R0
+- **輪次**：R0，R11 釐清範圍邊界
 - **現況**：`ai-opponents` 已排入 W2 第 8 順位，但只有碰撞（§6）有指標
 - **目標**：超車決策、橡皮筋強度、難度分級的可量測窗口
-- **影響**：不擋前七個元件。進入 `ai-opponents` 前必須補
-- **狀態**：待裁決
+- **影響**：**不擋 R11**——R11 只做多車架構的機械式落地與 kart-kart 碰撞
+  物理（仍屬 §6 既有範圍），對手車在 R11 是無決策的佔位符（固定輸入或
+  靜止），不需要 `src/ai/` 邏輯。真正的 AI 決策（超車、橡皮筋、難度）
+  要進 `src/ai/` 才需要這份指標，那是**進入 `ai-opponents` 元件本身**
+  （而不是它的前置架構回合）之前必須補的東西
+- **狀態**：待裁決，觸發點＝R11 落地後、真正 AI 決策開工前
 
 ### 文件標點全半形不一致
 - **輪次**：R0

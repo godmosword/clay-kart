@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T06:00:00Z",
+  "updated": "2026-08-02T13:30:00Z",
   "wave": "W2",
-  "round": 10,
-  "element": null,
+  "round": 11,
+  "element": "ai-opponents",
   "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R10 獨立驗證：8.1-8.4 全部真量測，特別核對了『四個數字剛好都是0』沒有照單全收——讀了 probe 實作跟原始資料，latency_probe 用獨特測試值 0.37 追蹤真正生效的 tick，buffer_probe 對照脈衝按壓（未觸發）與持續按住（觸發於 tick 83）證明沒有緩衝是真測出來的。三次 byte-identical，pytest 10/10，regression 乾淨。7 個可獨立處理的 W2 元件皆已有真實 telemetry/調校，僅 ai-opponents 待多車架構與行為指標，屬 Lead 範圍。W2 單車部分暫告一段落，等 Lead 裁決下一步。"
+  "note": "R10 獨立驗證：8.1-8.4 全部真量測，特別核對了『四個數字剛好都是0』沒有照單全收——讀了 probe 實作跟原始資料，latency_probe 用獨特測試值 0.37 追蹤真正生效的 tick，buffer_probe 對照脈衝按壓（未觸發）與持續按住（觸發於 tick 83）證明沒有緩衝是真測出來的。三次 byte-identical，pytest 10/10，regression 乾淨。Lead 已落地多車架構：src/contract/sim.ts 的 SimSnapshot 改為 karts[]/playerIndex/laps[]，新增 characterId 與 WorldOptions（aiOpponents 選配，預設行為零改動）；src/render/renderer.ts 已同步改完多車繪製，typecheck/build 目前只在 src/physics/world.ts 報兩個預期中的『還沒接上』錯誤。R11 任務已開：world.ts 多車化 + kart-kart 碰撞（BAR-FEEL 6.4）+ telemetry 消費端機械式更新，AI 決策邏輯與 per-character 調校明確排除在這輪外。"
 }
