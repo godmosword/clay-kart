@@ -82,6 +82,18 @@
   檢查並在收尾時完成合併，這個手動交接步驟就是正常流程的一部分，
   不代表協作出了問題。
 
+## R14 已交回（待 Lead 合併）
+
+### ai-opponents — R14 真正 AI 駕駛決策與 §12 行為 probes
+- **輪次**：R14
+- **現況**：12.1 `ai_lap_completion=true` PASS；12.2 `ai_overtake_time_s=3.6333333333` PASS；12.3 `difficulty_lap_time_spread_s=3.4833333333` PASS；12.4 `rubberband_speed_bonus_ratio=1.1` PASS。整體 feel verdict 仍為 FAIL，最大落差是既有 4.4，與 R14 範圍無關。
+- **實作**：physics commit `9c6e7dc`。新增 `src/ai/controller.ts` 純函式賽道線/速度控制；AI 每 tick 透過 `Kart.setInput()`，再走與玩家相同的 `#stepDrive()`/`#stepYaw()`；difficulty 影響巡航目標，落後時的 speed cap 上限為 1.1× BASE_TOP_SPEED。
+- **Probe**：新增 lap completion、overtake、difficulty spread、rubberband 四個專用 deterministic replay；每個 probe 兩次 byte-identical，三次獨立完整 ghost-replay 的 SHA-256 皆為 `21a8f812a5120cc8f7fd523dd5b5b44aea19dfeea386b3d8d8c5d86d2c983ba1`。rubberband 同時保留 observed speed ratio `0.9626708489` 與實際餵入 `#stepDrive()` 的 configured cap `1.1`。
+- **回歸**：`npm run typecheck`、`npm run build`、W1、pytest 14/14 全 PASS；physics/ai 無 three、DOM、wall-clock 或未固定亂數依賴。build 僅保留既有 renderer chunk >500 kB warning。
+- **產物**：`loop/round-14/artifacts/lap-a.json`（build sha `9c6e7dc772492eafabddaf22d566859d628bb5dc`）、`loop/round-14/VERDICT.json`；schema 驗證通過。
+- **預算**：R14 本輪實際 387891；`ai-opponents` 從 298953 累加至 686844，超支如實記錄，未灌入其他元件 ledger。
+- **狀態**：Codex feature 已 push；`origin/feat/physics` 尚未進 `main`，待 Lead 合併後重跑 merge-base。
+
 ## 待裁決
 
 ### ai-opponents — R11 第一階段多車架構與 kart-kart 碰撞已完成

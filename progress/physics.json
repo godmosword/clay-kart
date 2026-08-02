@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T16:00:00Z",
+  "updated": "2026-08-02T07:19:23Z",
   "wave": "W2",
   "round": 14,
   "element": "ai-opponents",
   "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R13 獨立驗證屬實（重跑 typecheck/build/pytest、重新產生 telemetry 跟 VERDICT.json 逐項零差異，6.5/5.5/5.6 皆真實量測，4.5 不退化），已合併進 main（5036a46）。W2 三輪委派的 BACKLOG 清理全數完成。R14 已開：Lead 已把 BAR-FEEL §12（AI 對手行為，12.1 ai_lap_completion／12.2 ai_overtake_time_s／12.3 difficulty_lap_time_spread_s／12.4 rubberband_speed_bonus_ratio）補進 BAR-FEEL.md，這是 R11-R13 從沒實作過的第一次真正 AI 駕駛決策——R11-R13 的 AI 車一直是決定性靜止佔位符。要求 AI 車走 setInput() 同一條物理路徑，不做特權捷徑；difficulty 要有真實效果；四個新指標窗口是 Lead 依設計意圖訂的第一版，若物理上調不進去要如實回報不要硬湊。ai-opponents cap 300000 已花 298953，這輪必然超支，比照 W2 其他元件不強制控制在 cap 內。"
+  "note": "R13 獨立驗證屬實（重跑 typecheck/build/pytest、重新產生 telemetry 跟 VERDICT.json 逐項零差異，6.5/5.5/5.6 皆真實量測，4.5 不退化），已合併進 main（5036a46）。R14 已完成真正 AI 駕駛決策：src/ai 純函式依賽道切線、difficulty、玩家相對進度產生輸入，每 tick 透過 Kart.setInput() 走共用 #stepDrive/#stepYaw；四個 deterministic probe 的 12.1=true、12.2=3.6333333333s、12.3=3.4833333333s、12.4=1.1 全 PASS。typecheck/build/W1/pytest 14/14、ghost replay 三次獨立輸出 byte-identical；整體 feel FAIL 只因既有 4.4。R14 本輪實際 goal usage 387891，ai-opponents 累加後 686844，未與其他 ledger 重複計入。feature commit 9c6e7dc 已 push；merge-base 尚待 Lead 合併。"
 }
