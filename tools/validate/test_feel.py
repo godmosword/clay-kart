@@ -308,3 +308,56 @@ def test_kart_kart_symmetry_uses_dedicated_probe_events() -> None:
     }
     metrics = calculate_metrics(telemetry)
     assert metrics["kart_kart_impulse_symmetry"] == 2.0 / 2.1
+
+
+def test_surface_metrics_use_raw_probe_samples_and_asphalt_reference() -> None:
+    telemetry = {
+        "meta": {
+            "tick_hz": 120,
+            "surface_probes": [
+                {
+                    "surface": "grass",
+                    "samples": [{"speed": 15.0}, {"speed": 15.0}],
+                    "asphalt_reference_speeds": [24.0, 24.0],
+                },
+                {
+                    "surface": "dirt",
+                    "samples": [{"speed": 20.4}, {"speed": 20.4}],
+                    "asphalt_reference_speeds": [24.0, 24.0],
+                },
+            ],
+        },
+        "frames": [],
+        "events": [],
+    }
+    metrics = calculate_metrics(telemetry)
+    assert metrics["grass_speed_penalty"] == 0.625
+    assert metrics["dirt_speed_penalty"] == 0.85
+
+
+def test_wall_stick_ignores_fast_collision_scrapes() -> None:
+    frames = []
+    for tick, speed, impulse in (
+        (1, 20.0, 2.0),
+        (2, 20.0, 2.0),
+        (3, 1.0, 2.0),
+        (4, 1.0, 2.0),
+        (5, 1.0, 2.0),
+        (6, 20.0, 2.0),
+    ):
+        frames.append({
+            "t": tick / 120,
+            "tick": tick,
+            "pos": [30, 0, 30],
+            "vel": [0, 0, speed],
+            "speed": speed,
+            "yaw": 0,
+            "yaw_rate": 0,
+            "steer_input": 0,
+            "throttle_input": 1,
+            "drift_state": "none",
+            "surface": "asphalt",
+            "collision_impulse": impulse,
+        })
+    metrics = calculate_metrics({"meta": {"tick_hz": 120}, "frames": frames, "events": []})
+    assert metrics["wall_stick_frames"] == 3.0

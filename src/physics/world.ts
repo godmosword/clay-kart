@@ -49,6 +49,15 @@ const KART_BOUNCE = 0.2;
 const LANDING_SMOOTH_ANGLE_DEG = 45;
 const LANDING_HARD_RETENTION = 0.7;
 const LANDING_MIN_HORIZONTAL_SPEED = 0.1;
+// Surface sectors live inside the existing annular lane and do not alter either
+// collision boundary.  They are deliberately placed on the lower half of the
+// lap so the gameplay fixture's short upper-half route remains asphalt.
+const SURFACE_DIRT_START_ANGLE = Math.PI * 1.34;
+const SURFACE_DIRT_END_ANGLE = Math.PI * 1.44;
+const SURFACE_GRASS_START_ANGLE = Math.PI * 1.54;
+const SURFACE_GRASS_END_ANGLE = Math.PI * 1.64;
+const DIRT_SPEED_FACTOR = 0.85;
+const GRASS_SPEED_FACTOR = 0.62;
 const DRIFT_ENTRY_SPEED = 10.5;
 const DRIFT_INPUT_BUFFER_SECONDS = 0.1;
 const DRIFT_INPUT_BUFFER_TICKS = Math.round(DRIFT_INPUT_BUFFER_SECONDS * 120);
@@ -100,6 +109,19 @@ function landingHorizontalRetention(horizontalSpeed: number, descentSpeed: numbe
     + (1 - LANDING_HARD_RETENTION) * smoothBlend * smoothBlend;
 }
 
+function surfaceAtPosition(angle: number): KartState['surface'] {
+  const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  if (wrappedAngle >= SURFACE_DIRT_START_ANGLE && wrappedAngle <= SURFACE_DIRT_END_ANGLE) return 'dirt';
+  if (wrappedAngle >= SURFACE_GRASS_START_ANGLE && wrappedAngle <= SURFACE_GRASS_END_ANGLE) return 'grass';
+  return 'asphalt';
+}
+
+function surfaceSpeedFactor(surface: KartState['surface']): number {
+  if (surface === 'grass') return GRASS_SPEED_FACTOR;
+  if (surface === 'dirt') return DIRT_SPEED_FACTOR;
+  return 1;
+}
+
 function wrapAngle(angle: number): number {
   const wrapped = angle % (Math.PI * 2);
   return wrapped < 0 ? wrapped + Math.PI * 2 : wrapped;
@@ -117,6 +139,7 @@ class Kart {
   #yawRate = 0;
   #grounded = true;
   #collisionImpulse = 0;
+  #surface: KartState['surface'] = 'asphalt';
 
   #throttle = 1;
   #steer = 0;
@@ -197,6 +220,7 @@ class Kart {
     this.#stepDrive(dt);
     this.#stepPosition(dt);
     this.#resolveTrackCollision();
+    this.#updateSurface();
 
     this.#updateLapState(dt, tick);
   }
@@ -216,7 +240,7 @@ class Kart {
       driftCharge: this.#driftCharge,
       driftTier: this.#driftTier,
       grounded: this.#grounded,
-      surface: 'asphalt',
+      surface: this.#surface,
       collisionImpulse: this.#collisionImpulse,
     };
     const lapTime = this.#finished
@@ -403,6 +427,9 @@ class Kart {
     const forwardZ = Math.cos(this.#yaw);
     const lateralX = Math.cos(this.#yaw);
     const lateralZ = -Math.sin(this.#yaw);
+    const surfaceFactor = surfaceSpeedFactor(this.#surface);
+    const surfaceForwardTopSpeed = BASE_TOP_SPEED * surfaceFactor;
+    const surfaceReverseTopSpeed = REVERSE_TOP_SPEED * surfaceFactor;
     const previousGroundSpeed = Math.hypot(this.#vx, this.#vz);
     let longitudinalSpeed = this.#vx * forwardX + this.#vz * forwardZ;
     const lateralSpeed = this.#vx * lateralX + this.#vz * lateralZ;
@@ -412,21 +439,21 @@ class Kart {
       longitudinalSpeed = moveTowardZero(longitudinalSpeed, BRAKE_DECELERATION * dt);
     } else if (this.#throttle > 0) {
       if (this.#reverse) {
-        const reverseRatio = clamp(Math.abs(Math.min(0, longitudinalSpeed)) / REVERSE_TOP_SPEED, 0, 1);
+        const reverseRatio = clamp(Math.abs(Math.min(0, longitudinalSpeed)) / surfaceReverseTopSpeed, 0, 1);
         const reverseAcceleration = ENGINE_ACCELERATION * (1 - reverseRatio * reverseRatio);
         longitudinalSpeed -= reverseAcceleration * this.#throttle * dt;
-        longitudinalSpeed = Math.max(-REVERSE_TOP_SPEED, longitudinalSpeed);
+        longitudinalSpeed = Math.max(-surfaceReverseTopSpeed, longitudinalSpeed);
         targetGroundSpeed = Math.min(
-          REVERSE_TOP_SPEED,
+          surfaceReverseTopSpeed,
           previousGroundSpeed + reverseAcceleration * this.#throttle * dt,
         );
       } else {
-        const forwardRatio = clamp(Math.max(0, longitudinalSpeed) / BASE_TOP_SPEED, 0, 1);
+        const forwardRatio = clamp(Math.max(0, longitudinalSpeed) / surfaceForwardTopSpeed, 0, 1);
         const forwardAcceleration = ENGINE_ACCELERATION * (1 - forwardRatio * forwardRatio);
         longitudinalSpeed += forwardAcceleration * this.#throttle * dt;
-        longitudinalSpeed = Math.min(BASE_TOP_SPEED, longitudinalSpeed);
+        longitudinalSpeed = Math.min(surfaceForwardTopSpeed, longitudinalSpeed);
         targetGroundSpeed = Math.min(
-          BASE_TOP_SPEED,
+          surfaceForwardTopSpeed,
           previousGroundSpeed + forwardAcceleration * this.#throttle * dt,
         );
       }
@@ -444,6 +471,14 @@ class Kart {
     const groundSpeed = Math.hypot(this.#vx, this.#vz);
     if (targetGroundSpeed !== null && groundSpeed > 0) {
       const scale = targetGroundSpeed / groundSpeed;
+      this.#vx *= scale;
+      this.#vz *= scale;
+    }
+
+    const speedLimit = this.#reverse ? surfaceReverseTopSpeed : surfaceForwardTopSpeed;
+    const cappedGroundSpeed = Math.hypot(this.#vx, this.#vz);
+    if (cappedGroundSpeed > speedLimit) {
+      const scale = speedLimit / cappedGroundSpeed;
       this.#vx *= scale;
       this.#vz *= scale;
     }
@@ -513,6 +548,12 @@ class Kart {
       this.#vx = tangentX * tangentSpeed + normalX * normalSpeed;
       this.#vz = tangentZ * tangentSpeed + normalZ * normalSpeed;
     }
+  }
+
+  #updateSurface(): void {
+    const dx = this.#x - TRACK_GEOMETRY.centerX;
+    const dz = this.#z - TRACK_CENTER_Z;
+    this.#surface = surfaceAtPosition(Math.atan2(dz, dx));
   }
 
   #updateLapState(dt: number, tick: number): void {

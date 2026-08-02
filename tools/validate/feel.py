@@ -20,6 +20,7 @@ from typing import Any
 CAR_LENGTH = 2.4
 BASE_TOP_SPEED = 24.0
 DEFAULT_TICK_HZ = 120.0
+WALL_STICK_SPEED_RATIO = 0.10
 
 # The order and priority ranks mirror BAR-FEEL §9.  Lower rank wins before
 # relative deviation is considered.
@@ -209,6 +210,38 @@ def _input_feedback_metrics(doc: dict[str, Any]) -> dict[str, float]:
         "throttle_deadzone": deadzones["throttle"],
         "steer_deadzone": deadzones["steer"],
     }
+
+
+def _surface_speed_metrics(doc: dict[str, Any], frames: list[dict[str, Any]]) -> dict[str, float]:
+    """Use deterministic surface probe records when the main fixture misses terrain zones."""
+    measured: dict[str, float] = {}
+    probes = _meta(doc).get("surface_probes", [])
+    if isinstance(probes, list):
+        for probe in probes:
+            if not isinstance(probe, dict) or probe.get("surface") not in {"grass", "dirt"}:
+                continue
+            samples = probe.get("samples", [])
+            references = probe.get("asphalt_reference_speeds", [])
+            speeds = [
+                _finite(sample.get("speed"))
+                for sample in samples
+                if isinstance(sample, dict) and math.isfinite(_finite(sample.get("speed"), math.nan))
+            ] if isinstance(samples, list) else []
+            asphalt_speeds = [
+                _finite(speed)
+                for speed in references
+                if math.isfinite(_finite(speed, math.nan))
+            ] if isinstance(references, list) else []
+            if speeds and asphalt_speeds and statistics.fmean(asphalt_speeds) > 0:
+                measured[str(probe["surface"])] = statistics.fmean(speeds) / statistics.fmean(asphalt_speeds)
+
+    asphalt = [_speed(frame) for frame in frames if frame.get("surface") == "asphalt"]
+    asphalt_mean = statistics.fmean(asphalt) if asphalt else 0.0
+    for surface in ("grass", "dirt"):
+        if surface not in measured:
+            values = [_speed(frame) for frame in frames if frame.get("surface") == surface]
+            measured[surface] = statistics.fmean(values) / asphalt_mean if values and asphalt_mean else 0.0
+    return measured
 
 
 def _collision_events(doc: dict[str, Any]) -> list[dict[str, Any]]:
@@ -488,18 +521,18 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
         and turn_radius_30 < turn_radius_60 < turn_radius_95
     )
 
-    asphalt = [_speed(frame) for frame in frames if frame.get("surface") == "asphalt"]
-    grass = [_speed(frame) for frame in frames if frame.get("surface") == "grass"]
-    dirt = [_speed(frame) for frame in frames if frame.get("surface") == "dirt"]
-    asphalt_mean = statistics.fmean(asphalt) if asphalt else 0.0
-    grass_penalty = statistics.fmean(grass) / asphalt_mean if grass and asphalt_mean else 0.0
-    dirt_penalty = statistics.fmean(dirt) / asphalt_mean if dirt and asphalt_mean else 0.0
+    surface_metrics = _surface_speed_metrics(doc, frames)
+    grass_penalty = surface_metrics["grass"]
+    dirt_penalty = surface_metrics["dirt"]
 
-    collision_frames = [index for index, frame in enumerate(frames) if _finite(frame.get("collision_impulse")) > 0]
+    wall_stick_speed_threshold = BASE_TOP_SPEED * WALL_STICK_SPEED_RATIO
     max_stick = 0
     current_stick = 0
-    for index in range(len(frames)):
-        if index in collision_frames:
+    for frame in frames:
+        if (
+            _finite(frame.get("collision_impulse")) > 0
+            and _speed(frame) < wall_stick_speed_threshold
+        ):
             current_stick += 1
             max_stick = max(max_stick, current_stick)
         else:
