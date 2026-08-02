@@ -13,7 +13,7 @@
     "steering-grip": { "cap": 250000, "spent": 625276, "bar": "BAR-FEEL §5", "$comment": "R6 完成，超支150%。核心目標 5.2/5.3/5.7/5.8/5.9 全 PASS，全指標掃描零退化，是至今最乾淨的一輪" },
     "collision-response": { "cap": 200000, "spent": 149104, "bar": "BAR-FEEL §6", "$comment": "R7 完成 telemetry 與 6.1-6.3 校準；6.4 單車架構跳過，6.5=289 仍待後續處理" },
     "airborne-landing": { "cap": 150000, "spent": 1135659, "bar": "BAR-FEEL §7", "$comment": "R9 完成 telemetry，7.3/7.4 根因已查清（引擎推力混入量測窗口、落地無水平減速機制），記入 BACKLOG。spent 數字疑似記錄錯誤——本輪只改 telemetry 未動物理，量級跟 R7 不成比例，待下輪確認" },
-    "input-feedback": { "cap": 100000, "spent": 0, "bar": "BAR-FEEL §8", "$comment": "R10 開工。8.1/8.3 目前的 PASS 是預設值巧合；8.2/8.4 可能是真的缺輸入緩衝/死區功能，不只是缺量測" },
+    "input-feedback": { "cap": 100000, "spent": 146156, "bar": "BAR-FEEL §8", "$comment": "R10 完成 §8 真實 probe 量測；8.1=0 PASS、8.2=0 FAIL、8.3=0 PASS、8.4=0 FAIL。8.2/8.4 未新增功能，已記入 BACKLOG。" },
     "ai-opponents": { "cap": 300000, "spent": 0, "bar": "BAR-FEEL §6 + 行為指標待補" }
   },
   "W3": {

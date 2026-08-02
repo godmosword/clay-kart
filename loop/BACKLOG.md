@@ -24,6 +24,15 @@
 
 ## 待裁決
 
+### input-feedback — 8.2 drift buffer 與 8.4 steer deadzone 尚未實作
+- **輪次**：R10
+- **現況**：8.1 `input_to_sim_latency_ticks=0` PASS；8.2 `input_buffer_window_ms=0` FAIL；8.3 `throttle_deadzone=0` PASS；8.4 `steer_deadzone=0` FAIL。
+- **目標**：8.1 `[0, 1]`、8.2 `[80, 130]` ms、8.3 `[0.0, 0.08]`、8.4 `[0.05, 0.15]`
+- **已嘗試**：deterministic latency probe、提前按下後放開的 drift pulse + held reference、throttle 101 點與 steer 201 點 requested/effective sweep；結果均由 probe records 推導，沒有讀缺欄位預設值。
+- **處置**：依 R10 TASK，本輪不新增輸入功能；現況的 drift state 沒有 release 後 buffer，`setInput()` 也沒有 steer deadzone。若要達成 8.2/8.4，需另行裁決輸入處理行為與其對既有漂移／轉向指標的影響。
+- **來源**：`loop/round-10/artifacts/lap-a.json`、`loop/round-10/VERDICT.json`、physics commit `d43e1a1`
+- **狀態**：待裁決
+
 ### airborne-landing — 7.3/7.4 落地速度保留率仍超出窗口
 - **輪次**：R9，Lead 拆開原始 probe 資料追出兩個不同根因
 - **現況**：smooth `landing_speed_retention=1.0019`、steep
