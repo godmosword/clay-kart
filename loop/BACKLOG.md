@@ -91,7 +91,9 @@
 - **已嘗試**：等質量、固定恢復係數的動態圓形碰撞；事件層記錄雙方 kart index、對方 index、雙方 impulse 與 symmetry ratio。單車既有 frames/events 逐項維持不變。
 - **處置**：R11 只完成架構與碰撞物理；AI 駕駛決策、超車／路線／難度與 per-character 調校依 TASK 明確留待後續分期。
 - **來源**：`loop/round-11/artifacts/lap-a.json`、`loop/round-11/VERDICT.json`、physics commit `88c102d`
-- **狀態**：待後續分期
+- **狀態**：後續分期已開工——`BAR-FEEL §12`（AI 對手行為，`12.1`-`12.4`）
+  已由 Lead 補進 `BAR-FEEL.md`，`loop/round-14/TASK.md` 已開給 Codex，
+  要求 AI 車走 `setInput()` 同一條物理路徑，不做特權捷徑
 
 ### input-feedback — 8.2 drift buffer 與 8.4 steer deadzone 尚未實作
 - **輪次**：R10
