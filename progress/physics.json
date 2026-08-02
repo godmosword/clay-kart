@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T09:22:40Z",
+  "updated": "2026-08-02T16:45:00Z",
   "wave": "W2",
   "round": 14,
   "element": "ai-opponents",
-  "status": "blocked",
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R14 審查修正版：commit 326283f 已推送 feat/physics，尚未合併 main。feel.py §12.4 改為只讀 observed_max_speed_ratio；重產 artifact 的 observed_max_speed_ratio=0.9626708488607413、configured_max_speed_ratio=1.1、max_rubberband_gap=2.5，因此 12.4 如實 FAIL（低於窗口下限 1.0），12.1/12.2/12.3 PASS。typecheck/build/W1/pytest 14/14 PASS，ghost-replay 三次 byte-identical，VERDICT schema PASS。等待 Lead 以同樣方式獨立驗證後，再判斷窗口或 rubberband 機制是否需要調整。"
+  "note": "R14 修正版獨立驗證：Lead 在 ck-physics worktree 對 326283f 重跑 typecheck/build/pytest 14/14 全 PASS，ghost-replay 三次重新產生位元級相同，乾淨重新產生的 telemetry 餵 feel.py 獨立算出 46 項 checks 跟已提交 VERDICT.json 逐項零差異，確認 12.4 已改為只讀 observed_max_speed_ratio（不再有 configured 替代分支），12.4=0.9626708488607413 誠實 FAIL（priority_rank 最低，不影響 largest_gap 仍為既有 4.4），12.1/12.2/12.3 與其餘 45 項玩家車指標維持不變。326283f 已由 Lead 合併進 main（merge commit c935d31）。12.4 FAIL 根因（Lead 分析）：AI 追近時 gap 縮小得比車速加速快，加成目標可能在車子還沒追上前就自我衰減，記入 BACKLOG，比照 5.5/5.6/6.5/7.3/7.4 先例先如實記錄，是否調窗口或調機制留待後續裁決。ai-opponents 第一版真實 AI 決策視為交付完成。"
 }

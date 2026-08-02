@@ -82,9 +82,9 @@
   檢查並在收尾時完成合併，這個手動交接步驟就是正常流程的一部分，
   不代表協作出了問題。
 
-## R14 審查中（三項收下，一項退回，未合併進 main）
+## R14 已完成（12.4 修正版已獨立驗證並合併）
 
-### ai-opponents — R14 真正 AI 駕駛決策：架構與 12.1-12.3 收下，12.4 退回
+### ai-opponents — R14 真正 AI 駕駛決策：架構與 12.1-12.3 收下，12.4 誠實 FAIL
 - **輪次**：R14
 - **Lead 獨立驗證（已完成）**：`ck-physics` worktree 對 `17cf3ca` 重跑
   typecheck/build/pytest 14/14 全 PASS；ghost-replay 兩次重新產生位元級
@@ -113,11 +113,32 @@
   是刻意在程式碼 comment 裡寫明理由的替換。已在 `loop/round-14/
   TASK.md` 加上審查段落退回，要求改讀 `observed`，若因此合法 FAIL
   也照實記錄，不要為了通過再想別的替代值。
-- **實作**：physics commit `17cf3ca`（前一實作 commit `9c6e7dc`）。
+- **修正版（commit `326283f`）**：`_ai_metrics()` 改為只讀
+  `observed_max_speed_ratio`，不再有 `configured` 分支頂替。Lead 獨立
+  驗證：`ck-physics` worktree 對 `326283f` 重跑 typecheck/build/pytest
+  14/14 全 PASS，ghost-replay 三次重新產生位元級相同，乾淨重新產生的
+  telemetry 餵 `feel.py` 獨立算出 46 項 checks 跟已提交 VERDICT.json
+  逐項零差異，`12.4=0.9626708488607413` 誠實 FAIL（`priority_rank=10`
+  最低，不影響 `largest_gap` 仍為既有 `4.4`），`12.1`-`12.3` 與其餘
+  45 項玩家車指標維持不變。
+- **12.4 FAIL 根因（Lead 分析）**：`max_rubberband_gap=2.5` 已超過
+  `RUBBERBAND_FULL_GAP≈2.356`，代表 AI 的目標速度確實一度封頂在
+  `1.1x`，但實際車速從未追上。合理推測：`decideAiInput()` 的
+  `progressGap` 是即時值，AI 一旦開始加速追近，gap 本身就開始縮小，
+  `gapFactor`／`targetRatio` 跟著往下掉——加成目標可能在車子還沒真的
+  加速上去之前就已經自我衰減，形成一個負回饋。這是設計/調校問題，不是
+  測量造假，比照 `5.5`/`5.6`/`6.5`/`7.3`/`7.4` 的先例：先誠實記錄
+  FAIL，列入 BACKLOG，之後再決定是調窗口（例如降低下限承認合理的
+  漸進式追趕，而非要求真的超過基礎極速）還是調機制（例如把加成套用在
+  加速度而非純粹目標速度上，讓追趕的過程本身更快）。
+- **實作**：physics commit `17cf3ca`＋修正 `326283f`（前一實作 commit
+  `9c6e7dc`）。
 - **預算**：Codex 回報本輪實際 420990，`ai-opponents` 累加至
-  719943——這個數字尚未因退回而重新估算，等修正版交回後一併確認。
-- **狀態**：**未合併進 main**，等 `12.4` 修正版交回、重新獨立驗證後
-  才合併。
+  719943；修正版本身只改了驗證邏輯，未產生額外物理改動，此數字視為
+  R14 整體花費，不再重新拆分。
+- **狀態**：已完成並驗證，`326283f` 已由 Lead 合併進 main（merge
+  commit `c935d31`）。`12.4` 的視窗/機制調整留待後續裁決，不阻擋
+  `ai-opponents` 元件本身視為已交付第一版真實 AI 決策。
 
 ## 待裁決
 
