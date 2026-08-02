@@ -8,5 +8,5 @@
   "element": "airborne-landing + input-feedback",
   "status": "done",
   "last_verdict": "FAIL",
-  "note": "R12 完成：physics commit c8c5265 已推送。落地加入角度耦合水平 retention（近零水平速度保留數值穩定），telemetry 封頂同 tick 引擎增速避免 7.3 邊界誤算；7.3=1.0、7.4=0.7645012039 均 PASS。drift 加入 100ms press buffer，probe=91.6666667ms；steer deadzone=0.08；8.2/8.4 均 PASS。§4.5=1.5191494913 維持 PASS，§5 全掃描除既有 5.5/5.6 外無回歸。typecheck/build/W1/pytest 11/11 通過，ghost 三次 byte-identical。整體 feel verdict 仍因既有 4.4/4.6/4.7/4.10/5.5/5.6/6.5 FAIL。R9 的 1135659 已由 VERDICT/budget 歷史紀錄核對，但沒有可獨立重建的 token 拆分證據，故保留不改；R12 實際 347710 已累加至兩個重開元件。"
+  "note": "R12 完成 builder 工作：physics commit c8c5265 已推送。落地加入角度耦合水平 retention（近零水平速度保留數值穩定），telemetry 封頂同 tick 引擎增速避免 7.3 邊界誤算；7.3=1.0、7.4=0.7645012039 均 PASS。drift 加入 100ms press buffer，probe=91.6666667ms；steer deadzone=0.08；8.2/8.4 均 PASS。§4.5=1.5191494913 維持 PASS，§5 全掃描除既有 5.5/5.6 外無回歸。typecheck/build/W1/pytest 11/11 通過，ghost 三次 byte-identical。整體 feel verdict 仍因既有 4.4/4.6/4.7/4.10/5.5/5.6/6.5 FAIL。R9 的 1135659 已由 VERDICT/budget 歷史紀錄核對，但沒有可獨立重建的 token 拆分證據，故保留不改；R12 最終實際 381800 已累加至兩個重開元件。最後 merge-base 檢查：origin/feat/physics 尚未是 main 祖先，需 Lead 合併 c8c5265 後再確認。"
 }
