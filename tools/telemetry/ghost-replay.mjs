@@ -76,6 +76,23 @@ function collisionData(previousKart, currentKart) {
   };
 }
 
+function landingData(previousKart, currentKart) {
+  const previousGroundSpeed = groundSpeed(previousKart);
+  const currentGroundSpeed = groundSpeed(currentKart);
+  const descentSpeed = Math.abs(previousKart.vel[1]);
+  const landingAngleDeg = Math.atan2(previousGroundSpeed, descentSpeed) * 180 / Math.PI;
+  return {
+    pre_speed: previousKart.speed,
+    post_speed: currentKart.speed,
+    pre_ground_speed: previousGroundSpeed,
+    post_ground_speed: currentGroundSpeed,
+    pre_vertical_speed: previousKart.vel[1],
+    post_vertical_speed: currentKart.vel[1],
+    landing_angle_deg: landingAngleDeg,
+    speed_retention: previousGroundSpeed > 0 ? currentGroundSpeed / previousGroundSpeed : 0,
+  };
+}
+
 function eventsBetween(previous, current) {
   const events = [];
   const tick = current.tick;
@@ -83,7 +100,14 @@ function eventsBetween(previous, current) {
     events.push({ tick, type: 'airborne_start', data: {} });
   }
   if (!previous.kart.grounded && current.kart.grounded) {
-    events.push({ tick, type: 'landing', data: {} });
+    events.push({
+      tick,
+      type: 'landing',
+      data: {
+        ...landingData(previous.kart, current.kart),
+        latency_ticks: current.tick - previous.tick - 1,
+      },
+    });
   }
   if (current.kart.collisionImpulse > 0) {
     events.push({
@@ -144,6 +168,21 @@ function annotateCollisionRecovery(events, frames) {
   }
 }
 
+function annotateLandingTelemetry(events) {
+  const airborneStarts = events
+    .filter((event) => event.type === 'airborne_start')
+    .map((event) => event.tick);
+  for (const event of events) {
+    if (event.type !== 'landing') continue;
+    const startTick = airborneStarts.filter((tick) => tick < event.tick).at(-1);
+    if (startTick !== undefined) {
+      event.data.airborne_start_tick = startTick;
+      event.data.airborne_duration_ticks = event.tick - startTick;
+    }
+    event.data.landing_angle_definition = 'angle between pre-landing ground velocity and downward vertical; >=45° smooth, <45° steep';
+  }
+}
+
 function addReleaseDurations(events, frames) {
   for (const event of events) {
     if (event.type !== 'miniturbo_release') continue;
@@ -169,6 +208,7 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed) {
   }
   addReleaseDurations(events, frames);
   annotateCollisionRecovery(events, frames);
+  annotateLandingTelemetry(events);
 
   return {
     meta: {
@@ -184,6 +224,7 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed) {
       base_top_speed: BASE_TOP_SPEED,
       collision_recovery_definition: 'first two consecutive grounded, collision-free frames above 50% pre-impact ground speed with yaw-rate error <= max(0.05, 25% expected)',
       kart_kart_collision_coverage: 'unavailable: SimSnapshot exposes one kart; deferred to ai-opponents',
+      landing_angle_definition: 'angle between pre-landing ground velocity and downward vertical; >=45° smooth, <45° steep',
     },
     frames,
     events,
@@ -213,11 +254,42 @@ async function collisionProbe(name, steer, ticks = 300) {
   };
 }
 
+async function landingProbe(name, inputAtTick, ticks = 320) {
+  const replay = await replayTicks(
+    ticks,
+    inputAtTick,
+    `landing-${name}`,
+    `${fixture.seed}-${name}`,
+  );
+  return {
+    name,
+    events: replay.events.filter((event) => event.type === 'landing'),
+  };
+}
+
 const driftReplays = await Promise.all([replayOnce(), replayOnce(), replayOnce()]);
 const baseline = await replayOnce((input) => ({ ...input, drift: false }));
 const collisionProbes = await Promise.all([
   collisionProbe('wall-30deg', -0.95),
   collisionProbe('wall-head-on', 1),
+]);
+const landingProbes = await Promise.all([
+  landingProbe('smooth', (tick) => ({
+    throttle: 1,
+    steer: -0.2,
+    brake: false,
+    reverse: false,
+    drift: false,
+    jump: tick === 180,
+  })),
+  landingProbe('steep', (tick) => ({
+    throttle: tick < 100 ? 1 : 0,
+    steer: 0,
+    brake: false,
+    reverse: false,
+    drift: false,
+    jump: tick === 180,
+  })),
 ]);
 // Keep the gameplay fixture focused on the cross-section used by §2–§4 and
 // §7.  The speed-radius checks need a sustained full-lock sweep, so collect
@@ -284,6 +356,7 @@ for (const replay of driftReplays) {
   replay.meta.drift_speed_retention = driftSpeedRetention;
   replay.meta.steering_radius_samples = steeringRadiusSamples;
   replay.meta.collision_probes = collisionProbes;
+  replay.meta.landing_probes = landingProbes;
 }
 const replays = driftReplays;
 const serialized = replays.map((replay) => JSON.stringify(replay, null, 2) + '\n');
