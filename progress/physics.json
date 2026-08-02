@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T17:40:00Z",
+  "updated": "2026-08-02T13:40:30Z",
   "wave": "W2",
   "round": 16,
   "element": "perf-validator",
-  "status": "idle",
-  "last_verdict": "FAIL",
-  "note": "R15（ai-opponents §12）已獨立驗證並合併，四項行為指標全數真實 PASS，累計 972995。W2 元件全數處理過一輪，Lead 決定轉向 W3 前先補一個擋路的舊缺口：perf-probe.mjs 的 BAR-PERF §4 防抽格檢查（character_anim_hz/vehicle_transform_hz/camera_hz）從 R3 起是寫死常數 12/60/60，從未量測 src/render/，這是全份 BAR-PERF 裡『違反即整輪 FAIL』優先序最高的檢查，目前形同虛設。R16 已開：要求用真實 headless browser 量測 vehicle_transform_hz/camera_hz（現有渲染器每幀都更新，現在就測得到）；character_anim_hz 因尚無角色內容，要求誠實回報不適用，不准憑空回報 12。若需要在 src/render/ 或 src/loader/ 加 debug hook，要求走 BACKLOG 提報，不要跨寫入範圍自己動手。"
+  "status": "blocked",
+  "last_verdict": "PASS",
+  "note": "R16 完成：commit c540b0f 將 perf-probe.mjs 改為以 Chrome headless ANGLE/SwiftShader 載入 build/out，以固定 fixtures/lap-a.json 輸入，從 requestAnimationFrame 與 WebGL draw instrumentation 實測瀏覽器 frame timing、車輛/相機更新率與單幀資源量。artifact=loop/round-16/artifacts/perf-proxy.json（device=proxy）：fps_p50=59.8802、fps_p05=55.2486、frame_time_p99_ms=18.4、vehicle_transform_hz=60.1831、camera_hz=60.1831、draw_calls=5、triangles_k=3.278；character_anim_hz=null，character_anim_status=not_applicable_no_character_animation，禁止憑空回報 12。perf.py 對明確不適用的 4.1 跳過，缺值或無狀態仍 FAIL；R16 VERDICT-perf.json=PASS。pytest 17 passed、typecheck/build PASS。功能 commit 尚未進 main，等 Lead 重新獨立驗證與合併。"
 }
