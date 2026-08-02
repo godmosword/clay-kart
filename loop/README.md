@@ -55,6 +55,21 @@ done
 三個都要是 ✓，才算這輪真的收尾。不是三個 ✓ 就 `git merge origin/<branch> --no-edit`，
 驗證 build，push，再繼續。
 
+**這個檢查抓不到「連 commit 都沒做」的情況**（R17 發生過一次：
+`ck-plumb` worktree 的變更完全是未追蹤的工作目錄異動，沒有任何
+commit hash 可以拿去比對，`merge-base` 檢查會顯示「已在 main 裡」，
+因為 origin 上根本沒有新 commit）。收工前一併對每個 worktree 跑：
+
+```bash
+for w in ../ck-visual ../ck-physics ../ck-plumb; do
+  echo "== $w =="
+  (cd "$w" && git status --short)
+done
+```
+
+若某個 worktree 有輸出但這裡完全乾淨，先別急著結案——確認一下 builder
+是不是忘了 commit，而不是這輪真的沒有異動。
+
 ### 遠端衝突規則
 
 `origin` = https://github.com/godmosword/clay-kart

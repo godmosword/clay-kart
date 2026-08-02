@@ -175,6 +175,26 @@
 
 ## 待裁決
 
+### Lead 流程觀察：R17 出現「連 commit 都沒做」的新變體
+- **輪次**：R17
+- **現況**：過去記錄的漏洞（見下方「Lead 流程漏洞」條目）都是「commit
+  了但沒併進 main」——程式碼至少留了一個 commit hash 可以追。R17 的
+  `ck-plumb` worktree 這次連 commit 都沒做，`tools/visual/`、
+  `package.json`/`package-lock.json` 的變更完全是未追蹤的工作目錄
+  異動。若這輪沒有用 `git status`／`git log` 交叉核對 worktree 實際
+  狀態，只看 Cursor 回報的文字（「完成，未合併功能分支進 main」，但
+  沒給 commit hash），很容易誤以為至少有個 commit 存在
+- **處置**：Lead 讀過內容確認無誤後代為 commit 並推送、合併，過程中
+  排除了 Cursor 自己驗證用的暫存輸出目錄
+- **影響**：現有的 `merge-base --is-ancestor` 檢查只能抓「commit 存在但
+  沒併入」，抓不到「連 commit 都沒有」——這種情況下該檢查甚至不會
+  報錯，因為沒有 commit hash 可以拿去比對，表面上看起來像「這輪什麼
+  都沒動」而不是「有東西但沒存」
+- **狀態**：已裁決並補上。`loop/README.md` 的收尾檢查新增
+  `git status --short` 逐一掃描三個 worktree 這一步，跟既有的
+  `merge-base` 檢查並列——後者抓「commit 存在但沒併入」，前者抓
+  「連 commit 都沒有」
+
 ### contact-sheet pairing — refs/clay 對不齊 BAR-VISUAL 12 元件
 - **輪次**：R17
 - **現況**：`refs/clay/` 現有素材與 `BAR-VISUAL.md §4` 的 12 個評分元件沒有一對一對應。腳本機制（`tools/visual/contact-sheet.mjs`：12 組並排、種子打亂、左右隨機、`contact-sheet.key.json` 隔離、缺圖 placeholder）已可跑；**配對本身未填**，manifest 裡 12 個 `ref` 皆為 `null`。
@@ -195,7 +215,17 @@
 - **目標**：Lead 裁決每組的參考半邊來源（整圖／裁切座標／暫緩該組／另補參考），再填 `tools/visual/contact-sheet.manifest.json` 的 `ref` 欄位。
 - **已嘗試**：無——依 `LOOP-OPS.md §4.4` / R17 TASK，配對判斷停手寫 BACKLOG，不自決湊法。
 - **來源**：Cursor R17；`loop/round-17/TASK.md`；`BAR-VISUAL.md §1`/§4；`refs/clay/`
-- **狀態**：待裁決
+- **Lead 獨立驗證（腳本本身，已完成）**：自己重新執行
+  `node tools/visual/contact-sheet.mjs`——同 seed 兩次執行輸出位元級
+  相同，不同 seed 輸出不同；PNG 尺寸 2048×3072 正確；用 `sharp` 讀
+  metadata 確認沒有 exif/iptc/xmp，沒有 key 檔名或路徑洩漏；manifest
+  的 12 個 `ref` 逐一核對皆為 `null`，非造假。**發現這輪的程式碼原本
+  完全沒有 commit**（跟過去「commit 了但沒併進 main」不同，這次連
+  commit 都沒做，只是 worktree 裡的未追蹤變更）——讀過內容確認無誤後
+  由 Lead 代為 commit（`43632a2`）並合併進 main（`6679f55`），過程中
+  排除了 Cursor 自己驗證用的 `tmp-a/b/c` 暫存輸出。腳本本身的機制已
+  驗證可信，配對判斷仍待裁決，狀態維持不變
+- **狀態**：待裁決（腳本已合併進 main，只差 12 組配對）
 
 ### ai-opponents — R11 第一階段多車架構與 kart-kart 碰撞已完成
 - **輪次**：R11
