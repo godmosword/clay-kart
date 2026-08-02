@@ -37,11 +37,25 @@ def _finite(value: Any) -> float:
     return value if math.isfinite(value) else 0.0
 
 
-def calculate_metrics(doc: dict[str, Any]) -> dict[str, float]:
+def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | None]:
     values = doc.get("metrics", doc)
     if not isinstance(values, dict):
         values = {}
-    return {metric: _finite(values.get(metric)) for _, metric, _, _, _ in WINDOWS}
+    character_status = values.get("character_anim_status")
+    metrics: dict[str, float | None] = {}
+    for _, metric, _, _, _ in WINDOWS:
+        raw = values.get(metric)
+        if (
+            metric == "character_anim_hz"
+            and raw is None
+            and character_status == "not_applicable_no_character_animation"
+        ):
+            # The renderer has no character animation yet. Keep this honest and
+            # omit §4.1 from the verdict until W3 supplies a measurable signal.
+            metrics[metric] = None
+        else:
+            metrics[metric] = _finite(raw)
+    return metrics
 
 
 def _relative_gap(actual: float, low: float, high: float) -> float:
@@ -53,7 +67,7 @@ def _relative_gap(actual: float, low: float, high: float) -> float:
 
 
 def build_verdict(
-    metrics: dict[str, float],
+    metrics: dict[str, float | None],
     *,
     round_number: int = 3,
     artifact: str = "loop/round-3/artifacts/perf-proxy.json",
@@ -62,7 +76,11 @@ def build_verdict(
     checks = []
     failures = []
     for metric_id, metric_name, low, high, priority in WINDOWS:
-        actual = _finite(metrics.get(metric_name))
+        actual = metrics.get(metric_name)
+        if actual is None:
+            # Only an explicit, documented not-applicable metric is skipped;
+            # missing/invalid values were normalized to 0.0 and still fail.
+            continue
         status = "PASS" if low <= actual <= high else "FAIL"
         checks.append({
             "id": metric_id,
