@@ -24,6 +24,15 @@
 
 ## 待裁決
 
+### ai-opponents — R11 第一階段多車架構與 kart-kart 碰撞已完成
+- **輪次**：R11
+- **現況**：`createWorld({ aiOpponents: [...] })` 產生對齊的 `karts[]`/`laps[]`；專用 pair probe 為 2 台車、`playerIndex=0`，6.4 `kart_kart_impulse_symmetry=1.0` PASS。AI 車目前是 deterministic stationary placeholder。
+- **目標**：6.4 `[0.92, 1.08]`
+- **已嘗試**：等質量、固定恢復係數的動態圓形碰撞；事件層記錄雙方 kart index、對方 index、雙方 impulse 與 symmetry ratio。單車既有 frames/events 逐項維持不變。
+- **處置**：R11 只完成架構與碰撞物理；AI 駕駛決策、超車／路線／難度與 per-character 調校依 TASK 明確留待後續分期。
+- **來源**：`loop/round-11/artifacts/lap-a.json`、`loop/round-11/VERDICT.json`、physics commit `88c102d`
+- **狀態**：待後續分期
+
 ### input-feedback — 8.2 drift buffer 與 8.4 steer deadzone 尚未實作
 - **輪次**：R10
 - **現況**：8.1 `input_to_sim_latency_ticks=0` PASS；8.2 `input_buffer_window_ms=0` FAIL；8.3 `throttle_deadzone=0` PASS；8.4 `steer_deadzone=0` FAIL。

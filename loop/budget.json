@@ -14,7 +14,7 @@
     "collision-response": { "cap": 200000, "spent": 149104, "bar": "BAR-FEEL §6", "$comment": "R7 完成 telemetry 與 6.1-6.3 校準；6.4 單車架構跳過，6.5=289 仍待後續處理" },
     "airborne-landing": { "cap": 150000, "spent": 1135659, "bar": "BAR-FEEL §7", "$comment": "R9 完成 telemetry，7.3/7.4 根因已查清（引擎推力混入量測窗口、落地無水平減速機制），記入 BACKLOG。spent 數字疑似記錄錯誤——本輪只改 telemetry 未動物理，量級跟 R7 不成比例，待下輪確認" },
     "input-feedback": { "cap": 100000, "spent": 182927, "bar": "BAR-FEEL §8", "$comment": "R10 完成 §8 真實 probe 量測；8.1=0 PASS、8.2=0 FAIL、8.3=0 PASS、8.4=0 FAIL。8.2/8.4 未新增功能，已記入 BACKLOG。" },
-    "ai-opponents": { "cap": 300000, "spent": 0, "bar": "BAR-FEEL §6 + 行為指標待補", "$comment": "R11 開工：多車架構落地（karts[]/playerIndex，Lead 已完成 contract 與 renderer）+ kart-kart 碰撞（6.4）。這輪不含 AI 決策邏輯，是 cap 內第一期分期，非全部" }
+    "ai-opponents": { "cap": 300000, "spent": 277589, "bar": "BAR-FEEL §6 + 行為指標待補", "$comment": "R11 第一階段完成：多車架構、deterministic stationary opponent、kart-kart collision；6.4=1.0 PASS。AI 決策與 per-character 調校留後續分期。" }
   },
   "W3": {
     "$comment": "Opus + ultracode，單位成本遠高於 W2。cap 較低是刻意的。",
