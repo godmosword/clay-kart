@@ -199,6 +199,57 @@ def _collision_metric(
     return statistics.median(values) if values else 0.0
 
 
+def _landing_events(doc: dict[str, Any]) -> list[dict[str, Any]]:
+    events = _events(doc, "landing")
+    probes = _meta(doc).get("landing_probes", [])
+    if not isinstance(probes, list):
+        return events
+    for probe in probes:
+        if not isinstance(probe, dict) or not isinstance(probe.get("events"), list):
+            continue
+        probe_name = probe.get("name")
+        for event in probe["events"]:
+            if not isinstance(event, dict) or event.get("type") != "landing":
+                continue
+            data = event.get("data", {})
+            data = dict(data) if isinstance(data, dict) else {}
+            data["probe"] = probe_name
+            events.append({**event, "data": data})
+    return events
+
+
+def _landing_metric(
+    events: list[dict[str, Any]],
+    key: str,
+    *,
+    angle_low: float | None = None,
+    angle_high: float | None = None,
+    probe_name: str | None = None,
+) -> float:
+    values = []
+    named_values = []
+    for event in events:
+        data = event.get("data", {})
+        if not isinstance(data, dict):
+            continue
+        angle = _finite(data.get("landing_angle_deg"), math.inf)
+        if angle_low is not None and angle < angle_low:
+            continue
+        if angle_high is not None and angle > angle_high:
+            continue
+        raw = data.get(key)
+        if raw is None:
+            continue
+        value = _finite(raw, math.nan)
+        if math.isfinite(value):
+            values.append(value)
+            if probe_name is not None and data.get("probe") == probe_name:
+                named_values.append(value)
+    if probe_name is not None and named_values:
+        values = named_values
+    return statistics.median(values) if values else 0.0
+
+
 def _nan_inf_frames(frames: list[dict[str, Any]]) -> int:
     count = 0
     for frame in frames:
@@ -272,7 +323,7 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
 
     release_events = _events(doc, "miniturbo_release")
     collision_events = _collision_events(doc)
-    landing_events = _events(doc, "landing")
+    landing_events = _landing_events(doc)
     active_steer_frames = [
         frame for frame in frames if abs(_finite(frame.get("steer_input"))) > 0.05
     ]
@@ -400,9 +451,19 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
             _, current_vy, _ = _vec3(current, "vel")
             gravity_values.append(-(current_vy - previous_vy) / dt if dt > 0 else 0.0)
     gravity = statistics.median(gravity_values) if gravity_values else _finite(meta.get("gravity_us2"))
-    landing_retention = _event_value(landing_events, "speed_retention")
-    hard_landing_retention = _event_value(landing_events, "hard_speed_retention")
-    air_latency = _event_value(landing_events, "latency_ticks")
+    landing_retention = _landing_metric(
+        landing_events,
+        "speed_retention",
+        angle_low=45.0,
+        probe_name="smooth",
+    )
+    hard_landing_retention = _landing_metric(
+        landing_events,
+        "speed_retention",
+        angle_high=45.0,
+        probe_name="steep",
+    )
+    air_latency = _landing_metric(landing_events, "latency_ticks")
 
     metrics: dict[str, float | bool] = {
         "tick_dt_variance": 0.0 if abs(dt_variance) < 1e-24 else dt_variance,

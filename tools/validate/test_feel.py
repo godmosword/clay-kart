@@ -181,3 +181,59 @@ def test_collision_metrics_use_angle_profiles_and_first_probe_impacts() -> None:
     assert metrics["wall_speed_retention"] == 0.6499999999999999
     assert metrics["wall_head_on_retention"] == 0.175
     assert metrics["collision_recovery_time_s"] == 0.25
+
+
+def test_landing_metrics_use_measured_smooth_and_steep_probe_data() -> None:
+    def landing(tick: int, angle: float, retention: float) -> dict:
+        return {
+            "tick": tick,
+            "type": "landing",
+            "data": {
+                "landing_angle_deg": angle,
+                "speed_retention": retention,
+                "latency_ticks": 0,
+            },
+        }
+
+    telemetry = {
+        "meta": {
+            "tick_hz": 120,
+            "replay_byte_identical": True,
+            "landing_probes": [
+                {"name": "smooth", "events": [landing(80, 65, 0.98)]},
+                {"name": "steep", "events": [landing(80, 25, 0.8)]},
+            ],
+        },
+        "frames": [
+            {"t": 1 / 120, "tick": 1, "pos": [30, 0, 30], "vel": [0, 0, 12], "speed": 12, "yaw": 0, "yaw_rate": 0, "grounded": True, "surface": "asphalt", "throttle_input": 1, "drift_state": "none"},
+            {"t": 2 / 120, "tick": 2, "pos": [30, 0, 30.1], "vel": [0, 0, 12], "speed": 12, "yaw": 0, "yaw_rate": 0, "grounded": True, "surface": "asphalt", "throttle_input": 1, "drift_state": "none"},
+        ],
+        "events": [],
+    }
+    metrics = calculate_metrics(telemetry)
+    assert metrics["landing_speed_retention"] == 0.98
+    assert metrics["hard_landing_retention"] == 0.8
+    assert metrics["airborne_to_grounded_latency_ticks"] == 0.0
+
+
+def test_landing_metrics_fall_back_to_unlabelled_measured_events() -> None:
+    telemetry = {
+        "meta": {"tick_hz": 120},
+        "frames": [],
+        "events": [
+            {
+                "tick": 80,
+                "type": "landing",
+                "data": {"landing_angle_deg": 70, "speed_retention": 0.97, "latency_ticks": 1},
+            },
+            {
+                "tick": 90,
+                "type": "landing",
+                "data": {"landing_angle_deg": 20, "speed_retention": 0.75, "latency_ticks": 1},
+            },
+        ],
+    }
+    metrics = calculate_metrics(telemetry)
+    assert metrics["landing_speed_retention"] == 0.97
+    assert metrics["hard_landing_retention"] == 0.75
+    assert metrics["airborne_to_grounded_latency_ticks"] == 1.0
