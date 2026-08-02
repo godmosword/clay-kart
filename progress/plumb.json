@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-01T13:50:27Z",
-  "wave": "W2",
-  "round": 8,
-  "element": "drift-input-binding",
-  "status": "done",
+  "updated": "2026-08-02T17:50:00Z",
+  "wave": "W3",
+  "round": 17,
+  "element": "contact-sheet-script",
+  "status": "idle",
   "last_verdict": null,
-  "note": "R8：player-input 補 drift（Ctrl + 觸控「漂」），poll() 每次回傳 drift；npm test 改為先 build 再跑 harness。typecheck/test/build PASS；腳本驗證 Ctrl+轉向→drift:true 且 physics driftState=charging。"
+  "note": "R8（drift-input-binding）確認完成。W2 已跑過一輪，Lead 決定轉向 W3，R17 已開：PLAN.md 指派給 Cursor 的 W3 第一步——contact sheet 生成腳本（12 組並排、隨機打亂、key 對照表隔離於 critic 存取範圍外）。明確指出一個需要判斷的缺口：refs/clay/ 只有 8 張場景合成圖，BAR-VISUAL.md §4 有 12 個元件，沒有現成的一對一參考圖，要求 Cursor 遇到配對判斷時停下來寫 BACKLOG，不要自行決定。"
 }
