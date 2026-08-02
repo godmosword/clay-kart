@@ -610,6 +610,15 @@ function aiProbeInput(throttle, steer = 0) {
   };
 }
 
+const AI_TRACE_SAMPLE_INTERVAL_TICKS = 10;
+
+function sampledAiTrace(trace) {
+  return trace.filter((_, index) => (
+    index % AI_TRACE_SAMPLE_INTERVAL_TICKS === 0
+    || index === trace.length - 1
+  ));
+}
+
 async function deterministicAiProbe(name, factory) {
   const [first, second] = await Promise.all([factory(), factory()]);
   const firstSerialized = JSON.stringify(first);
@@ -636,7 +645,8 @@ async function aiLapCompletionProbe() {
   return {
     ai_lap_completion: Boolean(state && state.splits_s.length >= 1),
     ai_lap_time_s: state?.splits_s?.[0] ?? null,
-    trace: replay.ai_trace,
+    trace_sample_interval_ticks: AI_TRACE_SAMPLE_INTERVAL_TICKS,
+    trace: sampledAiTrace(replay.ai_trace),
   };
 }
 
@@ -661,7 +671,11 @@ async function difficultyLapSpreadProbe() {
     difficulty_0_lap_time_s: easyLap,
     difficulty_1_lap_time_s: hardLap,
     spread_s: easyLap !== null && hardLap !== null ? easyLap - hardLap : null,
-    traces: { difficulty_0: easy.ai_trace, difficulty_1: hard.ai_trace },
+    trace_sample_interval_ticks: AI_TRACE_SAMPLE_INTERVAL_TICKS,
+    traces: {
+      difficulty_0: sampledAiTrace(easy.ai_trace),
+      difficulty_1: sampledAiTrace(hard.ai_trace),
+    },
   };
 }
 
@@ -696,7 +710,8 @@ async function overtakeProbe() {
   return {
     overtake_time_s: overtakeTick === null ? null : overtakeTick / TICK_HZ,
     overtake_tick: overtakeTick,
-    trace: replay.ai_trace,
+    trace_sample_interval_ticks: AI_TRACE_SAMPLE_INTERVAL_TICKS,
+    trace: sampledAiTrace(replay.ai_trace),
   };
 }
 
@@ -726,7 +741,8 @@ async function rubberbandProbe() {
     observed_max_speed_ratio: observedMaxSpeed / BASE_TOP_SPEED,
     configured_max_speed_ratio: configuredMaxRatio,
     max_rubberband_gap: Math.max(...activeGaps, 0),
-    trace: replay.ai_trace,
+    trace_sample_interval_ticks: AI_TRACE_SAMPLE_INTERVAL_TICKS,
+    trace: sampledAiTrace(replay.ai_trace),
   };
 }
 
