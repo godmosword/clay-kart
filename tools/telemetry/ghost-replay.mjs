@@ -308,9 +308,11 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options =
       kart_count: previous.karts.length,
       player_index: previous.playerIndex,
       collision_recovery_definition: 'first two consecutive grounded, collision-free frames above 50% pre-impact ground speed with yaw-rate error <= max(0.05, 25% expected)',
+      wall_stick_definition: 'consecutive collision frames with ground speed below 10% of asphalt BASE_TOP_SPEED; fast wall scrapes are not stuck',
       kart_kart_collision_coverage: 'available: kart_kart_collision events include both participants and impulses',
       landing_angle_definition: 'angle between pre-landing ground velocity and downward vertical; >=45° smooth, <45° steep',
       landing_speed_retention_definition: 'post/pre ground speed, capped at 1 to exclude same-tick drive acceleration from landing impact loss',
+      surface_definition: 'R13 uses two short angular sectors inside the existing annular lane; surface probes report raw target frames and a settled asphalt reference sweep',
     },
     frames,
     events,
@@ -351,6 +353,55 @@ async function landingProbe(name, inputAtTick, ticks = 320) {
   return {
     name,
     events: replay.events.filter((event) => event.type === 'landing'),
+  };
+}
+
+async function surfaceProbe(name, surface, ticks = 2400) {
+  const replay = await replayTicks(
+    ticks,
+    () => ({
+      throttle: 1,
+      steer: -0.3,
+      brake: false,
+      reverse: false,
+      drift: false,
+      jump: false,
+    }),
+    `surface-${name}`,
+    `${fixture.seed}-surface-${name}`,
+  );
+  const warmupTick = 300;
+  const samples = replay.frames
+    .filter((frame) => (
+      frame.tick > warmupTick
+      && frame.surface === surface
+      && frame.collision_impulse <= 0
+    ))
+    .map((frame) => ({
+      tick: frame.tick,
+      surface: frame.surface,
+      speed: frame.speed,
+      collision_impulse: frame.collision_impulse,
+    }));
+  const asphaltReferenceSpeeds = replay.frames
+    .filter((frame) => (
+      frame.tick > warmupTick
+      && frame.surface === 'asphalt'
+      && frame.collision_impulse <= 0
+      && frame.speed >= BASE_TOP_SPEED * 0.8
+    ))
+    .map((frame) => frame.speed);
+  if (samples.length < 30 || asphaltReferenceSpeeds.length < 30) {
+    throw new Error(`surface probe ${name} did not collect enough settled samples`);
+  }
+  return {
+    name,
+    surface,
+    steer: -0.3,
+    warmup_tick: warmupTick,
+    samples,
+    asphalt_reference_speeds: asphaltReferenceSpeeds,
+    definition: 'mean settled target-surface speed divided by mean collision-free asphalt speed >=80% BASE_TOP_SPEED in the same deterministic steering sweep',
   };
 }
 
@@ -518,6 +569,10 @@ const landingProbes = await Promise.all([
     jump: tick === 180,
   })),
 ]);
+const surfaceProbes = await Promise.all([
+  surfaceProbe('grass', 'grass'),
+  surfaceProbe('dirt', 'dirt'),
+]);
 const inputFeedback = {
   definition: {
     latency: 'simulation frame tick minus request tick minus one; setInput and step occur in the same advance tick',
@@ -598,6 +653,7 @@ for (const replay of driftReplays) {
   replay.meta.steering_radius_samples = steeringRadiusSamples;
   replay.meta.collision_probes = collisionProbes;
   replay.meta.landing_probes = landingProbes;
+  replay.meta.surface_probes = surfaceProbes;
   replay.meta.input_feedback = inputFeedback;
   replay.meta.kart_kart_probes = kartKartProbes;
 }
