@@ -361,3 +361,28 @@ def test_wall_stick_ignores_fast_collision_scrapes() -> None:
         })
     metrics = calculate_metrics({"meta": {"tick_hz": 120}, "frames": frames, "events": []})
     assert metrics["wall_stick_frames"] == 3.0
+
+
+def test_ai_metrics_use_named_deterministic_probe_records() -> None:
+    telemetry = {
+        "meta": {
+            "tick_hz": 120,
+            "ai_probes": [
+                {"name": "ai-lap-completion", "ai_lap_completion": True},
+                {"name": "ai-overtake", "overtake_time_s": 4.0},
+                {"name": "ai-difficulty-spread", "spread_s": 7.5},
+                {
+                    "name": "ai-rubberband",
+                    "observed_max_speed_ratio": 0.9,
+                    "configured_max_speed_ratio": 1.1,
+                },
+            ],
+        },
+        "frames": [],
+        "events": [],
+    }
+    metrics = calculate_metrics(telemetry)
+    assert metrics["ai_lap_completion"] is True
+    assert metrics["ai_overtake_time_s"] == 4.0
+    assert metrics["difficulty_lap_time_spread_s"] == 7.5
+    assert metrics["rubberband_speed_bonus_ratio"] == 0.9

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic BAR-FEEL §2–§8 validator.
+"""Deterministic BAR-FEEL §2–§8 and §12 validator.
 
 Usage:
     python3 tools/validate/feel.py telemetry/lap-a.json \
@@ -67,6 +67,10 @@ WINDOWS: tuple[tuple[str, str, float | bool, float | bool, int], ...] = (
     ("8.2", "input_buffer_window_ms", 80.0, 130.0, 9),
     ("8.3", "throttle_deadzone", 0.0, 0.08, 9),
     ("8.4", "steer_deadzone", 0.05, 0.15, 9),
+    ("12.1", "ai_lap_completion", True, True, 10),
+    ("12.2", "ai_overtake_time_s", 1.0, 8.0, 10),
+    ("12.3", "difficulty_lap_time_spread_s", 3.0, 20.0, 10),
+    ("12.4", "rubberband_speed_bonus_ratio", 1.0, 1.15, 10),
 )
 
 
@@ -242,6 +246,38 @@ def _surface_speed_metrics(doc: dict[str, Any], frames: list[dict[str, Any]]) ->
             values = [_speed(frame) for frame in frames if frame.get("surface") == surface]
             measured[surface] = statistics.fmean(values) / asphalt_mean if values and asphalt_mean else 0.0
     return measured
+
+
+def _ai_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
+    """Read §12 only from named deterministic AI probe records."""
+    metrics: dict[str, float | bool] = {
+        "ai_lap_completion": False,
+        "ai_overtake_time_s": 0.0,
+        "difficulty_lap_time_spread_s": 0.0,
+        "rubberband_speed_bonus_ratio": 0.0,
+    }
+    probes = _meta(doc).get("ai_probes", [])
+    if not isinstance(probes, list):
+        return metrics
+    for probe in probes:
+        if not isinstance(probe, dict):
+            continue
+        name = probe.get("name")
+        if name == "ai-lap-completion":
+            metrics["ai_lap_completion"] = probe.get("ai_lap_completion") is True
+        elif name == "ai-overtake":
+            metrics["ai_overtake_time_s"] = _finite(probe.get("overtake_time_s"))
+        elif name == "ai-difficulty-spread":
+            metrics["difficulty_lap_time_spread_s"] = _finite(probe.get("spread_s"))
+        elif name == "ai-rubberband":
+            # 12.4 is a measurement window: report the maximum physical speed
+            # actually observed in the probe. The configured cap remains in
+            # the artifact as diagnostics, but must not substitute for the
+            # observed value when evaluating the contract.
+            metrics["rubberband_speed_bonus_ratio"] = _finite(
+                probe.get("observed_max_speed_ratio"), math.nan
+            )
+    return metrics
 
 
 def _collision_events(doc: dict[str, Any]) -> list[dict[str, Any]]:
@@ -585,6 +621,7 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
     )
     air_latency = _landing_metric(landing_events, "latency_ticks")
     input_feedback = _input_feedback_metrics(doc)
+    ai_metrics = _ai_metrics(doc)
 
     metrics: dict[str, float | bool] = {
         "tick_dt_variance": 0.0 if abs(dt_variance) < 1e-24 else dt_variance,
@@ -629,6 +666,10 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
         "input_buffer_window_ms": input_feedback["input_buffer_window_ms"],
         "throttle_deadzone": input_feedback["throttle_deadzone"],
         "steer_deadzone": input_feedback["steer_deadzone"],
+        "ai_lap_completion": ai_metrics["ai_lap_completion"],
+        "ai_overtake_time_s": ai_metrics["ai_overtake_time_s"],
+        "difficulty_lap_time_spread_s": ai_metrics["difficulty_lap_time_spread_s"],
+        "rubberband_speed_bonus_ratio": ai_metrics["rubberband_speed_bonus_ratio"],
     }
     return metrics
 
@@ -695,7 +736,7 @@ def build_verdict(
         "wave": "W2",
         "element": "feel-validator",
         "verdict": verdict,
-        "bar_ref": "BAR-FEEL.md §2–§8",
+        "bar_ref": "BAR-FEEL.md §2–§8, §12",
         "checks": checks,
         "largest_gap": largest_gap,
         "artifacts": [artifact],

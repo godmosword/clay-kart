@@ -264,6 +264,7 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options =
   const frames = [];
   const events = [];
   const inputTrace = options.captureInput ? [] : null;
+  const aiTrace = options.captureAi ? [] : null;
   let previous = world.snapshot();
   for (let tick = 0; tick < totalTicks; tick += 1) {
     // advance() owns the world.setInput() + world.step() ordering.
@@ -286,12 +287,49 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options =
         },
       });
     }
+    if (aiTrace) {
+      const decisions = typeof world.getAiTelemetry === 'function'
+        ? world.getAiTelemetry()
+        : [];
+      aiTrace.push({
+        tick: current.tick,
+        player_pos: [...playerKart(current).pos],
+        karts: current.karts.slice(1).map((kart, index) => ({
+          kart_index: index + 1,
+          pos: [...kart.pos],
+          speed: kart.speed,
+          yaw: kart.yaw,
+          surface: kart.surface,
+          lap: current.laps[index + 1]?.current ?? 1,
+          splits: [...(current.laps[index + 1]?.splits ?? [])],
+        })),
+        decisions: decisions.map((decision) => ({
+          kart_index: decision.kartIndex,
+          difficulty: decision.difficulty,
+          input: { ...decision.input },
+          target_speed: decision.targetSpeed,
+          max_speed_ratio: decision.maxSpeedRatio,
+          rubberband_gap: decision.rubberbandGap,
+          radial_error: decision.radialError,
+        })),
+      });
+    }
     events.push(...eventsBetween(previous, current));
     previous = current;
   }
   addReleaseDurations(events, frames);
   annotateCollisionRecovery(events, frames);
   annotateLandingTelemetry(events);
+
+  const aiLapStates = previous.karts.length > 1
+    ? previous.laps.slice(1).map((lap, index) => ({
+      kart_index: index + 1,
+      current: lap.current,
+      total: lap.total,
+      best_time_s: lap.bestTime,
+      splits_s: [...lap.splits],
+    }))
+    : null;
 
   return {
     meta: {
@@ -313,10 +351,12 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options =
       landing_angle_definition: 'angle between pre-landing ground velocity and downward vertical; >=45° smooth, <45° steep',
       landing_speed_retention_definition: 'post/pre ground speed, capped at 1 to exclude same-tick drive acceleration from landing impact loss',
       surface_definition: 'R13 uses two short angular sectors inside the existing annular lane; surface probes report raw target frames and a settled asphalt reference sweep',
+      ...(aiLapStates ? { ai_lap_states: aiLapStates } : {}),
     },
     frames,
     events,
     ...(inputTrace ? { input_trace: inputTrace } : {}),
+    ...(aiTrace ? { ai_trace: aiTrace } : {}),
   };
 }
 
@@ -518,7 +558,7 @@ async function inputCommandSweep(name, field, values) {
 
 async function kartKartProbe() {
   const replay = await replayTicks(
-    47,
+    600,
     () => ({
       throttle: 1,
       steer: 0,
@@ -542,6 +582,167 @@ async function kartKartProbe() {
     kart_count: replay.meta.kart_count,
     player_index: replay.meta.player_index,
     events,
+  };
+}
+
+function trackAngleFromPosition(position) {
+  return Math.atan2(
+    position[2] - TRACK_GEOMETRY.centerZ,
+    position[0] - TRACK_GEOMETRY.centerX,
+  );
+}
+
+function signedTrackGap(playerPosition, aiPosition) {
+  let gap = trackAngleFromPosition(playerPosition) - trackAngleFromPosition(aiPosition);
+  while (gap > Math.PI) gap -= Math.PI * 2;
+  while (gap < -Math.PI) gap += Math.PI * 2;
+  return gap;
+}
+
+function aiProbeInput(throttle, steer = 0) {
+  return {
+    throttle,
+    steer,
+    brake: false,
+    reverse: false,
+    drift: false,
+    jump: false,
+  };
+}
+
+const AI_TRACE_SAMPLE_INTERVAL_TICKS = 10;
+
+function sampledAiTrace(trace) {
+  return trace.filter((_, index) => (
+    index % AI_TRACE_SAMPLE_INTERVAL_TICKS === 0
+    || index === trace.length - 1
+  ));
+}
+
+async function deterministicAiProbe(name, factory) {
+  const [first, second] = await Promise.all([factory(), factory()]);
+  const firstSerialized = JSON.stringify(first);
+  if (firstSerialized !== JSON.stringify(second)) {
+    throw new Error(`AI probe ${name} is not byte-identical across two runs`);
+  }
+  return { ...first, name, deterministic_byte_identical: true };
+}
+
+async function aiLapCompletionProbe() {
+  const replay = await replayTicks(
+    2400,
+    () => ({ throttle: 0, steer: 0, brake: true, reverse: false, drift: false, jump: false }),
+    'ai-lap-completion',
+    `${fixture.seed}-ai-lap-completion`,
+    {
+      captureAi: true,
+      worldOptions: {
+        aiOpponents: [{ characterId: 'duoduo', difficulty: 1 }],
+      },
+    },
+  );
+  const state = replay.meta.ai_lap_states?.[0];
+  return {
+    ai_lap_completion: Boolean(state && state.splits_s.length >= 1),
+    ai_lap_time_s: state?.splits_s?.[0] ?? null,
+    trace_sample_interval_ticks: AI_TRACE_SAMPLE_INTERVAL_TICKS,
+    trace: sampledAiTrace(replay.ai_trace),
+  };
+}
+
+async function difficultyLapSpreadProbe() {
+  const run = async (difficulty) => replayTicks(
+    3000,
+    () => ({ throttle: 0, steer: 0, brake: true, reverse: false, drift: false, jump: false }),
+    `ai-difficulty-${difficulty}`,
+    `${fixture.seed}-ai-difficulty-${difficulty}`,
+    {
+      captureAi: true,
+      worldOptions: {
+        aiStartAngles: [0.6],
+        aiOpponents: [{ characterId: 'duoduo', difficulty }],
+      },
+    },
+  );
+  const [easy, hard] = await Promise.all([run(0), run(1)]);
+  const easyLap = easy.meta.ai_lap_states?.[0]?.splits_s?.[0] ?? null;
+  const hardLap = hard.meta.ai_lap_states?.[0]?.splits_s?.[0] ?? null;
+  return {
+    difficulty_0_lap_time_s: easyLap,
+    difficulty_1_lap_time_s: hardLap,
+    spread_s: easyLap !== null && hardLap !== null ? easyLap - hardLap : null,
+    trace_sample_interval_ticks: AI_TRACE_SAMPLE_INTERVAL_TICKS,
+    traces: {
+      difficulty_0: sampledAiTrace(easy.ai_trace),
+      difficulty_1: sampledAiTrace(hard.ai_trace),
+    },
+  };
+}
+
+async function overtakeProbe() {
+  const replay = await replayTicks(
+    2400,
+    () => aiProbeInput(0.05, -0.3),
+    'ai-overtake',
+    `${fixture.seed}-ai-overtake`,
+    {
+      captureAi: true,
+      worldOptions: {
+        playerStartAngle: 1.0,
+        aiStartAngles: [0],
+        aiOpponents: [{ characterId: 'duoduo', difficulty: 1 }],
+      },
+    },
+  );
+  let previousGap = null;
+  let overtakeTick = null;
+  for (let index = 0; index < replay.ai_trace.length; index += 1) {
+    const trace = replay.ai_trace[index];
+    const aiKart = trace.karts[0];
+    if (!aiKart || !trace.player_pos) continue;
+    const gap = signedTrackGap(trace.player_pos, aiKart.pos);
+    if (previousGap !== null && previousGap > 0 && gap <= 0) {
+      overtakeTick = trace.tick;
+      break;
+    }
+    previousGap = gap;
+  }
+  return {
+    overtake_time_s: overtakeTick === null ? null : overtakeTick / TICK_HZ,
+    overtake_tick: overtakeTick,
+    trace_sample_interval_ticks: AI_TRACE_SAMPLE_INTERVAL_TICKS,
+    trace: sampledAiTrace(replay.ai_trace),
+  };
+}
+
+async function rubberbandProbe() {
+  const replay = await replayTicks(
+    2400,
+    () => aiProbeInput(0.28, -0.3),
+    'ai-rubberband',
+    `${fixture.seed}-ai-rubberband`,
+    {
+      captureAi: true,
+      worldOptions: {
+        playerStartAngle: 2.5,
+        aiStartAngles: [0],
+        aiOpponents: [{ characterId: 'duoduo', difficulty: 0.5 }],
+      },
+    },
+  );
+  const samples = replay.ai_trace.flatMap((trace) => trace.karts);
+  const decisions = replay.ai_trace.flatMap((trace) => trace.decisions);
+  const observedMaxSpeed = Math.max(...samples.map((sample) => sample.speed), 0);
+  const configuredMaxRatio = Math.max(...decisions.map((decision) => decision.max_speed_ratio), 1);
+  const activeGaps = decisions
+    .map((decision) => decision.rubberband_gap)
+    .filter((gap) => gap > 0);
+  return {
+    observed_max_speed_ratio: observedMaxSpeed / BASE_TOP_SPEED,
+    configured_max_speed_ratio: configuredMaxRatio,
+    max_rubberband_gap: Math.max(...activeGaps, 0),
+    trace_sample_interval_ticks: AI_TRACE_SAMPLE_INTERVAL_TICKS,
+    trace: sampledAiTrace(replay.ai_trace),
   };
 }
 
@@ -587,6 +788,12 @@ const inputFeedback = {
   ]),
 };
 const kartKartProbes = [await kartKartProbe()];
+const aiProbes = await Promise.all([
+  deterministicAiProbe('ai-lap-completion', aiLapCompletionProbe),
+  deterministicAiProbe('ai-overtake', overtakeProbe),
+  deterministicAiProbe('ai-difficulty-spread', difficultyLapSpreadProbe),
+  deterministicAiProbe('ai-rubberband', rubberbandProbe),
+]);
 // Keep the gameplay fixture focused on the cross-section used by §2–§4 and
 // §7.  The speed-radius checks need a sustained full-lock sweep, so collect
 // that diagnostic series in a separate deterministic replay and attach only
@@ -656,6 +863,8 @@ for (const replay of driftReplays) {
   replay.meta.surface_probes = surfaceProbes;
   replay.meta.input_feedback = inputFeedback;
   replay.meta.kart_kart_probes = kartKartProbes;
+  replay.meta.ai_probes = aiProbes;
+  replay.meta.ai_definition = 'AI decisions are pure per-tick track-line/speed control; all movement is applied through Kart.setInput() and shared drive/yaw integration. Probe traces include raw AI speed and decision caps.';
 }
 const replays = driftReplays;
 const serialized = replays.map((replay) => JSON.stringify(replay, null, 2) + '\n');
