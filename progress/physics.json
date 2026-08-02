@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T14:30:00Z",
+  "updated": "2026-08-02T06:11:24Z",
   "wave": "W2",
   "round": 12,
   "element": "airborne-landing + input-feedback",
-  "status": "idle",
+  "status": "done",
   "last_verdict": "FAIL",
-  "note": "R11 獨立驗證屬實（重跑 typecheck/build/pytest、重新產生 telemetry 餵 feel.py 跟 VERDICT.json 逐項零差異，6.4=1.0 核實為等質量對稱衝量公式的物理結果）。但發現 physics commit 88c102d 當時漏併入 main（只有紀錄檔併了），已由 Lead 手動 merge 補上（main commit 66b4ff3），main typecheck/build/pytest 現在全綠——這是同一類疏漏第四次發生，已記入 BACKLOG。R12 已開：回收兩個舊缺口——7.3/7.4 落地水平減速（7.3 是量測邊界效應、7.4 是真正缺少角度耦合的水平減速機制，根因 R9 已查清）與 8.2/8.4 輸入緩衝／死區（R10 判斷權交給 Codex 時選擇不做，現在裁決要做）。4.5 硬門檻不可退化是唯一不可談判項目。"
+  "note": "R12 完成：physics commit c8c5265 已推送。落地加入角度耦合水平 retention（近零水平速度保留數值穩定），telemetry 封頂同 tick 引擎增速避免 7.3 邊界誤算；7.3=1.0、7.4=0.7645012039 均 PASS。drift 加入 100ms press buffer，probe=91.6666667ms；steer deadzone=0.08；8.2/8.4 均 PASS。§4.5=1.5191494913 維持 PASS，§5 全掃描除既有 5.5/5.6 外無回歸。typecheck/build/W1/pytest 11/11 通過，ghost 三次 byte-identical。整體 feel verdict 仍因既有 4.4/4.6/4.7/4.10/5.5/5.6/6.5 FAIL。R9 的 1135659 已由 VERDICT/budget 歷史紀錄核對，但沒有可獨立重建的 token 拆分證據，故保留不改；R12 實際 347710 已累加至兩個重開元件。"
 }
