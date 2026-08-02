@@ -46,7 +46,13 @@ const WALL_GRAZING_BOUNCE = 0.35;
 const WALL_HEAD_ON_ANGLE_DEG = 15;
 const WALL_GRAZING_ANGLE_DEG = 30;
 const KART_BOUNCE = 0.2;
+const LANDING_SMOOTH_ANGLE_DEG = 45;
+const LANDING_HARD_RETENTION = 0.7;
+const LANDING_MIN_HORIZONTAL_SPEED = 0.1;
 const DRIFT_ENTRY_SPEED = 10.5;
+const DRIFT_INPUT_BUFFER_SECONDS = 0.1;
+const DRIFT_INPUT_BUFFER_TICKS = Math.round(DRIFT_INPUT_BUFFER_SECONDS * 120);
+const STEER_DEADZONE = 0.08;
 const DRIFT_TIER1_TIME = 0.85;
 const DRIFT_TIER2_TIME = 2.0;
 const DRIFT_TIER3_TIME = 3.5;
@@ -86,6 +92,14 @@ function moveTowardZero(value: number, amount: number): number {
   return value - Math.sign(value) * amount;
 }
 
+function landingHorizontalRetention(horizontalSpeed: number, descentSpeed: number): number {
+  if (horizontalSpeed < LANDING_MIN_HORIZONTAL_SPEED) return 1;
+  const landingAngleDeg = Math.atan2(horizontalSpeed, descentSpeed) * 180 / Math.PI;
+  const smoothBlend = clamp(landingAngleDeg / LANDING_SMOOTH_ANGLE_DEG, 0, 1);
+  return LANDING_HARD_RETENTION
+    + (1 - LANDING_HARD_RETENTION) * smoothBlend * smoothBlend;
+}
+
 function wrapAngle(angle: number): number {
   const wrapped = angle % (Math.PI * 2);
   return wrapped < 0 ? wrapped + Math.PI * 2 : wrapped;
@@ -109,6 +123,9 @@ class Kart {
   #brake = false;
   #reverse = false;
   #driftHeld = false;
+  #driftBufferPending = false;
+  #driftBufferExpiryTick = -1;
+  #driftBufferedActivation = false;
   #steerCommand = 0;
   #jumpHeld = false;
   #jumpQueued = false;
@@ -145,7 +162,8 @@ class Kart {
       this.#throttle = clamp(input.throttle, 0, 1);
     }
     if (input.steer !== undefined) {
-      this.#steer = clamp(input.steer, -1, 1);
+      const steer = clamp(input.steer, -1, 1);
+      this.#steer = Math.abs(steer) < STEER_DEADZONE ? 0 : steer;
     }
     if (input.brake !== undefined) {
       this.#brake = input.brake;
@@ -154,6 +172,10 @@ class Kart {
       this.#reverse = input.reverse;
     }
     if (input.drift !== undefined) {
+      if (input.drift && !this.#driftHeld) {
+        this.#driftBufferPending = true;
+        this.#driftBufferExpiryTick = this.#currentTick + DRIFT_INPUT_BUFFER_TICKS;
+      }
       this.#driftHeld = input.drift;
     }
     if (input.jump !== undefined) {
@@ -249,17 +271,26 @@ class Kart {
   #stepDriftState(dt: number): void {
     if (this.#driftState === 'none') {
       const speed = Math.hypot(this.#vx, this.#vz);
-      if (this.#driftHeld && Math.abs(this.#steer) > 0.0001 && speed >= DRIFT_ENTRY_SPEED) {
+      if (this.#driftBufferPending && this.#currentTick > this.#driftBufferExpiryTick) {
+        this.#driftBufferPending = false;
+      }
+      const bufferedStart = !this.#driftHeld && this.#driftBufferPending;
+      if ((this.#driftHeld || bufferedStart)
+        && Math.abs(this.#steer) > 0.0001
+        && speed >= DRIFT_ENTRY_SPEED) {
         this.#driftState = 'charging';
         this.#driftTime = 0;
         this.#driftCharge = 0;
         this.#driftTier = 0;
+        this.#driftBufferedActivation = bufferedStart;
+        this.#driftBufferPending = false;
       }
       return;
     }
 
     if (this.#driftState === 'charging') {
-      if (!this.#driftHeld || Math.abs(this.#steer) <= 0.0001) {
+      if ((!this.#driftHeld && !this.#driftBufferedActivation)
+        || Math.abs(this.#steer) <= 0.0001) {
         if (this.#driftTier > 0) {
           this.#releaseDrift();
         } else {
@@ -277,6 +308,9 @@ class Kart {
           : this.#driftTime >= DRIFT_TIER1_TIME
             ? 1
             : 0;
+      // A released early press gets one charging frame when the buffered
+      // condition is met; a held press follows the normal path above.
+      this.#driftBufferedActivation = false;
       return;
     }
 
@@ -295,6 +329,8 @@ class Kart {
     this.#driftCharge = 0;
     this.#driftTier = 0;
     this.#driftTime = 0;
+    this.#driftBufferedActivation = false;
+    this.#driftBufferPending = false;
   }
 
   #releaseDrift(): void {
@@ -308,6 +344,8 @@ class Kart {
     this.#driftCharge = 1;
     this.#releaseTimer = releaseDuration;
     this.#boostSpeed = (MINI_TURBO_GAIN_BY_TIER[tier] * CAR_LENGTH) / releaseDuration;
+    this.#driftBufferedActivation = false;
+    this.#driftBufferPending = false;
   }
 
   #stepVertical(dt: number): void {
@@ -326,6 +364,9 @@ class Kart {
     this.#vy -= GRAVITY * dt;
     this.#y += this.#vy * dt;
     if (this.#y <= 0) {
+      const retention = landingHorizontalRetention(Math.hypot(this.#vx, this.#vz), Math.abs(this.#vy));
+      this.#vx *= retention;
+      this.#vz *= retention;
       this.#y = 0;
       this.#vy = 0;
       this.#grounded = true;
