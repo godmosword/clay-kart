@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T15:00:00Z",
+  "updated": "2026-08-02T15:20:00Z",
   "wave": "W2",
-  "round": 12,
-  "element": "airborne-landing + input-feedback",
+  "round": 13,
+  "element": "collision-response + steering-grip",
   "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R12 獨立驗證：Lead 在 ck-physics worktree 對 c8c5265 重跑 typecheck/build/pytest 11/11 全 PASS，ghost-replay 三次重新產生位元級相同，乾淨重新產生的 telemetry 餵 feel.py 獨立算出 42 項 checks 跟已提交 VERDICT.json 逐項零差異：7.3=1.0、7.4=0.7645012038641997、8.2=91.66666666666667ms、8.4=0.07999999999999996、4.5=1.5191494912896797（不退化）。主 gameplay fixture 的 7200 frames／398 events 跟 R11 逐位元完全相同，這輪新增行為只影響專用 probe，回歸風險為零。發現：physics commit c8c5265 又一次漏併入 main（第五次同一類疏漏），已由 Lead 手動 merge 補上（main commit b4b5233），main typecheck/build/pytest 現在全綠。記入 BACKLOG 兩點待跟進：R12 的 417744 token 被逐字加進兩個元件而非拆分，需跟 Codex 確認是否重複計入；drift 緩衝的『點一下就放開』情境只給一個 tick 的 charging 就取消，滿足 8.2 量測定義但可能不是預期的玩家體感，非阻斷但值得之後試玩確認。"
+  "note": "R12 獨立驗證屬實（重跑 typecheck/build/pytest、重新產生 telemetry 跟 VERDICT.json 逐項零差異，7.3/7.4/8.2/8.4 皆真實量測，4.5 不退化，主 fixture 零回歸）。但 c8c5265 又漏併入 main（第五次同一類疏漏），已由 Lead 手動 merge 補上（main commit b4b5233）。R13 已開：回收剩餘兩個舊缺口——6.5 貼牆卡住判定過寬（wall_stick_frames 算法把高速擦牆跟真正卡住混在一起，量測面或物理面兩個方向由 Codex 選）與 5.5/5.6 草地/泥地速度懲罰完全沒有 surface telemetry（surface 目前寫死 asphalt，需要真的建立 grass/dirt 區域跟專用 probe）。特別要求這輪若同時處理兩個元件，token 花費要拆分記錄，不要像 R12 一樣把同一個總數逐字寫進兩個 ledger。"
 }
