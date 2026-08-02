@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T04:09:47Z",
+  "updated": "2026-08-02T05:00:00Z",
   "wave": "W2",
-  "round": 9,
-  "element": "airborne-landing",
-  "status": "done",
+  "round": 10,
+  "element": "input-feedback",
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R9 完成 landing telemetry：landing 事件記錄前後總速／地面速、垂直速、落地角度、retention、latency 與 airborne duration；另以同一物理模型的 smooth/steep deterministic probes 量測 7.3/7.4。實測 7.3=1.0018703341 FAIL、7.4=0.9607094898 FAIL、7.5=0 PASS；沒有虛構落地類型或調物理參數。三次 ghost byte-identical，pytest 9/9，typecheck/build 通過。physics commit 2eefb0c 已推送；R9 overall FAIL 的最大既有落差仍為 4.4。"
+  "note": "R9 獨立驗證：7.3/7.4/7.5 全部真量測，三次 byte-identical，pytest 9/9，全指標掃描零退化。拆開原始 probe 資料查出兩個不同根因：7.3 是引擎推力混進落地量測窗口的邊界效應，7.4 是落地時 vx/vz 完全不受垂直衝擊影響的真實物理缺口，兩者都記入 BACKLOG。budget 數字異常（spent=1135659，超支657%，跟改動量級不成比例）已記錄待確認，未改變決策依據。轉 input-feedback：8.1/8.3 的 PASS 是預設值巧合，8.2/8.4 可能是真的缺輸入緩衝/死區功能。R10 任務已開。"
 }

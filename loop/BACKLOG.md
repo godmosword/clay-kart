@@ -25,12 +25,41 @@
 ## 待裁決
 
 ### airborne-landing — 7.3/7.4 落地速度保留率仍超出窗口
-- **輪次**：R9
-- **現況**：smooth `landing_speed_retention=1.0018703341`、steep `hard_landing_retention=0.9607094898`；7.5 latency `0` 已真量測並 PASS。
+- **輪次**：R9，Lead 拆開原始 probe 資料追出兩個不同根因
+- **現況**：smooth `landing_speed_retention=1.0019`、steep
+  `hard_landing_retention=0.9607`；7.5 latency `0` 已真量測並 PASS
 - **目標**：7.3 `[0.90, 1.00]`、7.4 `[0.70, 0.85]`
-- **處置**：本輪完成真實 landing telemetry；以現有固定跳躍速度與平面賽道，未發明物理上不存在的落地分支，也未調整物理常數。若要讓 7.3/7.4 達標，需另行裁決落地動力學／速度保留行為。
-- **來源**：`loop/round-9/artifacts/lap-a.json`、`loop/round-9/VERDICT.json`、physics commit `2eefb0c`
-- **狀態**：待裁決
+- **根因（兩項性質不同）**：
+  1. **7.3 略超過上限**：`smooth` probe 全程 `throttle=1`，落地那個
+     tick 引擎推力跟 `#stepVertical()` 的 `vy` 歸零同時發生，正常加速度
+     混進了落地量測窗口，製造 0.19% 假性增速——量測方法論的邊界效應，
+     不是設計問題（理想情況下落地不扣速，這條本來就該貼著上限）
+  2. **7.4 幾乎不比 7.3 差，是真正的物理缺口**：落地時只有 `vy` 歸零，
+     `vx`/`vz` 完全不受影響。現行模型裡「落地衝擊角度」跟「水平速度
+     損失」之間**沒有任何耦合機制**，不管落地多陡，水平速度都不會被
+     削減。要讓 7.4 落進窗口需要加入衝擊角度相關的水平減速，類似 R7
+     給碰撞角度分段賦予不同反彈係數的做法（`#resolveTrackCollision()`
+     的 `grazingBlend`/`wallBounce` 分段邏輯可以參考）
+- **處置**：本輪完成真實 landing telemetry，未發明物理上不存在的落地
+  分支，也未調整物理常數——正確的紀律。若要讓 7.3/7.4 達標，是下一輪
+  物理面的工作，不是量測面的事
+- **來源**：`loop/round-9/artifacts/lap-a.json`、`loop/round-9/VERDICT.json`、
+  physics commit `2eefb0c`
+- **狀態**：待裁決——沒有硬門檻卡著，跟 drift-miniturbo/steering-grip/
+  collision-response 的收尾模式一致，可以先擱置轉下一個元件
+
+### airborne-landing 預算數字異常，疑似記錄錯誤
+- **輪次**：R9
+- **現況**：`loop/budget.json` 記錄 `airborne-landing.spent = 1135659`，
+  cap 150000，超支 657%
+- **可疑之處**：這輪只改了 `tools/telemetry/`、`tools/validate/`，
+  `world.ts` 完全沒動，工作量級跟 R7（collision-response，改動範圍相近，
+  花費 149104，首次沒超支）明顯不成比例。目前 W2 累計最高單元件花費是
+  `steering-grip` 三輪 625276——`airborne-landing` 一輪就報 1135659，
+  接近前者的兩倍
+- **狀態**：待裁決——懷疑是筆誤或單位算錯（例如把某個中間值誤乘了
+  一個數量級），已 merge 但不因此調整 cap 或改變預算重估的判斷基準，
+  下輪跟 Codex 確認
 
 ### collision-response — 6.5 持續貼牆滑行仍被計為 wall stick
 - **輪次**：R7
