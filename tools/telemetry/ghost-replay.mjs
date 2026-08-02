@@ -96,7 +96,12 @@ function landingData(previousKart, currentKart) {
     pre_vertical_speed: previousKart.vel[1],
     post_vertical_speed: currentKart.vel[1],
     landing_angle_deg: landingAngleDeg,
-    speed_retention: previousGroundSpeed > 0 ? currentGroundSpeed / previousGroundSpeed : 0,
+    // Landing happens before drive integration in the fixed-step order.  Cap
+    // acceleration gains at 1 so the metric measures impact loss, not engine
+    // thrust from the same frame as vy reaches zero.
+    speed_retention: previousGroundSpeed > 0
+      ? Math.min(1, currentGroundSpeed / previousGroundSpeed)
+      : 0,
   };
 }
 
@@ -305,6 +310,7 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options =
       collision_recovery_definition: 'first two consecutive grounded, collision-free frames above 50% pre-impact ground speed with yaw-rate error <= max(0.05, 25% expected)',
       kart_kart_collision_coverage: 'available: kart_kart_collision events include both participants and impulses',
       landing_angle_definition: 'angle between pre-landing ground velocity and downward vertical; >=45° smooth, <45° steep',
+      landing_speed_retention_definition: 'post/pre ground speed, capped at 1 to exclude same-tick drive acceleration from landing impact loss',
     },
     frames,
     events,
@@ -378,21 +384,6 @@ async function inputLatencyProbe() {
 }
 
 async function inputBufferProbe() {
-  const pressTick = 1;
-  const releaseTick = 2;
-  const pulse = await replayTicks(
-    180,
-    (tick) => ({
-      throttle: 1,
-      steer: 0.3,
-      brake: false,
-      reverse: false,
-      drift: tick === pressTick,
-      jump: false,
-    }),
-    'input-buffer-pulse',
-    `${fixture.seed}-input-buffer-pulse`,
-  );
   const held = await replayTicks(
     180,
     () => ({
@@ -406,14 +397,49 @@ async function inputBufferProbe() {
     'input-buffer-held-reference',
     `${fixture.seed}-input-buffer-held-reference`,
   );
-  const activation = pulse.events.find((event) => event.type === 'drift_start');
   const heldActivation = held.events.find((event) => event.type === 'drift_start');
+  if (!heldActivation) {
+    return {
+      press_tick: null,
+      release_tick: null,
+      activation_tick: null,
+      held_reference_activation_tick: null,
+      measured_lead_ticks: 0,
+      pulse_reached_reference_window: false,
+    };
+  }
+
+  // Sweep early tap positions around the held reference.  The latest
+  // successful release is the observed buffer edge, not a hard-coded event.
+  const candidates = Array.from({ length: 24 }, (_, index) => index + 1);
+  const pulses = await Promise.all(candidates.map(async (leadTicks) => {
+    const pressTick = Math.max(1, heldActivation.tick - leadTicks);
+    const releaseTick = pressTick + 1;
+    const pulse = await replayTicks(
+      180,
+      (tick) => ({
+        throttle: 1,
+        steer: 0.3,
+        brake: false,
+        reverse: false,
+        drift: tick === pressTick,
+        jump: false,
+      }),
+      `input-buffer-pulse-${leadTicks}`,
+      `${fixture.seed}-input-buffer-pulse-${leadTicks}`,
+    );
+    const activation = pulse.events.find((event) => event.type === 'drift_start');
+    return { leadTicks, pressTick, releaseTick, activation };
+  }));
+  const successful = pulses.filter((probe) => probe.activation);
+  const latest = successful.at(-1);
   return {
-    press_tick: pressTick,
-    release_tick: releaseTick,
-    activation_tick: activation?.tick ?? null,
+    press_tick: latest?.pressTick ?? null,
+    release_tick: latest?.releaseTick ?? null,
+    activation_tick: latest?.activation?.tick ?? null,
     held_reference_activation_tick: heldActivation?.tick ?? null,
-    pulse_reached_reference_window: heldActivation !== undefined,
+    measured_lead_ticks: latest?.leadTicks ?? 0,
+    pulse_reached_reference_window: latest?.activation !== undefined,
   };
 }
 
@@ -495,7 +521,7 @@ const landingProbes = await Promise.all([
 const inputFeedback = {
   definition: {
     latency: 'simulation frame tick minus request tick minus one; setInput and step occur in the same advance tick',
-    buffer: 'time after an early drift release that still activates when the speed condition is later met; no activation is measured as zero',
+    buffer: 'latest successful early drift release before the held reference activation; measured from release tick to buffered drift_start',
     deadzone: 'largest absolute requested command whose effective snapshot input remains zero, measured from the command sweep',
   },
   latency_probe: await inputLatencyProbe(),
