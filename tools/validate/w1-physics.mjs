@@ -60,7 +60,7 @@ function runUntilLaps() {
   for (let tick = 0; tick < 120 * 200; tick += 1) {
     world.step(DT);
     snapshot = world.snapshot();
-    if (snapshot.lap.splits.length === 3) return snapshot;
+    if (snapshot.laps[0].splits.length === 3) return snapshot;
   }
   return snapshot;
 }
@@ -76,13 +76,13 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
   const world = createWorld();
   world.setInput({ throttle: 1, steer: 0.8 });
   for (let tick = 0; tick < 240; tick += 1) world.step(DT);
-  const during = world.snapshot().kart.yawRate;
+  const during = world.snapshot().karts[0].yawRate;
   assert(Math.abs(during) > 0.001, 'steering did not produce yaw rate');
   world.setInput({ steer: 0 });
   let settled = null;
   for (let tick = 0; tick < 600; tick += 1) {
     world.step(DT);
-    if (settled === null && Math.abs(world.snapshot().kart.yawRate) < Math.abs(during) * 0.05) {
+    if (settled === null && Math.abs(world.snapshot().karts[0].yawRate) < Math.abs(during) * 0.05) {
       settled = tick * DT;
     }
   }
@@ -97,8 +97,8 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
   for (let tick = 0; tick < 120 * 60; tick += 1) {
     world.step(DT);
     const snapshot = world.snapshot();
-    const [x, y, z] = snapshot.kart.pos;
-    assert([x, y, z, snapshot.kart.speed, snapshot.kart.yaw].every(Number.isFinite), `non-finite frame ${tick + 1}`);
+    const [x, y, z] = snapshot.karts[0].pos;
+    assert([x, y, z, snapshot.karts[0].speed, snapshot.karts[0].yaw].every(Number.isFinite), `non-finite frame ${tick + 1}`);
     const radius = Math.hypot(x - centerX, z - centerZ);
     maxPenetration = Math.max(
       maxPenetration,
@@ -110,16 +110,16 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
     }
   }
   assert(touchedWall, 'zero-steer physical integration never reached a wall');
-  assert(Math.abs(Math.hypot(world.snapshot().kart.pos[0] - centerX, world.snapshot().kart.pos[2] - centerZ) - TRACK_RADIUS) > 0.1, 'position is still snapped to centreline');
+  assert(Math.abs(Math.hypot(world.snapshot().karts[0].pos[0] - centerX, world.snapshot().karts[0].pos[2] - centerZ) - TRACK_RADIUS) > 0.1, 'position is still snapped to centreline');
   assert(maxPenetration <= 0.05, `wall penetration exceeded BAR-FEEL §2.3: ${maxPenetration}`);
 }
 
 // 6. A steerable line can still complete three laps and report bestTime.
 {
   const snapshot = runUntilLaps();
-  assert(snapshot.lap.splits.length === 3, `expected 3 lap splits, got ${snapshot.lap.splits.length}`);
-  assert(snapshot.lap.current === 3 && snapshot.lap.total === 3, 'lap state did not finish at 3/3');
-  assertClose(snapshot.lap.bestTime, Math.min(...snapshot.lap.splits), 1e-12, 'bestTime');
+  assert(snapshot.laps[0].splits.length === 3, `expected 3 lap splits, got ${snapshot.laps[0].splits.length}`);
+  assert(snapshot.laps[0].current === 3 && snapshot.laps[0].total === 3, 'lap state did not finish at 3/3');
+  assertClose(snapshot.laps[0].bestTime, Math.min(...snapshot.laps[0].splits), 1e-12, 'bestTime');
 }
 
 // 7. Existing acceleration/reverse windows remain unchanged on a valid line.
@@ -132,9 +132,9 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
   for (let tick = 0; tick < 120 * 30; tick += 1) {
     world.step(DT);
     const snapshot = world.snapshot();
-    topSpeed = Math.max(topSpeed, snapshot.kart.speed);
-    if (t50 === null && snapshot.kart.speed >= 12) t50 = snapshot.t;
-    if (t95 === null && snapshot.kart.speed >= 22.8) t95 = snapshot.t;
+    topSpeed = Math.max(topSpeed, snapshot.karts[0].speed);
+    if (t50 === null && snapshot.karts[0].speed >= 12) t50 = snapshot.t;
+    if (t95 === null && snapshot.karts[0].speed >= 22.8) t95 = snapshot.t;
   }
   assert(t50 >= 0.55 && t50 <= 0.85, `time_to_50pct out of window: ${t50}`);
   assert(t95 >= 2.6 && t95 <= 3.4, `time_to_95pct out of window: ${t95}`);
@@ -146,10 +146,10 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
   for (let tick = 0; tick < 120 * 8; tick += 1) {
     reverse.step(DT);
     const snapshot = reverse.snapshot();
-    const forward = [Math.sin(snapshot.kart.yaw), Math.cos(snapshot.kart.yaw)];
+    const forward = [Math.sin(snapshot.karts[0].yaw), Math.cos(snapshot.karts[0].yaw)];
     minimumLongitudinal = Math.min(
       minimumLongitudinal,
-      snapshot.kart.vel[0] * forward[0] + snapshot.kart.vel[2] * forward[1],
+      snapshot.karts[0].vel[0] * forward[0] + snapshot.karts[0].vel[2] * forward[1],
     );
   }
   const reverseRatio = Math.abs(minimumLongitudinal) / 24;
@@ -158,6 +158,22 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
 
 // 8. The loader owns the fixed-step value; the world locks the first value it receives.
 {
+  const multi = createWorld({
+    playerCharacterId: 'xiaohong',
+    aiOpponents: [
+      { characterId: 'duoduo', difficulty: 0 },
+      { characterId: 'aku', difficulty: 0 },
+    ],
+  });
+  const initial = multi.snapshot();
+  assert(initial.karts.length === 3 && initial.laps.length === 3, 'multi-kart snapshot arrays are not aligned');
+  assert(initial.playerIndex === 0 && initial.karts[0].characterId === 'xiaohong', 'multi-kart player index is incorrect');
+  for (let tick = 0; tick < 240; tick += 1) {
+    multi.setInput({ throttle: 1, steer: 0, brake: false, reverse: false, drift: false, jump: false });
+    multi.step(DT);
+  }
+  assert(multi.snapshot().karts.length === 3, 'multi-kart world lost an opponent while stepping');
+
   const world = createWorld();
   world.step(1 / 60);
   assertClose(world.snapshot().t, 1 / 60, 1e-15, 'loader-provided fixed dt');
