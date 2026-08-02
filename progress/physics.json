@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T13:40:30Z",
+  "updated": "2026-08-02T18:10:00Z",
   "wave": "W2",
   "round": 16,
   "element": "perf-validator",
-  "status": "blocked",
+  "status": "idle",
   "last_verdict": "PASS",
-  "note": "R16 完成：commit c540b0f 將 perf-probe.mjs 改為以 Chrome headless ANGLE/SwiftShader 載入 build/out，以固定 fixtures/lap-a.json 輸入，從 requestAnimationFrame 與 WebGL draw instrumentation 實測瀏覽器 frame timing、車輛/相機更新率與單幀資源量。artifact=loop/round-16/artifacts/perf-proxy.json（device=proxy）：fps_p50=59.8802、fps_p05=55.2486、frame_time_p99_ms=18.4、vehicle_transform_hz=60.1831、camera_hz=60.1831、draw_calls=5、triangles_k=3.278；character_anim_hz=null，character_anim_status=not_applicable_no_character_animation，禁止憑空回報 12。perf.py 對明確不適用的 4.1 跳過，缺值或無狀態仍 FAIL；R16 VERDICT-perf.json=PASS。pytest 17 passed、typecheck/build PASS。功能 commit 尚未進 main，等 Lead 重新獨立驗證與合併。"
+  "note": "R16 獨立驗證：Lead 在 ck-physics worktree 對 c540b0f 重跑 typecheck/build/pytest 17/17 全 PASS。自己用真實 headless Chrome 重新跑一次 perf-probe.mjs（非信任 artifact）：決定性指標（bundle size、triangles_k、draw_calls）逐位元跟 Codex 的結果相同，時間性指標（fps/vehicle_transform_hz/camera_hz）數值相近但不同——正是真實瀏覽器量測該有的模式。4.1 正確從 checks 省略，不是假 PASS，test_perf.py 額外測了缺 status 欄位不能悄悄變 PASS 的邊界情況。BAR-PERF §4 這個從 R3 就是寫死常數、優先序最高的檢查現在是真的了。c540b0f 已由 Lead 合併進 main（merge commit 7046b34）。順帶發現 gc_pause_max_ms/texture_memory_mb 仍是 null 被 _finite() 正規化成 0 剛好過關，非本輪範圍，已記入 BACKLOG 新條目。W2 收尾工作全數完成，main 現在乾淨，準備進入 W3 視覺內容。"
 }

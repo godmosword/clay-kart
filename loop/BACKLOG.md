@@ -418,10 +418,46 @@
 - **不是阻斷項**：不擋 W2——W2 沒有渲染改動。但**必須在 W3 視覺 builder
   開工前解決**，否則 §4 這道防線形同虛設。需要真的跑瀏覽器（Playwright
   headless 或類似方案）量測，Node-only 的 proxy 做不到這件事
-- **狀態**：觸發點已到——W2 八個元件都跑過至少一輪，Lead 決定轉向 W3
-  前先處理這項。`loop/round-16/TASK.md` 已開給 Codex，`character_anim_hz`
-  明確要求誠實回報「無角色內容可測」，不准憑空回報 12 湊一個看起來
-  合理的數字
+- **修復（commit `c540b0f`）**：改用真實 headless Chrome（raw CDP，未
+  新增 npm 依賴）——`Page.addScriptToEvaluateOnNewDocument` 在 app
+  程式碼執行前注入 `requestAnimationFrame`／WebGL `drawElements`/
+  `drawArrays` 監聽，完全不需要碰 `src/render/`／`src/loader/`（尊重
+  寫入範圍）。`character_anim_hz` 誠實回報 `null` 搭配
+  `character_anim_status: 'not_applicable_no_character_animation'`，
+  `perf.py` 只在這個明確條件下跳過 `4.1`，其餘任何缺值仍正規化成
+  `0.0` 照樣判 FAIL——`test_perf.py` 額外測了「缺 status 欄位不能悄悄
+  變 PASS」這個邊界情況，確認沒有留後門。
+- **Lead 獨立驗證（已完成）**：`ck-physics` worktree 對 `c540b0f` 重跑
+  typecheck/build/pytest 17/17 全 PASS。自己用真實 Chrome 重新跑一次
+  `perf-probe.mjs`（非信任 artifact）：`vehicle_transform_hz`/
+  `camera_hz`≈60.13（Codex 60.18）、`fps_p50=59.88023956370228`（跟
+  Codex 完全一致）、`fps_p05=58.55`（Codex 55.25，時間性指標本來就會
+  因真實瀏覽器時序抖動略有差異）；跟時間無關的指標
+  （`initial_bundle_kb_gz=132.3505859375`、`triangles_k=3.278`、
+  `draw_calls=5.0`）逐位元完全相同——這種「決定性指標吻合、時間性指標
+  相近但不同」的模式正是真實瀏覽器量測該有的樣子，不是猜出來的。
+  `4.1` 在 checks 裡完全省略，不是假 PASS。整體 VERDICT 16 項 PASS，
+  跟自己重新測出的結果逐項對得上。
+- **殘留缺口（非本輪範圍，另開新條目追蹤）**：`gc_pause_max_ms`／
+  `texture_memory_mb` 仍是 `null`，被 `_finite()` 正規化成 `0.0`
+  剛好落在窗口內——這是 R16 之前就存在的行為，R16 沒有讓它變壞，但
+  也還沒真的測到，記入下方新條目
+- **狀態**：已完成並驗證，`c540b0f` 已由 Lead 合併進 main（merge
+  commit `7046b34`）。`BAR-PERF §4` 這道優先序最高的防線現在是真的了
+
+### perf-probe.mjs 的 gc_pause_max_ms／texture_memory_mb 仍未真的量測
+- **輪次**：R16 發現，隨 §4 修復一起浮現
+- **現況**：兩者在 `perf-probe.mjs` 裡回傳 `null`（誠實標記未量測），
+  但 `perf.py` 的 `_finite()` 對非 `character_anim_hz` 的缺值一律
+  正規化成 `0.0`，`2.5`／`5.5` 的窗口都含 0，於是「沒測」跟「测到
+  數值 0」在 VERDICT 裡看起來一樣，都顯示 PASS
+- **目標**：`BAR-PERF §2.5`（GC 暫停）、`§5.5`（材質記憶體）
+- **影響**：不算造假（跟 R16 修的問題性質不同，這是既有的 `_finite()`
+  行為，R16 沒有新增或加劇），但這兩項目前形同虛設，跟 R3 到 R16 之間
+  `§4` 的狀態類似——只是優先序較低（`§6` 排序 2.5 是第 4 順位、5.5
+  是最低順位），不像 `§4` 是「違反即整輪 FAIL」
+- **狀態**：待裁決，不阻擋 W3 開工，記錄下來避免之後又當成新發現重查
+  一次
 
 ### Lead 流程漏洞：builder 完工後沒有立刻併回 main（第二次發生）
 - **輪次**：R2 收尾審查
