@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T06:11:24Z",
+  "updated": "2026-08-02T15:00:00Z",
   "wave": "W2",
   "round": 12,
   "element": "airborne-landing + input-feedback",
-  "status": "done",
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R12 完成 builder 工作：physics commit c8c5265 已推送。落地加入角度耦合水平 retention（近零水平速度保留數值穩定），telemetry 封頂同 tick 引擎增速避免 7.3 邊界誤算；7.3=1.0、7.4=0.7645012039 均 PASS。drift 加入 100ms press buffer，probe=91.6666667ms；steer deadzone=0.08；8.2/8.4 均 PASS。§4.5=1.5191494913 維持 PASS，§5 全掃描除既有 5.5/5.6 外無回歸。typecheck/build/W1/pytest 11/11 通過，ghost 三次 byte-identical。整體 feel verdict 仍因既有 4.4/4.6/4.7/4.10/5.5/5.6/6.5 FAIL。R9 的 1135659 已由 VERDICT/budget 歷史紀錄核對，但沒有可獨立重建的 token 拆分證據，故保留不改；R12 最終實際 417744 已累加至兩個重開元件。最後 merge-base 檢查：origin/feat/physics 尚未是 main 祖先，需 Lead 合併 c8c5265 後再確認。"
+  "note": "R12 獨立驗證：Lead 在 ck-physics worktree 對 c8c5265 重跑 typecheck/build/pytest 11/11 全 PASS，ghost-replay 三次重新產生位元級相同，乾淨重新產生的 telemetry 餵 feel.py 獨立算出 42 項 checks 跟已提交 VERDICT.json 逐項零差異：7.3=1.0、7.4=0.7645012038641997、8.2=91.66666666666667ms、8.4=0.07999999999999996、4.5=1.5191494912896797（不退化）。主 gameplay fixture 的 7200 frames／398 events 跟 R11 逐位元完全相同，這輪新增行為只影響專用 probe，回歸風險為零。發現：physics commit c8c5265 又一次漏併入 main（第五次同一類疏漏），已由 Lead 手動 merge 補上（main commit b4b5233），main typecheck/build/pytest 現在全綠。記入 BACKLOG 兩點待跟進：R12 的 417744 token 被逐字加進兩個元件而非拆分，需跟 Codex 確認是否重複計入；drift 緩衝的『點一下就放開』情境只給一個 tick 的 charging 就取消，滿足 8.2 量測定義但可能不是預期的玩家體感，非阻斷但值得之後試玩確認。"
 }

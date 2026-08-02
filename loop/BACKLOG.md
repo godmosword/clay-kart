@@ -30,8 +30,29 @@
 - **回歸**：4.5 `car_lengths_gained_tier2=1.5191494913` PASS；§5 全掃描除既有 5.5/5.6 外無回歸；既有 4.4/4.6/4.7/4.10/6.5 仍留待後續裁決。
 - **實作**：physics commit `c8c5265`；落地角度耦合水平減速、同 tick 引擎增速不計入 retention、100ms drift press buffer、0.08 steer deadzone。
 - **驗證**：R12 artifact/verdict、typecheck、build、W1、pytest 11/11、ghost 三次 byte-identical。
-- **預算**：本輪最終實際 417744，已在 `budget.json` 的 airborne-landing 與 input-feedback 原 spent 上累加。R9 的 1135659 只核對到歷史 VERDICT/budget，沒有獨立可重建的 token 拆分證據，未改寫。
-- **狀態**：builder 已完成；以下 R9/R10 歷史條目由本節 supersede，整體 BAR 的既有 FAIL 仍保留。physics merge-base 尚未通過，待 Lead 將 `c8c5265` 合併進 main。
+- **預算**：本輪最終實際 417744，已在 `budget.json` 的 airborne-landing 與 input-feedback 原 spent 上累加。R9 的 1135659 只核對到歷史 VERDICT/budget，沒有獨立可重建的 token 拆分證據，未改寫。**待釐清**：417744 這個數字被逐字加進了兩個元件（不是拆分成兩份），若這是同一輪合併工作的總花費，兩個 ledger 都加整數會造成帳面上重複計入；若這輪對兩個元件真的是各自獨立花費 417744（例如分開起了兩個 context），則各自記錄是對的。目前無法從 repo 內獨立判斷，下輪跟 Codex 確認。
+- **Lead 獨立驗證（已完成）**：在 `ck-physics` worktree 對 `c8c5265` 重跑
+  typecheck/build/pytest 11/11 全 PASS；ghost-replay 三次重新產生位元級
+  相同；乾淨重新產生的 telemetry 餵 `feel.py` 獨立算出 42 項 checks，
+  跟已提交 VERDICT.json 逐項零差異。主 gameplay fixture（`lap-a`）的
+  7200 frames／398 events 跟 R11 逐位元完全相同——這輪新增的落地／輸入
+  行為完全沒有觸及主 fixture，只影響專用 probe，回歸風險等於零。
+  7.3=1.0 是 `landingHorizontalRetention()` 在 `smoothBlend` 飽和到 1
+  時的理論上限，跟 `ghost-replay.mjs` 新增的 `Math.min(1, ...)` 量測
+  上限剛好重合，不是巧合湊數——完全符合 R9 當時的預測（「理想情況下
+  落地不扣速，這條本來就該貼著上限」）。8.2=91.6666667ms 是掃過
+  1–24 tick 提前量找到的實際邊界（非硬編碼常數 100ms），邊界效應
+  本身就是有機測出來的證據。
+- **設計細節值得注意（非阻斷）**：drift 緩衝的狀態機讓「按一下就放開」
+  的提前輸入只在條件滿足後獲得恰好一個 tick 的 charging 才被取消
+  （因為放開後 `driftBufferedActivation` 只提供一幀寬限），`driftTier`
+  永遠來不及離開 0，所以純粹的「點一下」不會真的讓玩家漂移成功，只是
+  讓 `drift_start` 事件如實觸發、滿足 `8.2` 的量測定義。這是否符合
+  預期的玩家體感（緩衝是否該讓輸入撐到條件滿足後繼續正常累積）待實際
+  試玩後再判斷，記錄於此避免之後重新診斷同一行為時要重查一次。
+- **狀態**：已完成並驗證，`c8c5265` 已由 Lead 合併進 main（merge commit
+  `b4b5233`）。這是同一類「程式碼漏併入 main」疏漏第五次發生（前四次：
+  physics×2、visual、plumb），機制持續有效但不保證不再發生。
 
 ## 待裁決
 
