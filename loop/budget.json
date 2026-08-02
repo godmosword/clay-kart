@@ -10,8 +10,8 @@
     "sim-determinism": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §2" },
     "acceleration-curve": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §3" },
     "drift-miniturbo": { "cap": 400000, "spent": 626134, "bar": "BAR-FEEL §4", "$comment": "R5 收尾：4.5 硬門檻達標，超支 56%，轉 steering-grip。4.4/4.6/4.7/4.10 記在 BACKLOG，未強制解決" },
-    "steering-grip": { "cap": 250000, "spent": 625276, "bar": "BAR-FEEL §5", "$comment": "R6 完成，超支150%。核心目標 5.2/5.3/5.7/5.8/5.9 全 PASS，全指標掃描零退化，是至今最乾淨的一輪。R13 重開：處理 5.5/5.6 surface 懲罰" },
-    "collision-response": { "cap": 200000, "spent": 149104, "bar": "BAR-FEEL §6", "$comment": "R7 完成 telemetry 與 6.1-6.3 校準；6.4 已於 R11 完成。R13 重開：處理 6.5 貼牆卡住判定" },
+    "steering-grip": { "cap": 250000, "spent": 765817, "bar": "BAR-FEEL §5", "$comment": "R6 完成，超支150%。R13 surface 工作拆分實際花費 140541（約本輪 80%，依 surface world/probe/validator/test diff scope），累加後 765817。5.5=0.6435420429、5.6=0.8794263055 PASS，5.2/5.7/5.8/5.9 零回歸。" },
+    "collision-response": { "cap": 200000, "spent": 184239, "bar": "BAR-FEEL §6", "$comment": "R7 完成 telemetry 與 6.1-6.3 校準；6.4 已於 R11 完成。R13 6.5 工作拆分實際花費 35135（約本輪 20%，依 stuck threshold/telemetry/test diff scope），累加後 184239；6.5=2 PASS。" },
     "airborne-landing": { "cap": 150000, "spent": 1553403, "bar": "BAR-FEEL §7", "$comment": "R9 原記錄 1135659 已核對存在於 VERDICT/budget 歷史，但無可獨立重建的 token 拆分證據，保留不改；R12 最終實際 417744 累加。R12 7.3=1.0、7.4=0.7645012039 PASS，落地角度耦合水平減速與同 tick 引擎增速量測修正完成。" },
     "input-feedback": { "cap": 100000, "spent": 600671, "bar": "BAR-FEEL §8", "$comment": "R10 原 spent=182927；R12 最終實際 417744 累加。R12 實作 100ms drift press buffer 與 0.08 steer deadzone；8.2=91.6666667ms、8.4=0.08 PASS，並確認 §4.5 無回歸。" },
     "ai-opponents": { "cap": 300000, "spent": 298953, "bar": "BAR-FEEL §6 + 行為指標待補", "$comment": "R11 第一階段完成：多車架構、deterministic stationary opponent、kart-kart collision；6.4=1.0 PASS。AI 決策與 per-character 調校留後續分期。" }

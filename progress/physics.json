@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T15:20:00Z",
+  "updated": "2026-08-02T06:36:00Z",
   "wave": "W2",
   "round": 13,
   "element": "collision-response + steering-grip",
-  "status": "idle",
+  "status": "done",
   "last_verdict": "FAIL",
-  "note": "R12 獨立驗證屬實（重跑 typecheck/build/pytest、重新產生 telemetry 跟 VERDICT.json 逐項零差異，7.3/7.4/8.2/8.4 皆真實量測，4.5 不退化，主 fixture 零回歸）。但 c8c5265 又漏併入 main（第五次同一類疏漏），已由 Lead 手動 merge 補上（main commit b4b5233）。R13 已開：回收剩餘兩個舊缺口——6.5 貼牆卡住判定過寬（wall_stick_frames 算法把高速擦牆跟真正卡住混在一起，量測面或物理面兩個方向由 Codex 選）與 5.5/5.6 草地/泥地速度懲罰完全沒有 surface telemetry（surface 目前寫死 asphalt，需要真的建立 grass/dirt 區域跟專用 probe）。特別要求這輪若同時處理兩個元件，token 花費要拆分記錄，不要像 R12 一樣把同一個總數逐字寫進兩個 ledger。"
+  "note": "R13 builder 工作完成：physics commit 112ff16 已推送。6.5 改為碰撞衝量且地面速度低於 10% asphalt 極速（2.4 u/s）的 stuck 定義，主 replay=2 PASS；高速擦牆不再誤算。賽道碰撞邊界未改，在下半圈現有環形 lane 內加入短角度 dirt/grass sectors；surface probe 收集 144 grass／106 dirt raw frames，以同 sweep settled asphalt reference 計算 5.5=0.6435420429、5.6=0.8794263055，均 PASS。主 fixture 7200 frames 維持 asphalt，5.2/5.7/5.8/5.9 零回歸。4.5=1.5191494913、7.3/7.4/8.2/8.4 維持 PASS。typecheck/build/W1/pytest 13/13、ghost 三次 byte-identical；R13 feel 整體仍因既有 4.4 等 backlog FAIL。R13 用量 175676 已拆分：collision-response 35135、steering-grip 140541，沒有重複計入。最後 merge-base 尚待 Lead 將 112ff16 合併進 main。"
 }
