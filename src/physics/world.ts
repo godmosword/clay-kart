@@ -1,12 +1,14 @@
 /**
- * Deterministic W1 kart simulation.
+ * Deterministic kart simulation.
  *
  * This module deliberately contains no rendering or browser dependencies.  The
  * track is an annular collider.  Each kart is integrated freely in world space;
  * steering is the only source of yaw, so a released steering input really does
- * settle to zero.  AI opponents use a deterministic stationary placeholder in
- * this architecture phase; driving decisions are deliberately out of scope.
+ * settle to zero.  AI decisions are produced before each Kart.step() and are
+ * applied through the same Kart.setInput() and drive/yaw integration as players.
  */
+import type { AiDecision, AiKartObservation } from '../ai/controller.js';
+import { decideAiInput } from '../ai/controller.js';
 import type {
   CharacterId,
   KartState,
@@ -89,6 +91,23 @@ export interface WorldInput {
 
 export interface PhysicsWorld extends SimWorld {
   setInput(input: WorldInput): void;
+  getAiTelemetry(): readonly AiTelemetry[];
+}
+
+export interface AiTelemetry {
+  readonly kartIndex: number;
+  readonly difficulty: number;
+  readonly input: WorldInput;
+  readonly targetSpeed: number;
+  readonly maxSpeedRatio: number;
+  readonly rubberbandGap: number;
+  readonly radialError: number;
+}
+
+interface InternalWorldOptions extends WorldOptions {
+  /** Probe-only deterministic starting angles; not part of the shared contract. */
+  playerStartAngle?: number;
+  aiStartAngles?: readonly number[];
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -127,6 +146,11 @@ function wrapAngle(angle: number): number {
   return wrapped < 0 ? wrapped + Math.PI * 2 : wrapped;
 }
 
+function wrapSignedAngle(angle: number): number {
+  const wrapped = wrapAngle(angle);
+  return wrapped > Math.PI ? wrapped - Math.PI * 2 : wrapped;
+}
+
 class Kart {
   readonly characterId: CharacterId;
   #x: number;
@@ -140,6 +164,7 @@ class Kart {
   #grounded = true;
   #collisionImpulse = 0;
   #surface: KartState['surface'] = 'asphalt';
+  #speedLimitRatio = 1;
 
   #throttle = 1;
   #steer = 0;
@@ -168,16 +193,18 @@ class Kart {
   #bestTime: number | null = null;
   readonly #splits: number[] = [];
 
-  constructor(characterId: CharacterId, spawnIndex: number, ai: boolean) {
+  constructor(characterId: CharacterId, spawnIndex: number, ai: boolean, startAngle = 0) {
     this.characterId = characterId;
-    this.#x = TRACK_GEOMETRY.centerX + TRACK_RADIUS;
-    this.#z = TRACK_CENTER_Z + spawnIndex * (KART_BOUNDING_RADIUS * 2 + 1);
-    if (ai) {
-      // R11 placeholder only: deterministic stationary opponents.  AI driving
-      // decisions are intentionally deferred until their behavior bar exists.
-      this.#throttle = 0;
-      this.#brake = true;
-    }
+    const tangentOffset = spawnIndex * (KART_BOUNDING_RADIUS * 2 + 1);
+    const radialX = Math.cos(startAngle);
+    const radialZ = Math.sin(startAngle);
+    const tangentX = -radialZ;
+    const tangentZ = radialX;
+    this.#x = TRACK_GEOMETRY.centerX + TRACK_RADIUS * radialX + tangentX * tangentOffset;
+    this.#z = TRACK_CENTER_Z + TRACK_RADIUS * radialZ + tangentZ * tangentOffset;
+    this.#yaw = wrapSignedAngle(-startAngle);
+    this.#trackAngle = wrapAngle(startAngle);
+    if (ai) this.#throttle = 0;
   }
 
   setInput(input: WorldInput): void {
@@ -205,6 +232,14 @@ class Kart {
       if (input.jump && !this.#jumpHeld) this.#jumpQueued = true;
       this.#jumpHeld = input.jump;
     }
+  }
+
+  applyAiDecision(decision: AiDecision): void {
+    // AI is intentionally restricted to this public input path.  The only
+    // additional value is a speed cap consumed by the same #stepDrive method;
+    // no position, velocity, yaw, or lap state is written by the controller.
+    this.setInput(decision.input);
+    this.#speedLimitRatio = clamp(decision.maxSpeedRatio, 1, 1.15);
   }
 
   step(dt: number, tick: number): void {
@@ -274,6 +309,33 @@ class Kart {
 
   get collisionImpulse(): number {
     return this.#collisionImpulse;
+  }
+
+  get speed(): number {
+    return Math.hypot(this.#vx, this.#vz);
+  }
+
+  get yaw(): number {
+    return this.#yaw;
+  }
+
+  get trackAngle(): number {
+    return this.#trackAngle;
+  }
+
+  get currentLap(): number {
+    return this.#currentLap;
+  }
+
+  aiObservation(): AiKartObservation {
+    return {
+      x: this.#x,
+      z: this.#z,
+      yaw: this.#yaw,
+      speed: this.speed,
+      trackAngle: this.#trackAngle,
+      lap: this.#currentLap,
+    };
   }
 
   translate(dx: number, dz: number): void {
@@ -428,8 +490,8 @@ class Kart {
     const lateralX = Math.cos(this.#yaw);
     const lateralZ = -Math.sin(this.#yaw);
     const surfaceFactor = surfaceSpeedFactor(this.#surface);
-    const surfaceForwardTopSpeed = BASE_TOP_SPEED * surfaceFactor;
-    const surfaceReverseTopSpeed = REVERSE_TOP_SPEED * surfaceFactor;
+    const surfaceForwardTopSpeed = BASE_TOP_SPEED * surfaceFactor * this.#speedLimitRatio;
+    const surfaceReverseTopSpeed = REVERSE_TOP_SPEED * surfaceFactor * this.#speedLimitRatio;
     const previousGroundSpeed = Math.hypot(this.#vx, this.#vz);
     let longitudinalSpeed = this.#vx * forwardX + this.#vz * forwardZ;
     const lateralSpeed = this.#vx * lateralX + this.#vz * lateralZ;
@@ -589,16 +651,42 @@ class World implements PhysicsWorld {
   #fixedDt: number | null = null;
   readonly #playerIndex = 0;
   readonly #karts: Kart[];
+  readonly #aiDifficulties: number[];
+  readonly #aiKarts: Kart[];
+  #aiTelemetry: AiTelemetry[] = [];
 
   constructor(options: WorldOptions = {}) {
-    this.#karts = [new Kart(options.playerCharacterId ?? 'xiaohong', 0, false)];
+    const internalOptions = options as InternalWorldOptions;
+    this.#karts = [new Kart(
+      options.playerCharacterId ?? 'xiaohong',
+      0,
+      false,
+      internalOptions.playerStartAngle ?? 0,
+    )];
+    this.#aiDifficulties = [];
+    this.#aiKarts = [];
     for (const [index, opponent] of (options.aiOpponents ?? []).entries()) {
-      this.#karts.push(new Kart(opponent.characterId, index + 1, true));
+      const kart = new Kart(
+        opponent.characterId,
+        index + 1,
+        true,
+        internalOptions.aiStartAngles?.[index] ?? 0,
+      );
+      this.#karts.push(kart);
+      this.#aiKarts.push(kart);
+      this.#aiDifficulties.push(clamp(opponent.difficulty, 0, 1));
     }
   }
 
   setInput(input: WorldInput): void {
     this.#karts[this.#playerIndex]!.setInput(input);
+  }
+
+  getAiTelemetry(): readonly AiTelemetry[] {
+    return this.#aiTelemetry.map((record) => ({
+      ...record,
+      input: { ...record.input },
+    }));
   }
 
   step(dt: number): void {
@@ -612,6 +700,23 @@ class World implements PhysicsWorld {
     const fixedDt = this.#fixedDt;
 
     this.#tick += 1;
+    const playerObservation = this.#karts[this.#playerIndex]!.aiObservation();
+    this.#aiTelemetry = this.#aiKarts.map((kart, index) => {
+      const decision = decideAiInput(this.#aiDifficulties[index]!, {
+        self: kart.aiObservation(),
+        player: playerObservation,
+      });
+      kart.applyAiDecision(decision);
+      return {
+        kartIndex: index + 1,
+        difficulty: this.#aiDifficulties[index]!,
+        input: { ...decision.input },
+        targetSpeed: decision.targetSpeed,
+        maxSpeedRatio: decision.maxSpeedRatio,
+        rubberbandGap: decision.rubberbandGap,
+        radialError: decision.radialError,
+      };
+    });
     for (const kart of this.#karts) {
       kart.step(fixedDt, this.#tick);
     }
