@@ -30,7 +30,7 @@
 - **回歸**：4.5 `car_lengths_gained_tier2=1.5191494913` PASS；§5 全掃描除既有 5.5/5.6 外無回歸；既有 4.4/4.6/4.7/4.10/6.5 仍留待後續裁決。
 - **實作**：physics commit `c8c5265`；落地角度耦合水平減速、同 tick 引擎增速不計入 retention、100ms drift press buffer、0.08 steer deadzone。
 - **驗證**：R12 artifact/verdict、typecheck、build、W1、pytest 11/11、ghost 三次 byte-identical。
-- **預算**：本輪最終實際 391344，已在 `budget.json` 的 airborne-landing 與 input-feedback 原 spent 上累加。R9 的 1135659 只核對到歷史 VERDICT/budget，沒有獨立可重建的 token 拆分證據，未改寫。
+- **預算**：本輪最終實際 417744，已在 `budget.json` 的 airborne-landing 與 input-feedback 原 spent 上累加。R9 的 1135659 只核對到歷史 VERDICT/budget，沒有獨立可重建的 token 拆分證據，未改寫。
 - **狀態**：builder 已完成；以下 R9/R10 歷史條目由本節 supersede，整體 BAR 的既有 FAIL 仍保留。physics merge-base 尚未通過，待 Lead 將 `c8c5265` 合併進 main。
 
 ## 待裁決
