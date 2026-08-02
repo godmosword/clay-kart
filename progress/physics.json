@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T10:05:20Z",
+  "updated": "2026-08-02T10:06:02Z",
   "wave": "W2",
   "round": 15,
   "element": "ai-opponents",
   "status": "blocked",
   "last_verdict": "FAIL",
-  "note": "R15 修正：commit bddf6ce 已推送 feat/physics，尚未合併 main。實際 trace 確認原機制在 AI 實速追上前讓 targetRatio 隨即時 gap 線性衰減（tick 301：speed=0.9871、target=1.0319；原版同點 target=0.9714）。src/ai/controller.ts 改用 gapFactor^0.33 的次線性 catch-up target response，仍在 gap=0 回到 base target。正式 telemetry：12.4 observed_max_speed_ratio=1.0032181019026873 PASS、configured_max_speed_ratio=1.1 僅診斷、max_rubberband_gap=2.5；12.3 spread=3.0166666666666675s PASS、12.1/12.2/4.5 PASS。R15 實際花費 207156，ai-opponents 累計 927099。typecheck/build/W1/pytest14/14、schema、ghost-replay 三次 byte-identical 全 PASS。整體 verdict 仍只剩既有 4.4/4.6/4.7/4.10 FAIL；等待 Lead 獨立驗證後合併。"
+  "note": "R15 修正：commit bddf6ce 已推送 feat/physics，尚未合併 main。實際 trace 確認原機制在 AI 實速追上前讓 targetRatio 隨即時 gap 線性衰減（tick 301：speed=0.9871、target=1.0319；原版同點 target=0.9714）。src/ai/controller.ts 改用 gapFactor^0.33 的次線性 catch-up target response，仍在 gap=0 回到 base target。正式 telemetry：12.4 observed_max_speed_ratio=1.0032181019026873 PASS、configured_max_speed_ratio=1.1 僅診斷、max_rubberband_gap=2.5；12.3 spread=3.0166666666666675s PASS、12.1/12.2/4.5 PASS。R15 實際花費 218466，ai-opponents 累計 938409。typecheck/build/W1/pytest14/14、schema、ghost-replay 三次 byte-identical 全 PASS。整體 verdict 仍只剩既有 4.4/4.6/4.7/4.10 FAIL；等待 Lead 獨立驗證後合併。"
 }
