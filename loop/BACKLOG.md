@@ -61,9 +61,26 @@
 - **現況**：6.5 `wall_stick_frames=2` PASS；5.5 `grass_speed_penalty=0.6435420429` PASS；5.6 `dirt_speed_penalty=0.8794263055` PASS。
 - **實作**：physics commit `112ff16`。6.5 使用「collision impulse 且地面速度 < 10% BASE_TOP_SPEED（2.4 u/s）」的量測定義；surface 在既有環形 lane 的下半圈加入短角度 dirt/grass sectors，未改牆 collider，並由 deterministic surface probe 提供 raw target frames 與 settled asphalt reference。
 - **回歸**：主 fixture 7200 frames 全為 asphalt；§2/§3/§4、4.5、5.2/5.7/5.8/5.9、6.1–6.4、7/8 全部維持 R12 數值。整體 feel 仍只保留既有 backlog FAIL（最大 4.4）。
-- **驗證**：typecheck、build、W1、pytest 13/13、ghost 三次 byte-identical；R13 VERDICT schema 待 main copy 後驗證。
-- **預算拆分**：R13 最終總用量 200786；collision-response `40157`（20%，stuck threshold/telemetry/test scope）、steering-grip `160629`（80%，surface world/probe/validator/test scope），兩數相加才是本輪總花費，未重複灌入 ledger。
-- **狀態**：builder 已完成；待 Lead 將 `112ff16` 合併進 main 並通過 merge-base。
+- **Lead 獨立驗證（已完成）**：在 `ck-physics` worktree 對 `112ff16` 重跑
+  typecheck/build/pytest 13/13 全 PASS；ghost-replay 三次重新產生位元級
+  相同；乾淨重新產生的 telemetry 餵 `feel.py` 獨立算出 42 項 checks，
+  跟已提交 VERDICT.json 逐項零差異，包含 6.5=2.0、5.5=0.6435420428806979、
+  5.6=0.8794263054903919、4.5=1.5191494912896797（不退化）；既有的
+  4.4/4.6/4.7/4.10 FAIL 維持不變，跟這輪範圍無關。主 fixture 的 frame
+  數值有 ULP 級（~1e-14）浮點差異——追查是新增的速度上限安全鉗制在
+  柏油路頂速門檻附近偶爾因浮點精度觸發極微小縮放，不是行為變化，
+  `max_penetration_depth` 仍是 1e-14 量級，determinism 本身在重複執行
+  間保持 100% byte-identical，不影響任何 BAR-FEEL 窗口。
+- **預算拆分**：R13 最終總用量 200786；collision-response `40157`（20%，
+  stuck threshold/telemetry/test scope）、steering-grip `160629`（80%，
+  surface world/probe/validator/test scope），兩數相加才是本輪總花費，
+  未重複灌入 ledger——這次正確回應了 R12 收尾時提出的要求。
+- **狀態**：已完成並驗證，`112ff16` 已由 Lead 合併進 main（merge commit
+  `5036a46`）。這輪 Codex 正確地沒有嘗試自己合併，只回報 blocked 等
+  Lead 收尾——這正是 R2 之後建立的分工設計本身，不是疏漏，記錄於此
+  更新前幾輪「第N次同一疏漏」的框架：只要 Lead 每輪都跑 merge-base
+  檢查並在收尾時完成合併，這個手動交接步驟就是正常流程的一部分，
+  不代表協作出了問題。
 
 ## 待裁決
 
