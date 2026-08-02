@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T10:08:14Z",
+  "updated": "2026-08-02T17:20:00Z",
   "wave": "W2",
   "round": 15,
   "element": "ai-opponents",
-  "status": "blocked",
+  "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R15 修正：commit bddf6ce 已推送 feat/physics，尚未合併 main。實際 trace 確認原機制在 AI 實速追上前讓 targetRatio 隨即時 gap 線性衰減（tick 301：speed=0.9871、target=1.0319；原版同點 target=0.9714）。src/ai/controller.ts 改用 gapFactor^0.33 的次線性 catch-up target response，仍在 gap=0 回到 base target。正式 telemetry：12.4 observed_max_speed_ratio=1.0032181019026873 PASS、configured_max_speed_ratio=1.1 僅診斷、max_rubberband_gap=2.5；12.3 spread=3.0166666666666675s PASS、12.1/12.2/4.5 PASS。R15 實際花費 253052，ai-opponents 累計 972995。typecheck/build/W1/pytest14/14、schema、ghost-replay 三次 byte-identical 全 PASS。整體 verdict 仍只剩既有 4.4/4.6/4.7/4.10 FAIL；等待 Lead 獨立驗證後合併。"
+  "note": "R15 獨立驗證：Lead 在 ck-physics worktree 對 bddf6ce 重跑 typecheck/build/pytest 14/14 全 PASS，ghost-replay 三次重新產生位元級相同，乾淨重新產生的 telemetry 餵 feel.py 獨立算出 46 項 checks 跟已提交 VERDICT.json 逐項零差異。從自己產生的原始 probe 資料核實 12.4 observed_max_speed_ratio=1.0032181019026873 真正 PASS（feel.py 這輪未被改動，確認沒有走回配置值頂替的老路）。修法：src/ai/controller.ts 的 targetRatio 改用 gapFactor^0.33 次線性響應曲線，讓追趕目標在 gap 還沒完全收斂前維持較高。12.3=3.0166666666666675 也 PASS 但 margin 明顯變薄（原 3.4833333333333343），機制上可解釋（difficulty spread probe 的靜止 player 參照讓兩個難度都獲得一些橡皮筋加速，相對縮小圈速差），Codex 已檢查並如實回報，記入 BACKLOG 留意——之後若再調 rubberband/difficulty 參數要優先檢查這項margin。bddf6ce 已由 Lead 合併進 main（merge commit b28bd25）。ai-opponents 的 §12 四項行為指標（12.1-12.4）現在全數真實 PASS，累計花費 972995（cap 300000 已達 3.2 倍，超支如實記錄）。"
 }

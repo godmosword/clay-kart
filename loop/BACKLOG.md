@@ -82,6 +82,39 @@
   檢查並在收尾時完成合併，這個手動交接步驟就是正常流程的一部分，
   不代表協作出了問題。
 
+## R15 已完成（12.4 真正 PASS，已獨立驗證並合併）
+
+### ai-opponents — R15 修正橡皮筋機制，12.4 從誠實 FAIL 變成真正 PASS
+- **輪次**：R15
+- **Lead 獨立驗證（已完成）**：`ck-physics` worktree 對 `bddf6ce` 重跑
+  typecheck/build/pytest 14/14 全 PASS；ghost-replay 三次重新產生位元級
+  相同；乾淨重新產生的 telemetry 餵 `feel.py` 獨立算出 46 項 checks，
+  跟已提交 VERDICT.json 逐項零差異。確認 `tools/validate/feel.py` 這輪
+  沒被改動，`12.4` 仍讀 `observed_max_speed_ratio`，沒有走回 R14 第一版
+  用配置值頂替的老路——從自己重新產生的 telemetry 原始 probe 資料直接
+  核實 `observed_max_speed_ratio=1.0032181019026873`，非信任 artifact。
+- **修法**：`src/ai/controller.ts` 把 `targetRatio` 的 `gapFactor` 混合
+  改成 `gapFactor^0.33`（`RUBBERBAND_TARGET_RESPONSE_EXPONENT`）的次
+  線性響應曲線——R14 的根因猜測（追趕目標隨即時 gap 立刻自我衰減）
+  被 Codex 用實際 trace 資料證實（tick 301：舊版 target 已掉到
+  `0.9714`，新版維持在 `1.0319`），修法讓目標在 gap 還沒完全 closed
+  前維持較高，`gapFactor=0` 時仍正確收斂回 base target，無 NaN/邊界
+  問題。
+- **副作用（已檢查，非造假）**：`12.3` 從 `3.4833333333333343` 變成
+  `3.0166666666666675`，margin 明顯變薄（只高於窗口下限 `3.0` 約
+  `0.0167s`）。機制上可解釋：`difficulty-spread` probe 的 player 是
+  靜止參照，兩個難度的 AI 靠近該參照時都會獲得一些橡皮筋加速，相對
+  縮小彼此的圈速差——這正是 R15 任務裡明確要求檢查的交互作用，Codex
+  確實檢查並如實回報，兩個數字都從真實模擬推導。**margin 變薄記入
+  觀察，若之後再調整 rubberband/difficulty 相關參數，`12.3` 有可能
+  被連帶推出窗口，優先檢查這項**。
+- **實作**：physics commit `bddf6ce`。
+- **預算**：R15 本輪實際 253052，`ai-opponents` 累加至 972995（cap
+  300000，已達 3.2 倍，超支如實記錄，符合 W2 一貫政策）。
+- **狀態**：已完成並驗證，`bddf6ce` 已由 Lead 合併進 main（merge
+  commit `b28bd25`）。`ai-opponents` 元件的四項 §12 行為指標
+  （`12.1`-`12.4`）現在全數真實 PASS。
+
 ## R14 已完成（12.4 修正版已獨立驗證並合併）
 
 ### ai-opponents — R14 真正 AI 駕駛決策：架構與 12.1-12.3 收下，12.4 誠實 FAIL
