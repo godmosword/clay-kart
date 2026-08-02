@@ -1,0 +1,78 @@
+{
+  "seed": 17,
+  "comment": "R17：12 元件槽位已列齊，但 refs/clay ↔ 元件的配對刻意留空。不要在這份檔案自行填入「看起來合理」的合成圖裁切或場景圖對應——那是 Lead 裁決（見 loop/BACKLOG.md R17）。ours 路徑是未來 ck-visual 產圖的假設位置，視覺 builder 尚未產出前一律走 placeholder。",
+  "components": [
+    {
+      "id": "kart-body",
+      "ref": null,
+      "ours": "build/visual/kart-body.png",
+      "note": "unpaired — Lead 裁決參考來源"
+    },
+    {
+      "id": "kart-wheels",
+      "ref": null,
+      "ours": "build/visual/kart-wheels.png",
+      "note": "unpaired — Lead 裁決參考來源"
+    },
+    {
+      "id": "driver-face",
+      "ref": null,
+      "ours": "build/visual/driver-face.png",
+      "note": "unpaired — characters/*.jpg 是否可用待 Lead 裁決，Cursor 不自決"
+    },
+    {
+      "id": "track-surface",
+      "ref": null,
+      "ours": "build/visual/track-surface.png",
+      "note": "unpaired — Lead 裁決參考來源"
+    },
+    {
+      "id": "track-barriers",
+      "ref": null,
+      "ours": "build/visual/track-barriers.png",
+      "note": "unpaired — Lead 裁決參考來源"
+    },
+    {
+      "id": "foliage",
+      "ref": null,
+      "ours": "build/visual/foliage.png",
+      "note": "unpaired — Lead 裁決參考來源"
+    },
+    {
+      "id": "skybox-lighting",
+      "ref": null,
+      "ours": "build/visual/skybox-lighting.png",
+      "note": "unpaired — cloud-*.png 是否對得上待 Lead 裁決"
+    },
+    {
+      "id": "drift-sparks",
+      "ref": null,
+      "ours": "build/visual/drift-sparks.png",
+      "note": "unpaired — refs/clay 無對應素材"
+    },
+    {
+      "id": "item-boxes",
+      "ref": null,
+      "ours": "build/visual/item-boxes.png",
+      "note": "unpaired — refs/clay 無對應素材"
+    },
+    {
+      "id": "shadows-contact",
+      "ref": null,
+      "ours": "build/visual/shadows-contact.png",
+      "note": "unpaired — 場景合成圖內嵌，Cursor 不裁切"
+    },
+    {
+      "id": "water-sea",
+      "ref": null,
+      "ours": "build/visual/water-sea.png",
+      "note": "unpaired — sea.png/ocean.png 候選，Cursor 不自決用哪張"
+    },
+    {
+      "id": "ui-hud",
+      "ref": null,
+      "ours": "build/visual/ui-hud.png",
+      "note": "unpaired — refs/clay 無 HUD 參考"
+    }
+  ]
+}
