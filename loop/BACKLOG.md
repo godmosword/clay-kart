@@ -62,7 +62,7 @@
 - **實作**：physics commit `112ff16`。6.5 使用「collision impulse 且地面速度 < 10% BASE_TOP_SPEED（2.4 u/s）」的量測定義；surface 在既有環形 lane 的下半圈加入短角度 dirt/grass sectors，未改牆 collider，並由 deterministic surface probe 提供 raw target frames 與 settled asphalt reference。
 - **回歸**：主 fixture 7200 frames 全為 asphalt；§2/§3/§4、4.5、5.2/5.7/5.8/5.9、6.1–6.4、7/8 全部維持 R12 數值。整體 feel 仍只保留既有 backlog FAIL（最大 4.4）。
 - **驗證**：typecheck、build、W1、pytest 13/13、ghost 三次 byte-identical；R13 VERDICT schema 待 main copy 後驗證。
-- **預算拆分**：R13 總用量 175676；collision-response `35135`（20%，stuck threshold/telemetry/test scope）、steering-grip `140541`（80%，surface world/probe/validator/test scope），兩數相加才是本輪總花費，未重複灌入 ledger。
+- **預算拆分**：R13 最終總用量 200786；collision-response `40157`（20%，stuck threshold/telemetry/test scope）、steering-grip `160629`（80%，surface world/probe/validator/test scope），兩數相加才是本輪總花費，未重複灌入 ledger。
 - **狀態**：builder 已完成；待 Lead 將 `112ff16` 合併進 main 並通過 merge-base。
 
 ## 待裁決

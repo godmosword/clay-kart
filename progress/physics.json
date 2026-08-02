@@ -8,5 +8,5 @@
   "element": "collision-response + steering-grip",
   "status": "done",
   "last_verdict": "FAIL",
-  "note": "R13 builder 工作完成：physics commit 112ff16 已推送。6.5 改為碰撞衝量且地面速度低於 10% asphalt 極速（2.4 u/s）的 stuck 定義，主 replay=2 PASS；高速擦牆不再誤算。賽道碰撞邊界未改，在下半圈現有環形 lane 內加入短角度 dirt/grass sectors；surface probe 收集 144 grass／106 dirt raw frames，以同 sweep settled asphalt reference 計算 5.5=0.6435420429、5.6=0.8794263055，均 PASS。主 fixture 7200 frames 維持 asphalt，5.2/5.7/5.8/5.9 零回歸。4.5=1.5191494913、7.3/7.4/8.2/8.4 維持 PASS。typecheck/build/W1/pytest 13/13、ghost 三次 byte-identical；R13 feel 整體仍因既有 4.4 等 backlog FAIL。R13 用量 175676 已拆分：collision-response 35135、steering-grip 140541，沒有重複計入。最後 merge-base 尚待 Lead 將 112ff16 合併進 main。"
+  "note": "R13 builder 工作完成：physics commit 112ff16 已推送。6.5 改為碰撞衝量且地面速度低於 10% asphalt 極速（2.4 u/s）的 stuck 定義，主 replay=2 PASS；高速擦牆不再誤算。賽道碰撞邊界未改，在下半圈現有環形 lane 內加入短角度 dirt/grass sectors；surface probe 收集 144 grass／106 dirt raw frames，以同 sweep settled asphalt reference 計算 5.5=0.6435420429、5.6=0.8794263055，均 PASS。主 fixture 7200 frames 維持 asphalt，5.2/5.7/5.8/5.9 零回歸。4.5=1.5191494913、7.3/7.4/8.2/8.4 維持 PASS。typecheck/build/W1/pytest 13/13、ghost 三次 byte-identical；R13 feel 整體仍因既有 4.4 等 backlog FAIL。R13 最終用量 200786 已拆分：collision-response 40157、steering-grip 160629，沒有重複計入。最後 merge-base 尚待 Lead 將 112ff16 合併進 main。"
 }
