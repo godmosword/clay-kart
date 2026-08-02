@@ -24,6 +24,14 @@
 
 ## 待裁決
 
+### airborne-landing — 7.3/7.4 落地速度保留率仍超出窗口
+- **輪次**：R9
+- **現況**：smooth `landing_speed_retention=1.0018703341`、steep `hard_landing_retention=0.9607094898`；7.5 latency `0` 已真量測並 PASS。
+- **目標**：7.3 `[0.90, 1.00]`、7.4 `[0.70, 0.85]`
+- **處置**：本輪完成真實 landing telemetry；以現有固定跳躍速度與平面賽道，未發明物理上不存在的落地分支，也未調整物理常數。若要讓 7.3/7.4 達標，需另行裁決落地動力學／速度保留行為。
+- **來源**：`loop/round-9/artifacts/lap-a.json`、`loop/round-9/VERDICT.json`、physics commit `2eefb0c`
+- **狀態**：待裁決
+
 ### collision-response — 6.5 持續貼牆滑行仍被計為 wall stick
 - **輪次**：R7
 - **現況**：`wall_stick_frames=289`，目標 `[0, 3]`；主 replay 的碰撞段約 291 tick，速度大多仍在移動，末段才降到低速。

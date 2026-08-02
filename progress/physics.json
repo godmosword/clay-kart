@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-01T10:00:00Z",
+  "updated": "2026-08-02T04:09:47Z",
   "wave": "W2",
   "round": 9,
   "element": "airborne-landing",
-  "status": "idle",
+  "status": "done",
   "last_verdict": "FAIL",
-  "note": "R7 獨立驗證：6.1/6.2/6.3 全部真量測（獨立確定性 probe，非硬編碼），三次 byte-identical，pytest 7/7，全指標掃描零退化，首次未超支。R8（Cursor 漂移按鍵）已用真瀏覽器 CDP 驗證真的能觸發漂移，已合併。轉 airborne-landing：7.3/7.4/7.5 三項都讀從沒被填入的 landing 事件欄位，7.5 目前的 PASS 是預設值巧合，非真測。附帶提出結構性問題：現行單一跳躍高度下『大角度落地』沒有天然的產生機制，需要 Codex 自行判斷方向。R9 任務已開。"
+  "note": "R9 完成 landing telemetry：landing 事件記錄前後總速／地面速、垂直速、落地角度、retention、latency 與 airborne duration；另以同一物理模型的 smooth/steep deterministic probes 量測 7.3/7.4。實測 7.3=1.0018703341 FAIL、7.4=0.9607094898 FAIL、7.5=0 PASS；沒有虛構落地類型或調物理參數。三次 ghost byte-identical，pytest 9/9，typecheck/build 通過。physics commit 2eefb0c 已推送；R9 overall FAIL 的最大既有落差仍為 4.4。"
 }

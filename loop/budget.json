@@ -12,7 +12,7 @@
     "drift-miniturbo": { "cap": 400000, "spent": 626134, "bar": "BAR-FEEL §4", "$comment": "R5 收尾：4.5 硬門檻達標，超支 56%，轉 steering-grip。4.4/4.6/4.7/4.10 記在 BACKLOG，未強制解決" },
     "steering-grip": { "cap": 250000, "spent": 625276, "bar": "BAR-FEEL §5", "$comment": "R6 完成，超支150%。核心目標 5.2/5.3/5.7/5.8/5.9 全 PASS，全指標掃描零退化，是至今最乾淨的一輪" },
     "collision-response": { "cap": 200000, "spent": 149104, "bar": "BAR-FEEL §6", "$comment": "R7 完成 telemetry 與 6.1-6.3 校準；6.4 單車架構跳過，6.5=289 仍待後續處理" },
-    "airborne-landing": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §7" },
+    "airborne-landing": { "cap": 150000, "spent": 1135659, "bar": "BAR-FEEL §7" },
     "input-feedback": { "cap": 100000, "spent": 0, "bar": "BAR-FEEL §8" },
     "ai-opponents": { "cap": 300000, "spent": 0, "bar": "BAR-FEEL §6 + 行為指標待補" }
   },
