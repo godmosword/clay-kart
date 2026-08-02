@@ -8,5 +8,5 @@
   "element": "ai-opponents",
   "status": "idle",
   "last_verdict": "FAIL",
-  "note": "R13 獨立驗證屬實（重跑 typecheck/build/pytest、重新產生 telemetry 跟 VERDICT.json 逐項零差異，6.5/5.5/5.6 皆真實量測，4.5 不退化），已合併進 main（5036a46）。R14 已完成真正 AI 駕駛決策：src/ai 純函式依賽道切線、difficulty、玩家相對進度產生輸入，每 tick 透過 Kart.setInput() 走共用 #stepDrive/#stepYaw；四個 deterministic probe 的 12.1=true、12.2=3.6333333333s、12.3=3.4833333333s、12.4=1.1 全 PASS。typecheck/build/W1/pytest 14/14、ghost replay 三次獨立輸出 byte-identical；整體 feel FAIL 只因既有 4.4。R14 本輪實際 goal usage 387891，ai-opponents 累加後 686844，未與其他 ledger 重複計入。feature commit 9c6e7dc 已 push；merge-base 尚待 Lead 合併。"
+  "note": "R13 獨立驗證屬實（重跑 typecheck/build/pytest、重新產生 telemetry 跟 VERDICT.json 逐項零差異，6.5/5.5/5.6 皆真實量測，4.5 不退化），已合併進 main（5036a46）。R14 已完成真正 AI 駕駛決策：src/ai 純函式依賽道切線、difficulty、玩家相對進度產生輸入，每 tick 透過 Kart.setInput() 走共用 #stepDrive/#stepYaw；四個 deterministic probe 的 12.1=true、12.2=3.6333333333s、12.3=3.4833333333s、12.4=1.1 全 PASS。typecheck/build/W1/pytest 14/14、ghost replay 三次獨立輸出 byte-identical；整體 feel FAIL 只因既有 4.4。R14 本輪實際 goal usage 413656，ai-opponents 累加後 712609，未與其他 ledger 重複計入。feature commit 17cf3ca 已 push；merge-base 尚待 Lead 合併。"
 }
