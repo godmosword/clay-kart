@@ -13,6 +13,10 @@ const DIFFICULTY_CRUISE_RANGE = 0.48;
 const MAX_RUBBERBAND_BONUS_RATIO = 0.10;
 const RUBBERBAND_FULL_GAP = Math.PI * 0.75;
 const RUBBERBAND_MIN_GAP = 0.15;
+// Keep the catch-up target from collapsing faster than the fixed-tick engine
+// can accelerate toward it.  The response still reaches the base target at
+// zero gap, but remains strong while a real gap is closing.
+const RUBBERBAND_TARGET_RESPONSE_EXPONENT = 0.33;
 const TANGENT_CORRECTION_STRENGTH = 0.55;
 const STEER_ERROR_RANGE = 0.35;
 
@@ -94,7 +98,8 @@ export function decideAiInput(
   const gapFactor = clamp(gap / RUBBERBAND_FULL_GAP, 0, 1);
   const maxSpeedRatio = 1 + MAX_RUBBERBAND_BONUS_RATIO * gapFactor;
   const baseTargetRatio = BASE_CRUISE_RATIO + DIFFICULTY_CRUISE_RANGE * normalizedDifficulty;
-  const targetRatio = baseTargetRatio + (maxSpeedRatio - baseTargetRatio) * gapFactor;
+  const targetGapFactor = Math.pow(gapFactor, RUBBERBAND_TARGET_RESPONSE_EXPONENT);
+  const targetRatio = baseTargetRatio + (maxSpeedRatio - baseTargetRatio) * targetGapFactor;
   const targetSpeed = BASE_TOP_SPEED * targetRatio;
   const speedError = targetSpeed - self.speed;
   const throttle = speedError > 0.2 ? clamp(speedError / 2, 0.2, 1) : 0;
