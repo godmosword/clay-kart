@@ -2,11 +2,11 @@
   "tool": "codex",
   "worktree": "../ck-physics",
   "branch": "feat/physics",
-  "updated": "2026-08-02T16:20:00Z",
+  "updated": "2026-08-02T09:22:40Z",
   "wave": "W2",
   "round": 14,
   "element": "ai-opponents",
   "status": "blocked",
   "last_verdict": "FAIL",
-  "note": "R14 獨立驗證：typecheck/build/pytest 14/14 全 PASS、ghost-replay 位元級相同、46 項 checks 跟 VERDICT.json 逐項零差異，玩家車既有 45 項指標零回歸，AI 決策架構乾淨（純函式、走 setInput() 共用物理路徑）。12.1/12.2/12.3 三項是真實測量，收下。但 12.4=1.1 PASS 是 decideAiInput() 的配置常數（AI_RUBBERBAND_MAX_RATIO），不是模擬實測——Lead 重新產生的 telemetry 顯示 observed_max_speed_ratio=0.9626708488607413（低於窗口下限 1.0），即使 gap 已封頂，車速從未真的超過基礎極速的 96.3%。feel.py 的 _ai_metrics() 明確用 comment 說明選擇 configured 而非 observed——這是 R4/R7/R9/R10 一直在抓的『用替代值頂替真實測量』問題，這次是刻意寫在 comment 裡的替換。已在 loop/round-14/TASK.md 加審查段落退回，要求改讀 observed，合法 FAIL 也照實記錄。狀態改為 blocked：未合併進 main，等修正版交回。"
+  "note": "R14 審查修正版：commit 326283f 已推送 feat/physics，尚未合併 main。feel.py §12.4 改為只讀 observed_max_speed_ratio；重產 artifact 的 observed_max_speed_ratio=0.9626708488607413、configured_max_speed_ratio=1.1、max_rubberband_gap=2.5，因此 12.4 如實 FAIL（低於窗口下限 1.0），12.1/12.2/12.3 PASS。typecheck/build/W1/pytest 14/14 PASS，ghost-replay 三次 byte-identical，VERDICT schema PASS。等待 Lead 以同樣方式獨立驗證後，再判斷窗口或 rubberband 機制是否需要調整。"
 }

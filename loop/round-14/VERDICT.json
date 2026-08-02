@@ -449,12 +449,12 @@
     {
       "id": "12.4",
       "metric": "rubberband_speed_bonus_ratio",
-      "actual": 1.1,
+      "actual": 0.9626708488607413,
       "window": [
         1.0,
         1.15
       ],
-      "status": "PASS"
+      "status": "FAIL"
     }
   ],
   "largest_gap": {
