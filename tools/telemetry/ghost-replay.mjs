@@ -193,16 +193,33 @@ function addReleaseDurations(events, frames) {
   }
 }
 
-async function replayTicks(totalTicks, inputAtTick, fixtureName, seed) {
+async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options = {}) {
   const world = createWorld();
   const frames = [];
   const events = [];
+  const inputTrace = options.captureInput ? [] : null;
   let previous = world.snapshot();
   for (let tick = 0; tick < totalTicks; tick += 1) {
     // advance() owns the world.setInput() + world.step() ordering.
-    advance(world, 1, () => inputAtTick(tick));
+    let requestedInput;
+    advance(world, 1, () => {
+      requestedInput = inputAtTick(tick);
+      return requestedInput;
+    });
     const current = world.snapshot();
-    frames.push(frameFromSnapshot(current));
+    const frame = frameFromSnapshot(current);
+    frames.push(frame);
+    if (inputTrace) {
+      inputTrace.push({
+        request_tick: tick,
+        frame_tick: current.tick,
+        requested: { ...requestedInput },
+        effective: {
+          throttle: frame.throttle_input,
+          steer: frame.steer_input,
+        },
+      });
+    }
     events.push(...eventsBetween(previous, current));
     previous = current;
   }
@@ -228,6 +245,7 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed) {
     },
     frames,
     events,
+    ...(inputTrace ? { input_trace: inputTrace } : {}),
   };
 }
 
@@ -267,6 +285,97 @@ async function landingProbe(name, inputAtTick, ticks = 320) {
   };
 }
 
+async function inputLatencyProbe() {
+  const requestTick = 24;
+  const replay = await replayTicks(
+    60,
+    (tick) => ({
+      throttle: 1,
+      steer: tick >= requestTick ? 0.37 : 0,
+      brake: false,
+      reverse: false,
+      drift: false,
+      jump: false,
+    }),
+    'input-latency',
+    `${fixture.seed}-input-latency`,
+    { captureInput: true },
+  );
+  const sample = replay.input_trace.find(
+    (entry) => entry.request_tick === requestTick && entry.effective.steer === 0.37,
+  );
+  if (!sample) throw new Error('input latency probe did not observe the requested steer on the next simulation frame');
+  return {
+    request_tick: sample.request_tick,
+    applied_tick: sample.frame_tick,
+    requested_steer: sample.requested.steer,
+    effective_steer: sample.effective.steer,
+    latency_ticks: sample.frame_tick - (sample.request_tick + 1),
+  };
+}
+
+async function inputBufferProbe() {
+  const pressTick = 1;
+  const releaseTick = 2;
+  const pulse = await replayTicks(
+    180,
+    (tick) => ({
+      throttle: 1,
+      steer: 0.3,
+      brake: false,
+      reverse: false,
+      drift: tick === pressTick,
+      jump: false,
+    }),
+    'input-buffer-pulse',
+    `${fixture.seed}-input-buffer-pulse`,
+  );
+  const held = await replayTicks(
+    180,
+    () => ({
+      throttle: 1,
+      steer: 0.3,
+      brake: false,
+      reverse: false,
+      drift: true,
+      jump: false,
+    }),
+    'input-buffer-held-reference',
+    `${fixture.seed}-input-buffer-held-reference`,
+  );
+  const activation = pulse.events.find((event) => event.type === 'drift_start');
+  const heldActivation = held.events.find((event) => event.type === 'drift_start');
+  return {
+    press_tick: pressTick,
+    release_tick: releaseTick,
+    activation_tick: activation?.tick ?? null,
+    held_reference_activation_tick: heldActivation?.tick ?? null,
+    pulse_reached_reference_window: heldActivation !== undefined,
+  };
+}
+
+async function inputCommandSweep(name, field, values) {
+  const replay = await replayTicks(
+    values.length,
+    (tick) => ({
+      throttle: field === 'throttle' ? values[tick] : 0,
+      steer: field === 'steer' ? values[tick] : 0,
+      brake: false,
+      reverse: false,
+      drift: false,
+      jump: false,
+    }),
+    `input-${name}`,
+    `${fixture.seed}-input-${name}`,
+    { captureInput: true },
+  );
+  return {
+    name,
+    field,
+    samples: replay.input_trace,
+  };
+}
+
 const driftReplays = await Promise.all([replayOnce(), replayOnce(), replayOnce()]);
 const baseline = await replayOnce((input) => ({ ...input, drift: false }));
 const collisionProbes = await Promise.all([
@@ -291,6 +400,19 @@ const landingProbes = await Promise.all([
     jump: tick === 180,
   })),
 ]);
+const inputFeedback = {
+  definition: {
+    latency: 'simulation frame tick minus request tick minus one; setInput and step occur in the same advance tick',
+    buffer: 'time after an early drift release that still activates when the speed condition is later met; no activation is measured as zero',
+    deadzone: 'largest absolute requested command whose effective snapshot input remains zero, measured from the command sweep',
+  },
+  latency_probe: await inputLatencyProbe(),
+  buffer_probe: await inputBufferProbe(),
+  deadzone_probes: await Promise.all([
+    inputCommandSweep('throttle-deadzone', 'throttle', Array.from({ length: 101 }, (_, index) => index / 100)),
+    inputCommandSweep('steer-deadzone', 'steer', Array.from({ length: 201 }, (_, index) => index / 100 - 1)),
+  ]),
+};
 // Keep the gameplay fixture focused on the cross-section used by §2–§4 and
 // §7.  The speed-radius checks need a sustained full-lock sweep, so collect
 // that diagnostic series in a separate deterministic replay and attach only
@@ -357,6 +479,7 @@ for (const replay of driftReplays) {
   replay.meta.steering_radius_samples = steeringRadiusSamples;
   replay.meta.collision_probes = collisionProbes;
   replay.meta.landing_probes = landingProbes;
+  replay.meta.input_feedback = inputFeedback;
 }
 const replays = driftReplays;
 const serialized = replays.map((replay) => JSON.stringify(replay, null, 2) + '\n');
