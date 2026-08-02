@@ -2,11 +2,19 @@
  * Deterministic W1 kart simulation.
  *
  * This module deliberately contains no rendering or browser dependencies.  The
- * track is an annular collider.  The kart is integrated freely in world space;
+ * track is an annular collider.  Each kart is integrated freely in world space;
  * steering is the only source of yaw, so a released steering input really does
- * settle to zero.  Callers can use setInput() for headless and future UI input.
+ * settle to zero.  AI opponents use a deterministic stationary placeholder in
+ * this architecture phase; driving decisions are deliberately out of scope.
  */
-import type { KartState, LapState, SimSnapshot, SimWorld } from '@loader/bootstrap';
+import type {
+  CharacterId,
+  KartState,
+  LapState,
+  SimSnapshot,
+  SimWorld,
+  WorldOptions,
+} from '@contract/sim';
 import {
   BASE_TOP_SPEED,
   CAR_LENGTH,
@@ -37,6 +45,7 @@ const WALL_DEFAULT_BOUNCE = 0.15;
 const WALL_GRAZING_BOUNCE = 0.35;
 const WALL_HEAD_ON_ANGLE_DEG = 15;
 const WALL_GRAZING_ANGLE_DEG = 30;
+const KART_BOUNCE = 0.2;
 const DRIFT_ENTRY_SPEED = 10.5;
 const DRIFT_TIER1_TIME = 0.85;
 const DRIFT_TIER2_TIME = 2.0;
@@ -82,12 +91,11 @@ function wrapAngle(angle: number): number {
   return wrapped < 0 ? wrapped + Math.PI * 2 : wrapped;
 }
 
-class World implements PhysicsWorld {
-  #tick = 0;
-  #fixedDt: number | null = null;
-  #x = TRACK_GEOMETRY.centerX + TRACK_RADIUS;
+class Kart {
+  readonly characterId: CharacterId;
+  #x: number;
   #y = 0;
-  #z = TRACK_CENTER_Z;
+  #z: number;
   #vx = 0;
   #vy = 0;
   #vz = 0;
@@ -120,6 +128,18 @@ class World implements PhysicsWorld {
   #bestTime: number | null = null;
   readonly #splits: number[] = [];
 
+  constructor(characterId: CharacterId, spawnIndex: number, ai: boolean) {
+    this.characterId = characterId;
+    this.#x = TRACK_GEOMETRY.centerX + TRACK_RADIUS;
+    this.#z = TRACK_CENTER_Z + spawnIndex * (KART_BOUNDING_RADIUS * 2 + 1);
+    if (ai) {
+      // R11 placeholder only: deterministic stationary opponents.  AI driving
+      // decisions are intentionally deferred until their behavior bar exists.
+      this.#throttle = 0;
+      this.#brake = true;
+    }
+  }
+
   setInput(input: WorldInput): void {
     if (input.throttle !== undefined) {
       this.#throttle = clamp(input.throttle, 0, 1);
@@ -142,37 +162,27 @@ class World implements PhysicsWorld {
     }
   }
 
-  step(dt: number): void {
-    if (!Number.isFinite(dt) || dt <= 0) {
-      throw new RangeError(`World.step() requires a positive fixed dt, got ${dt}`);
-    }
-    if (this.#fixedDt === null) this.#fixedDt = dt;
-    if (dt !== this.#fixedDt) {
-      throw new RangeError(`World.step() requires a fixed dt (${this.#fixedDt}), got ${dt}`);
-    }
-    const fixedDt = this.#fixedDt;
-
-    this.#tick += 1;
+  step(dt: number, tick: number): void {
     this.#collisionImpulse = 0;
-
-    this.#stepDriftState(fixedDt);
-    this.#stepVertical(fixedDt);
+    this.#currentTick = tick;
+    this.#stepDriftState(dt);
+    this.#stepVertical(dt);
 
     const oldForwardX = Math.sin(this.#yaw);
     const oldForwardZ = Math.cos(this.#yaw);
     const oldLongitudinalSpeed = this.#vx * oldForwardX + this.#vz * oldForwardZ;
-    this.#stepYaw(fixedDt, oldLongitudinalSpeed);
-    this.#stepDrive(fixedDt);
-    this.#stepPosition(fixedDt);
+    this.#stepYaw(dt, oldLongitudinalSpeed);
+    this.#stepDrive(dt);
+    this.#stepPosition(dt);
     this.#resolveTrackCollision();
 
-    this.#updateLapState(fixedDt);
+    this.#updateLapState(dt, tick);
   }
 
-  snapshot(): SimSnapshot {
-    const fixedDt = this.#fixedDt ?? 0;
+  snapshot(fixedDt: number): { kart: KartState; lap: LapState } {
     const speed = Math.hypot(this.#vx, this.#vy, this.#vz);
     const kart: KartState = {
+      characterId: this.characterId,
       pos: [this.#x, this.#y, this.#z],
       vel: [this.#vx, this.#vy, this.#vz],
       speed,
@@ -189,7 +199,7 @@ class World implements PhysicsWorld {
     };
     const lapTime = this.#finished
       ? this.#splits[this.#splits.length - 1] ?? 0
-      : (this.#tick - this.#lapStartTick) * fixedDt;
+      : (this.#currentTick - this.#lapStartTick) * fixedDt;
     const lap: LapState = {
       current: this.#currentLap,
       total: TOTAL_LAPS,
@@ -197,8 +207,44 @@ class World implements PhysicsWorld {
       bestTime: this.#bestTime,
       splits: this.#splits.slice(),
     };
-    return { tick: this.#tick, t: this.#tick * fixedDt, kart, lap };
+    return { kart, lap };
   }
+
+  get x(): number {
+    return this.#x;
+  }
+
+  get z(): number {
+    return this.#z;
+  }
+
+  get vx(): number {
+    return this.#vx;
+  }
+
+  get vz(): number {
+    return this.#vz;
+  }
+
+  get collisionImpulse(): number {
+    return this.#collisionImpulse;
+  }
+
+  translate(dx: number, dz: number): void {
+    this.#x += dx;
+    this.#z += dz;
+  }
+
+  addVelocity(dx: number, dz: number): void {
+    this.#vx += dx;
+    this.#vz += dz;
+  }
+
+  markCollisionImpulse(impulse: number): void {
+    this.#collisionImpulse = Math.max(this.#collisionImpulse, impulse);
+  }
+
+  #currentTick = 0;
 
   #stepDriftState(dt: number): void {
     if (this.#driftState === 'none') {
@@ -381,8 +427,8 @@ class World implements PhysicsWorld {
     const normalZ = dz / radius;
     let boundary = 0;
     let towardBoundary = 0;
-    let tangentX = -normalZ;
-    let tangentZ = normalX;
+    const tangentX = -normalZ;
+    const tangentZ = normalX;
 
     if (radius > OUTER_COLLISION_RADIUS) {
       boundary = OUTER_COLLISION_RADIUS;
@@ -428,7 +474,7 @@ class World implements PhysicsWorld {
     }
   }
 
-  #updateLapState(dt: number): void {
+  #updateLapState(dt: number, tick: number): void {
     const angle = wrapAngle(Math.atan2(this.#z - TRACK_CENTER_Z, this.#x - TRACK_GEOMETRY.centerX));
     const crossedStartLine = this.#hasLeftStartLine
       && this.#trackAngle >= START_LINE_RETURN_ANGLE
@@ -439,14 +485,14 @@ class World implements PhysicsWorld {
     }
 
     if (crossedStartLine && !this.#finished && this.#currentLap <= TOTAL_LAPS) {
-      const lapTime = (this.#tick - this.#lapStartTick) * dt;
+      const lapTime = (tick - this.#lapStartTick) * dt;
       this.#splits.push(lapTime);
       if (this.#bestTime === null || lapTime < this.#bestTime) {
         this.#bestTime = lapTime;
       }
       if (this.#currentLap < TOTAL_LAPS) {
         this.#currentLap += 1;
-        this.#lapStartTick = this.#tick;
+        this.#lapStartTick = tick;
       } else {
         this.#finished = true;
       }
@@ -456,8 +502,87 @@ class World implements PhysicsWorld {
   }
 }
 
-export function createWorld(): PhysicsWorld {
-  return new World();
+class World implements PhysicsWorld {
+  #tick = 0;
+  #fixedDt: number | null = null;
+  readonly #playerIndex = 0;
+  readonly #karts: Kart[];
+
+  constructor(options: WorldOptions = {}) {
+    this.#karts = [new Kart(options.playerCharacterId ?? 'xiaohong', 0, false)];
+    for (const [index, opponent] of (options.aiOpponents ?? []).entries()) {
+      this.#karts.push(new Kart(opponent.characterId, index + 1, true));
+    }
+  }
+
+  setInput(input: WorldInput): void {
+    this.#karts[this.#playerIndex]!.setInput(input);
+  }
+
+  step(dt: number): void {
+    if (!Number.isFinite(dt) || dt <= 0) {
+      throw new RangeError(`World.step() requires a positive fixed dt, got ${dt}`);
+    }
+    if (this.#fixedDt === null) this.#fixedDt = dt;
+    if (dt !== this.#fixedDt) {
+      throw new RangeError(`World.step() requires a fixed dt (${this.#fixedDt}), got ${dt}`);
+    }
+    const fixedDt = this.#fixedDt;
+
+    this.#tick += 1;
+    for (const kart of this.#karts) {
+      kart.step(fixedDt, this.#tick);
+    }
+    this.#resolveKartCollisions();
+  }
+
+  snapshot(): SimSnapshot {
+    const fixedDt = this.#fixedDt ?? 0;
+    const snapshots = this.#karts.map((kart) => kart.snapshot(fixedDt));
+    return {
+      tick: this.#tick,
+      t: this.#tick * fixedDt,
+      karts: snapshots.map(({ kart }) => kart),
+      playerIndex: this.#playerIndex,
+      laps: snapshots.map(({ lap }) => lap),
+    };
+  }
+
+  #resolveKartCollisions(): void {
+    const minimumDistance = KART_BOUNDING_RADIUS * 2;
+    for (let firstIndex = 0; firstIndex < this.#karts.length; firstIndex += 1) {
+      const first = this.#karts[firstIndex]!;
+      for (let secondIndex = firstIndex + 1; secondIndex < this.#karts.length; secondIndex += 1) {
+        const second = this.#karts[secondIndex]!;
+        const dx = second.x - first.x;
+        const dz = second.z - first.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance >= minimumDistance) continue;
+
+        const normalX = distance > 1e-12 ? dx / distance : 1;
+        const normalZ = distance > 1e-12 ? dz / distance : 0;
+        const overlap = minimumDistance - distance;
+        first.translate(-normalX * overlap * 0.5, -normalZ * overlap * 0.5);
+        second.translate(normalX * overlap * 0.5, normalZ * overlap * 0.5);
+
+        const relativeNormalSpeed = (second.vx - first.vx) * normalX
+          + (second.vz - first.vz) * normalZ;
+        if (relativeNormalSpeed >= 0) continue;
+
+        // Equal-mass impulse: both cars receive the same magnitude, making the
+        // symmetry metric a physical consequence rather than a telemetry value.
+        const impulse = -(1 + KART_BOUNCE) * relativeNormalSpeed * 0.5;
+        first.addVelocity(-normalX * impulse, -normalZ * impulse);
+        second.addVelocity(normalX * impulse, normalZ * impulse);
+        first.markCollisionImpulse(impulse);
+        second.markCollisionImpulse(impulse);
+      }
+    }
+  }
+}
+
+export function createWorld(options?: WorldOptions): PhysicsWorld {
+  return new World(options);
 }
 
 // Public physics API for renderers and headless tooling.

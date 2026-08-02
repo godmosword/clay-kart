@@ -277,3 +277,34 @@ def test_input_feedback_metrics_are_derived_from_probe_records() -> None:
     assert metrics["input_buffer_window_ms"] == 100.0
     assert metrics["throttle_deadzone"] == 0.0
     assert metrics["steer_deadzone"] == 0.08
+
+
+def test_kart_kart_symmetry_uses_dedicated_probe_events() -> None:
+    telemetry = {
+        "meta": {
+            "tick_hz": 120,
+            "kart_kart_probes": [
+                {
+                    "name": "kart-kart-symmetry",
+                    "events": [
+                        {
+                            "tick": 42,
+                            "type": "kart_kart_collision",
+                            "data": {
+                                "phase": "impact",
+                                "kart_a": 0,
+                                "kart_b": 1,
+                                "impulse_a": 2.0,
+                                "impulse_b": 2.1,
+                                "impulse_symmetry": 2.0 / 2.1,
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+        "frames": [],
+        "events": [],
+    }
+    metrics = calculate_metrics(telemetry)
+    assert metrics["kart_kart_impulse_symmetry"] == 2.0 / 2.1

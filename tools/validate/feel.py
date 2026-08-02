@@ -230,6 +230,25 @@ def _collision_events(doc: dict[str, Any]) -> list[dict[str, Any]]:
     return events
 
 
+def _kart_kart_events(doc: dict[str, Any]) -> list[dict[str, Any]]:
+    events = _events(doc, "kart_kart_collision")
+    probes = _meta(doc).get("kart_kart_probes", [])
+    if not isinstance(probes, list):
+        return events
+    for probe in probes:
+        if not isinstance(probe, dict) or not isinstance(probe.get("events"), list):
+            continue
+        probe_name = probe.get("name")
+        for event in probe["events"]:
+            if not isinstance(event, dict) or event.get("type") != "kart_kart_collision":
+                continue
+            data = event.get("data", {})
+            data = dict(data) if isinstance(data, dict) else {}
+            data["probe"] = probe_name
+            events.append({**event, "data": data})
+    return events
+
+
 def _collision_metric(
     events: list[dict[str, Any]],
     key: str,
@@ -390,6 +409,7 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
 
     release_events = _events(doc, "miniturbo_release")
     collision_events = _collision_events(doc)
+    kart_kart_events = _kart_kart_events(doc)
     landing_events = _landing_events(doc)
     active_steer_frames = [
         frame for frame in frames if abs(_finite(frame.get("steer_input"))) > 0.05
@@ -505,7 +525,7 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
         "recovery_time_s",
         first_impact_per_source=True,
     )
-    symmetry = _event_value(collision_events, "impulse_symmetry")
+    symmetry = _event_value(kart_kart_events, "impulse_symmetry")
     airborne = [frame for frame in frames if not frame.get("grounded", True)]
     grounded = [frame for frame in frames if frame.get("grounded", True)]
     air_yaw = statistics.fmean(abs(_finite(frame.get("yaw_rate"))) for frame in airborne) if airborne else 0.0

@@ -14,9 +14,16 @@ const fixturePath = process.argv[2] ?? 'fixtures/lap-a.json';
 const outputPath = process.argv[3] ?? 'telemetry/lap-a.json';
 const fixture = await readFixture(fixturePath);
 const { createWorld, advance, BASE_TOP_SPEED, CAR_LENGTH, CAR_WIDTH, TRACK_GEOMETRY, TICK_HZ } = await loadSimulation();
+const KART_BOUNDING_DIAMETER = Math.hypot(CAR_LENGTH, CAR_WIDTH);
+
+function playerKart(snapshot) {
+  const kart = snapshot.karts[snapshot.playerIndex];
+  if (!kart) throw new Error(`snapshot has no player kart at index ${snapshot.playerIndex}`);
+  return kart;
+}
 
 function frameFromSnapshot(snapshot) {
-  const kart = snapshot.kart;
+  const kart = playerKart(snapshot);
   return {
     t: snapshot.t,
     tick: snapshot.tick,
@@ -96,38 +103,92 @@ function landingData(previousKart, currentKart) {
 function eventsBetween(previous, current) {
   const events = [];
   const tick = current.tick;
-  if (previous.kart.grounded && !current.kart.grounded) {
+  const previousKart = playerKart(previous);
+  const currentKart = playerKart(current);
+  const kartKartEvents = [];
+  for (let firstIndex = 0; firstIndex < current.karts.length; firstIndex += 1) {
+    const first = current.karts[firstIndex];
+    const previousFirst = previous.karts[firstIndex];
+    if (!first || !previousFirst) continue;
+    for (let secondIndex = firstIndex + 1; secondIndex < current.karts.length; secondIndex += 1) {
+      const second = current.karts[secondIndex];
+      const previousSecond = previous.karts[secondIndex];
+      if (!second || !previousSecond) continue;
+      const distance = Math.hypot(second.pos[0] - first.pos[0], second.pos[2] - first.pos[2]);
+      if (first.collisionImpulse <= 0
+        || second.collisionImpulse <= 0
+        || distance > KART_BOUNDING_DIAMETER + 1e-6) continue;
+      kartKartEvents.push({
+        tick,
+        type: 'kart_kart_collision',
+        data: {
+          phase: previousFirst.collisionImpulse > 0 && previousSecond.collisionImpulse > 0
+            ? 'contact'
+            : 'impact',
+          kart_a: firstIndex,
+          kart_b: secondIndex,
+          character_a: first.characterId,
+          character_b: second.characterId,
+          participants: [
+            {
+              kart_index: firstIndex,
+              other_kart_index: secondIndex,
+              impulse: first.collisionImpulse,
+              other_impulse: second.collisionImpulse,
+            },
+            {
+              kart_index: secondIndex,
+              other_kart_index: firstIndex,
+              impulse: second.collisionImpulse,
+              other_impulse: first.collisionImpulse,
+            },
+          ],
+          impulse_a: first.collisionImpulse,
+          impulse_b: second.collisionImpulse,
+          impulse_symmetry: second.collisionImpulse > 0
+            ? first.collisionImpulse / second.collisionImpulse
+            : 0,
+          center_distance: distance,
+        },
+      });
+    }
+  }
+  events.push(...kartKartEvents);
+  const playerKartCollision = kartKartEvents.some((event) => (
+    event.data.kart_a === current.playerIndex || event.data.kart_b === current.playerIndex
+  ));
+  if (previousKart.grounded && !currentKart.grounded) {
     events.push({ tick, type: 'airborne_start', data: {} });
   }
-  if (!previous.kart.grounded && current.kart.grounded) {
+  if (!previousKart.grounded && currentKart.grounded) {
     events.push({
       tick,
       type: 'landing',
       data: {
-        ...landingData(previous.kart, current.kart),
+        ...landingData(previousKart, currentKart),
         latency_ticks: current.tick - previous.tick - 1,
       },
     });
   }
-  if (current.kart.collisionImpulse > 0) {
+  if (currentKart.collisionImpulse > 0 && !playerKartCollision) {
     events.push({
       tick,
       type: 'collision',
       data: {
-        impulse: current.kart.collisionImpulse,
-        phase: previous.kart.collisionImpulse > 0 ? 'contact' : 'impact',
-        ...collisionData(previous.kart, current.kart),
+        impulse: currentKart.collisionImpulse,
+        phase: previousKart.collisionImpulse > 0 ? 'contact' : 'impact',
+        ...collisionData(previousKart, currentKart),
       },
     });
   }
-  if (previous.kart.driftState === 'none' && current.kart.driftState !== 'none') {
+  if (previousKart.driftState === 'none' && currentKart.driftState !== 'none') {
     events.push({ tick, type: 'drift_start', data: {} });
   }
-  if (current.kart.driftTier > previous.kart.driftTier) {
-    events.push({ tick, type: 'drift_tier_up', data: { tier: current.kart.driftTier } });
+  if (currentKart.driftTier > previousKart.driftTier) {
+    events.push({ tick, type: 'drift_tier_up', data: { tier: currentKart.driftTier } });
   }
-  if (previous.kart.driftState === 'charging' && current.kart.driftState === 'released') {
-    events.push({ tick, type: 'miniturbo_release', data: { tier: previous.kart.driftTier } });
+  if (previousKart.driftState === 'charging' && currentKart.driftState === 'released') {
+    events.push({ tick, type: 'miniturbo_release', data: { tier: previousKart.driftTier } });
   }
   return events;
 }
@@ -194,7 +255,7 @@ function addReleaseDurations(events, frames) {
 }
 
 async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options = {}) {
-  const world = createWorld();
+  const world = createWorld(options.worldOptions);
   const frames = [];
   const events = [];
   const inputTrace = options.captureInput ? [] : null;
@@ -239,8 +300,10 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options =
       car_length: CAR_LENGTH,
       car_width: CAR_WIDTH,
       base_top_speed: BASE_TOP_SPEED,
+      kart_count: previous.karts.length,
+      player_index: previous.playerIndex,
       collision_recovery_definition: 'first two consecutive grounded, collision-free frames above 50% pre-impact ground speed with yaw-rate error <= max(0.05, 25% expected)',
-      kart_kart_collision_coverage: 'unavailable: SimSnapshot exposes one kart; deferred to ai-opponents',
+      kart_kart_collision_coverage: 'available: kart_kart_collision events include both participants and impulses',
       landing_angle_definition: 'angle between pre-landing ground velocity and downward vertical; >=45° smooth, <45° steep',
     },
     frames,
@@ -376,6 +439,35 @@ async function inputCommandSweep(name, field, values) {
   };
 }
 
+async function kartKartProbe() {
+  const replay = await replayTicks(
+    47,
+    () => ({
+      throttle: 1,
+      steer: 0,
+      brake: false,
+      reverse: false,
+      drift: false,
+      jump: false,
+    }),
+    'kart-kart-symmetry',
+    `${fixture.seed}-kart-kart-symmetry`,
+    {
+      worldOptions: {
+        aiOpponents: [{ characterId: 'duoduo', difficulty: 0 }],
+      },
+    },
+  );
+  const events = replay.events.filter((event) => event.type === 'kart_kart_collision');
+  if (events.length === 0) throw new Error('kart-kart probe did not produce a collision');
+  return {
+    name: 'kart-kart-symmetry',
+    kart_count: replay.meta.kart_count,
+    player_index: replay.meta.player_index,
+    events,
+  };
+}
+
 const driftReplays = await Promise.all([replayOnce(), replayOnce(), replayOnce()]);
 const baseline = await replayOnce((input) => ({ ...input, drift: false }));
 const collisionProbes = await Promise.all([
@@ -413,6 +505,7 @@ const inputFeedback = {
     inputCommandSweep('steer-deadzone', 'steer', Array.from({ length: 201 }, (_, index) => index / 100 - 1)),
   ]),
 };
+const kartKartProbes = [await kartKartProbe()];
 // Keep the gameplay fixture focused on the cross-section used by §2–§4 and
 // §7.  The speed-radius checks need a sustained full-lock sweep, so collect
 // that diagnostic series in a separate deterministic replay and attach only
@@ -480,6 +573,7 @@ for (const replay of driftReplays) {
   replay.meta.collision_probes = collisionProbes;
   replay.meta.landing_probes = landingProbes;
   replay.meta.input_feedback = inputFeedback;
+  replay.meta.kart_kart_probes = kartKartProbes;
 }
 const replays = driftReplays;
 const serialized = replays.map((replay) => JSON.stringify(replay, null, 2) + '\n');
