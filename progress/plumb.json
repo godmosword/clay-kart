@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-02T17:50:00Z",
+  "updated": "2026-08-02T13:32:12Z",
   "wave": "W3",
   "round": 17,
   "element": "contact-sheet-script",
-  "status": "idle",
+  "status": "done",
   "last_verdict": null,
-  "note": "R8（drift-input-binding）確認完成。W2 已跑過一輪，Lead 決定轉向 W3，R17 已開：PLAN.md 指派給 Cursor 的 W3 第一步——contact sheet 生成腳本（12 組並排、隨機打亂、key 對照表隔離於 critic 存取範圍外）。明確指出一個需要判斷的缺口：refs/clay/ 只有 8 張場景合成圖，BAR-VISUAL.md §4 有 12 個元件，沒有現成的一對一參考圖，要求 Cursor 遇到配對判斷時停下來寫 BACKLOG，不要自行決定。"
+  "note": "R17：tools/visual/contact-sheet.mjs 完成（2048×3072、種子打亂、key 隔離、placeholder）。12 元件 ref 刻意全 null——refs/clay 8 張場景合成圖對不齊 BAR-VISUAL 12 元件，配對判斷已停手寫入 loop/BACKLOG.md 待 Lead 裁決。typecheck/build PASS。"
 }

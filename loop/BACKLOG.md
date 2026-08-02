@@ -175,6 +175,28 @@
 
 ## 待裁決
 
+### contact-sheet pairing — refs/clay 對不齊 BAR-VISUAL 12 元件
+- **輪次**：R17
+- **現況**：`refs/clay/` 現有素材與 `BAR-VISUAL.md §4` 的 12 個評分元件沒有一對一對應。腳本機制（`tools/visual/contact-sheet.mjs`：12 組並排、種子打亂、左右隨機、`contact-sheet.key.json` 隔離、缺圖 placeholder）已可跑；**配對本身未填**，manifest 裡 12 個 `ref` 皆為 `null`。
+- **盤點（refs/clay）**：
+  - 場景合成圖 8 張：`car-park.png`（黃金樣本）、`dino.png`、`rescue.png`、`ocean.png`、`sea.png`、`cloud-a.png`、`cloud-b.png`、`cloud-c.png`
+  - 角色肖像 6 張：`characters/*.jpg`（含小紅賽車）
+  - 以上幾乎都是整場景或角色立繪，不是依元件拆好的 512×512 參考半邊
+- **對 12 元件的缺口（Cursor 不自行湊）**：
+
+  | 元件 | 為何不能自行配 |
+  |---|---|
+  | kart-body / kart-wheels / driver-face | 合成圖裡有車，但是否裁切、裁哪、角色 JPG 能否當 face 參考＝設計判斷 |
+  | track-surface / track-barriers / foliage / shadows-contact | 嵌在場景合成圖裡，裁切區域與「元件級參考」是否等價＝設計判斷 |
+  | skybox-lighting | `cloud-*` 候選存在，但是否對齊 §5.0 燈光條款＝設計判斷 |
+  | water-sea | `sea.png` vs `ocean.png` 用哪張＝設計判斷 |
+  | drift-sparks / item-boxes / ui-hud | refs 內無對應素材 |
+
+- **目標**：Lead 裁決每組的參考半邊來源（整圖／裁切座標／暫緩該組／另補參考），再填 `tools/visual/contact-sheet.manifest.json` 的 `ref` 欄位。
+- **已嘗試**：無——依 `LOOP-OPS.md §4.4` / R17 TASK，配對判斷停手寫 BACKLOG，不自決湊法。
+- **來源**：Cursor R17；`loop/round-17/TASK.md`；`BAR-VISUAL.md §1`/§4；`refs/clay/`
+- **狀態**：待裁決
+
 ### ai-opponents — R11 第一階段多車架構與 kart-kart 碰撞已完成
 - **輪次**：R11
 - **現況**：`createWorld({ aiOpponents: [...] })` 產生對齊的 `karts[]`/`laps[]`；專用 pair probe 為 2 台車、`playerIndex=0`，6.4 `kart_kart_impulse_symmetry=1.0` PASS。AI 車目前是 deterministic stationary placeholder。
