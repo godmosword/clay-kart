@@ -144,6 +144,73 @@ def _event_value(events: list[dict[str, Any]], key: str, default: float = 0.0) -
     return statistics.fmean(values) if values else default
 
 
+def _input_feedback_metrics(doc: dict[str, Any]) -> dict[str, float]:
+    meta = _meta(doc)
+    feedback = meta.get("input_feedback", {})
+    if not isinstance(feedback, dict):
+        return {
+            "input_to_sim_latency_ticks": 0.0,
+            "input_buffer_window_ms": 0.0,
+            "throttle_deadzone": 0.0,
+            "steer_deadzone": 0.0,
+        }
+
+    latency_probe = feedback.get("latency_probe", {})
+    latency = 0.0
+    if isinstance(latency_probe, dict):
+        request_tick = _finite(latency_probe.get("request_tick"), math.nan)
+        applied_tick = _finite(latency_probe.get("applied_tick"), math.nan)
+        if math.isfinite(request_tick) and math.isfinite(applied_tick):
+            latency = max(0.0, applied_tick - request_tick - 1.0)
+
+    buffer_probe = feedback.get("buffer_probe", {})
+    buffer_window = 0.0
+    if isinstance(buffer_probe, dict):
+        release_tick = _finite(buffer_probe.get("release_tick"), math.nan)
+        activation = buffer_probe.get("activation_tick")
+        activation_tick = _finite(activation, math.nan)
+        condition_reached = buffer_probe.get("pulse_reached_reference_window") is True
+        if (
+            condition_reached
+            and math.isfinite(release_tick)
+            and math.isfinite(activation_tick)
+            and activation_tick > release_tick
+        ):
+            tick_hz = _finite(meta.get("tick_hz"), DEFAULT_TICK_HZ)
+            buffer_window = (activation_tick - release_tick) * 1000.0 / tick_hz if tick_hz > 0 else 0.0
+
+    deadzones = {"throttle": 0.0, "steer": 0.0}
+    probes = feedback.get("deadzone_probes", [])
+    if isinstance(probes, list):
+        for probe in probes:
+            if not isinstance(probe, dict) or not isinstance(probe.get("samples"), list):
+                continue
+            field = probe.get("field")
+            if field not in deadzones:
+                continue
+            zero_requests = []
+            for sample in probe["samples"]:
+                if not isinstance(sample, dict):
+                    continue
+                requested = sample.get("requested", {})
+                effective = sample.get("effective", {})
+                if not isinstance(requested, dict) or not isinstance(effective, dict):
+                    continue
+                requested_value = _finite(requested.get(field), math.nan)
+                effective_value = _finite(effective.get(field), math.nan)
+                if math.isfinite(requested_value) and math.isfinite(effective_value) and abs(effective_value) <= 1e-12:
+                    zero_requests.append(abs(requested_value))
+            if zero_requests:
+                deadzones[field] = max(zero_requests)
+
+    return {
+        "input_to_sim_latency_ticks": latency,
+        "input_buffer_window_ms": buffer_window,
+        "throttle_deadzone": deadzones["throttle"],
+        "steer_deadzone": deadzones["steer"],
+    }
+
+
 def _collision_events(doc: dict[str, Any]) -> list[dict[str, Any]]:
     events = _events(doc, "collision")
     probes = _meta(doc).get("collision_probes", [])
@@ -464,6 +531,7 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
         probe_name="steep",
     )
     air_latency = _landing_metric(landing_events, "latency_ticks")
+    input_feedback = _input_feedback_metrics(doc)
 
     metrics: dict[str, float | bool] = {
         "tick_dt_variance": 0.0 if abs(dt_variance) < 1e-24 else dt_variance,
@@ -504,10 +572,10 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
         "landing_speed_retention": landing_retention,
         "hard_landing_retention": hard_landing_retention,
         "airborne_to_grounded_latency_ticks": air_latency,
-        "input_to_sim_latency_ticks": _finite(meta.get("input_to_sim_latency_ticks")),
-        "input_buffer_window_ms": _finite(meta.get("input_buffer_window_ms")),
-        "throttle_deadzone": _finite(meta.get("throttle_deadzone")),
-        "steer_deadzone": _finite(meta.get("steer_deadzone")),
+        "input_to_sim_latency_ticks": input_feedback["input_to_sim_latency_ticks"],
+        "input_buffer_window_ms": input_feedback["input_buffer_window_ms"],
+        "throttle_deadzone": input_feedback["throttle_deadzone"],
+        "steer_deadzone": input_feedback["steer_deadzone"],
     }
     return metrics
 

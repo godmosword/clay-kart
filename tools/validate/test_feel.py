@@ -237,3 +237,43 @@ def test_landing_metrics_fall_back_to_unlabelled_measured_events() -> None:
     assert metrics["landing_speed_retention"] == 0.97
     assert metrics["hard_landing_retention"] == 0.75
     assert metrics["airborne_to_grounded_latency_ticks"] == 1.0
+
+
+def test_input_feedback_metrics_are_derived_from_probe_records() -> None:
+    telemetry = {
+        "meta": {
+            "tick_hz": 120,
+            "input_feedback": {
+                "latency_probe": {"request_tick": 10, "applied_tick": 11},
+                "buffer_probe": {
+                    "release_tick": 2,
+                    "activation_tick": 14,
+                    "pulse_reached_reference_window": True,
+                },
+                "deadzone_probes": [
+                    {
+                        "field": "throttle",
+                        "samples": [
+                            {"requested": {"throttle": 0}, "effective": {"throttle": 0}},
+                            {"requested": {"throttle": 0.01}, "effective": {"throttle": 0.01}},
+                        ],
+                    },
+                    {
+                        "field": "steer",
+                        "samples": [
+                            {"requested": {"steer": 0}, "effective": {"steer": 0}},
+                            {"requested": {"steer": 0.08}, "effective": {"steer": 0}},
+                            {"requested": {"steer": 0.09}, "effective": {"steer": 0.09}},
+                        ],
+                    },
+                ],
+            },
+        },
+        "frames": [],
+        "events": [],
+    }
+    metrics = calculate_metrics(telemetry)
+    assert metrics["input_to_sim_latency_ticks"] == 0.0
+    assert metrics["input_buffer_window_ms"] == 100.0
+    assert metrics["throttle_deadzone"] == 0.0
+    assert metrics["steer_deadzone"] == 0.08
