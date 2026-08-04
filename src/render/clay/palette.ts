@@ -66,12 +66,36 @@ export const XIAOHONG = {
   spoiler: 0xcf6248,
 } as const;
 
-/** 輪胎（`kart-wheels` 元件會用到，先放這裡保持 token 集中）。 */
+/** 輪胎（`BAR-VISUAL §4` 元件 #2 `kart-wheels`）。 */
 export const TIRE = {
   /** 不是純黑（`§6` 禁令），是很深的暖灰。 */
-  rubber: 0x2e2a28,
-  rim: 0xf4ead6,
-  hub: 0xd94436,
+  rubber: 0x3a3330,
+  rim: 0xf0e4cd,
+  /** 輪轂中心，跟車身同一支紅。 */
+  hub: 0xc4544a,
+} as const;
+
+/**
+ * 臉（`BAR-VISUAL §4` 元件 #3 `driver-face`）。
+ *
+ * `CHARACTERS.md §4`：「**大圓眼 + 明確笑口**是全卡司共通識別，任何角度
+ * 都要看得到眼睛」——所以眼白與瞳孔的明度差要夠，不能為了粉彩而拉平。
+ */
+export const FACE = {
+  /** 臉盤底色，比車身奶油白再亮一點點。 */
+  panel: 0xf7efe0,
+  /** 眼白。刻意不是純白（`§6` 禁令）。 */
+  eyeWhite: 0xfbf6ec,
+  /** 虹膜的深藍。 */
+  iris: 0x2b4f86,
+  /** 瞳孔。深棕而非純黑——`§6` 禁純黑，而且黏土本來就沒有純黑。 */
+  pupil: 0x241c1a,
+  /** 眼神光。 */
+  highlight: 0xfdfbf6,
+  /** 嘴。跟瞳孔同一支深棕，保持五官色系一致。 */
+  mouth: 0x241c1a,
+  /** 舌頭的粉。 */
+  tongue: 0xe08a92,
 } as const;
 
 /**
