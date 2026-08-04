@@ -138,10 +138,17 @@ Claude Code，全新 session，Sonnet：
 
 | worktree | 分支 | 工具 | 可寫路徑 |
 |---|---|---|---|
-| `../ck-visual` | `feat/visual` | Claude Code | `src/render/`, `src/characters/`, `src/vfx/` |
+| `../ck-visual` | `feat/visual` | Claude Code | `src/render/`, `src/characters/`, `src/vfx/`, `tools/visual/`※ |
 | `../ck-physics` | `feat/physics` | Codex | `src/physics/`, `src/ai/`, `tools/telemetry/`, `tools/validate/` |
-| `../ck-plumb` | `feat/plumb` | Cursor | `src/ui/`, `src/loader/`, `build/` |
+| `../ck-plumb` | `feat/plumb` | Cursor | `src/ui/`, `src/loader/`, `build/`, `tools/visual/`※ |
 
 任何工具都可以**讀**其他 worktree，但只能**寫**自己的範圍。違反即在 review 時 revert。
+
+> ※ **`tools/visual/` 是 W3 視覺工具共用目錄**（R18 Lead 裁決）。`ck-plumb` 在 R17
+> 建立了 `contact-sheet.mjs`，`ck-visual` 在 R18 需要放 render harness 的驅動腳本——
+> 兩者都不屬於彼此的既有路徑，但主題上都是 W3 視覺工具。
+> **共用不等於可以互改：各自只擁有自己建立的檔案，不得修改對方的。**
+> 理由：寫入範圍規則的目的是防止兩個工具同時改同一個檔案，不是禁止在同一個主題
+> 目錄下各自新增檔案。渲染邏輯本身（場景、相機、材質、光照）仍全部留在 `src/render/`。
 
 `loop/`、`BAR-*.md`、`progress/*.json` 的寫入規則見 `loop/README.md`。
