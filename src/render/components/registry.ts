@@ -6,7 +6,9 @@
  * 原則：「還沒做」跟「做了但沒過」必須在產物上分得出來，不能長得一樣。
  */
 import type { Group } from 'three';
+import { createDriverFace } from '../../characters/driver-face.js';
 import { createKartBody } from './kart-body.js';
+import { createKartWheel } from './kart-wheels.js';
 
 /** 元件 id 直接沿用 `BAR-VISUAL §4` 的命名，不要另創。 */
 export type ComponentId =
@@ -33,8 +35,18 @@ export interface ComponentEntry {
 
 export const COMPONENTS: readonly ComponentEntry[] = [
   { id: 'kart-body', scope: '小紅賽車車身 mesh + 黏土材質', create: createKartBody },
-  { id: 'kart-wheels', scope: '輪胎、輪框、形變', create: null },
-  { id: 'driver-face', scope: '大圓眼 + 笑口，12fps 抽格', create: null },
+  {
+    id: 'kart-wheels',
+    scope: '輪胎、輪框、形變',
+    // 審查用單顆：一顆放大看得到胎面/輪框/壓痕，四顆排開反而每顆都太小。
+    // 遊戲用的四顆組合是 `createKartWheelSet()`。
+    create: createKartWheel,
+  },
+  {
+    id: 'driver-face',
+    scope: '大圓眼 + 笑口，12fps 抽格',
+    create: () => createDriverFace().group,
+  },
   { id: 'track-surface', scope: '賽道路面材質與接縫', create: null },
   { id: 'track-barriers', scope: '護欄、路緣石', create: null },
   { id: 'foliage', scope: '樹木、草叢', create: null },

@@ -2,11 +2,11 @@
   "tool": "claude-code",
   "worktree": "../ck-visual",
   "branch": "feat/visual",
-  "updated": "2026-08-02T19:30:00Z",
+  "updated": "2026-08-02T20:10:00Z",
   "wave": "W3",
-  "round": 18,
-  "element": "visual-foundation + kart-body",
+  "round": 19,
+  "element": "kart-wheels + driver-face",
   "status": "done",
   "last_verdict": "PASS",
-  "note": "R18 建立 W3 視覺地基並用 kart-body 端到端驗證。共用件（src/render/clay/）：黏土材質（程序生成指紋/壓棒痕法線貼圖，決定性種子，影像資料全域單例、按密度 clone，§6 禁令用程式夾住而非靠註解）、全域光照鑽機（§5.0 柔和大面積弱方向主光 + 高均勻暖白環境 + VSM 短柔接地陰影，刻意不提供逐元件調光把手，因為 §3 明文禁止逐元件調光）、§3 拍攝台（四角度 512×512、#8a8a8a 無漸層、依包圍球自動框定讓大小件構圖可比）、側面輪廓擠出基元。工具：tools/visual/render-components.mjs（headless Chrome + CDP，沿用 R16 做法，不新增 npm 依賴；同時產 §3 四角度圖與 contact sheet 用的 2×2 合成格，解決兩份規格的版面張力）。§6 全域禁令在管線裡實際稽核並會擋下產出，且有 self-test 確認稽核本身抓得到違規（4 種違規案例全中；7 個真實材質 0 違規）。perf-probe 重跑無退化。已知限制：地基尚未接進遊戲 renderer.ts，BAR-PERF 量到的仍是 W1 方塊車，不反映黏土成本。"
+  "note": "R19 加上 kart-wheels 與 driver-face——刻意挑同一台車的另外兩個元件，因為地基宣稱「全 12 元件共用一套材質語言」，同車三件擺在一起是一眼可驗的。輪子：厚實圓環胎面 + 奶油輪框 + 紅輪轂，輪軸對齊 kart-body 擋泥板；審查用單顆、遊戲用四顆組。臉：臉盤 + 四層壓上去的大圓眼 + 笑口 + 舌頭，眼球做成接近半球而非貼平圓片（CHARACTERS.md §4 要求任何角度都要看得到眼睛，貼平的側視就消失）。目錄分界依 CHARACTERS.md §3 的判準：輪子屬載具 60fps 放 src/render/，臉屬純表演 12fps 放 src/characters/；setExpressionTime() 內建 floor(t*12)/12 量化，呼叫端傳原始時間即可。§6 稽核 17 個材質 0 違規、self-test 4 案例仍有效；perf-probe 無退化。R18 建立 W3 視覺地基並用 kart-body 端到端驗證。共用件（src/render/clay/）：黏土材質（程序生成指紋/壓棒痕法線貼圖，決定性種子，影像資料全域單例、按密度 clone，§6 禁令用程式夾住而非靠註解）、全域光照鑽機（§5.0 柔和大面積弱方向主光 + 高均勻暖白環境 + VSM 短柔接地陰影，刻意不提供逐元件調光把手，因為 §3 明文禁止逐元件調光）、§3 拍攝台（四角度 512×512、#8a8a8a 無漸層、依包圍球自動框定讓大小件構圖可比）、側面輪廓擠出基元。工具：tools/visual/render-components.mjs（headless Chrome + CDP，沿用 R16 做法，不新增 npm 依賴；同時產 §3 四角度圖與 contact sheet 用的 2×2 合成格，解決兩份規格的版面張力）。§6 全域禁令在管線裡實際稽核並會擋下產出，且有 self-test 確認稽核本身抓得到違規（4 種違規案例全中；7 個真實材質 0 違規）。perf-probe 重跑無退化。已知限制：地基尚未接進遊戲 renderer.ts，BAR-PERF 量到的仍是 W1 方塊車，不反映黏土成本。"
 }
