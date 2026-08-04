@@ -1,0 +1,176 @@
+{
+  "round": 18,
+  "wave": "W2",
+  "element": "perf-validator",
+  "verdict": "PASS",
+  "bar_ref": "BAR-PERF.md §2–§5",
+  "checks": [
+    {
+      "id": "4.2",
+      "metric": "vehicle_transform_hz",
+      "actual": 59.98353393186294,
+      "window": [
+        58.0,
+        62.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.3",
+      "metric": "camera_hz",
+      "actual": 59.98353393186294,
+      "window": [
+        58.0,
+        62.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "2.1",
+      "metric": "fps_p50",
+      "actual": 59.8802395219599,
+      "window": [
+        58.0,
+        62.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "2.2",
+      "metric": "fps_p05",
+      "actual": 58.20753434041712,
+      "window": [
+        55.0,
+        62.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.2",
+      "metric": "heap_growth_per_lap_mb",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        2.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "2.3",
+      "metric": "frame_time_p99_ms",
+      "actual": 18.196000000182536,
+      "window": [
+        0.0,
+        22.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "2.4",
+      "metric": "long_frame_count",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        3.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "2.5",
+      "metric": "gc_pause_max_ms",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        8.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.1",
+      "metric": "first_interactive_s",
+      "actual": 0.03889999999990687,
+      "window": [
+        0.0,
+        3.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.2",
+      "metric": "initial_bundle_kb_gz",
+      "actual": 132.3505859375,
+      "window": [
+        0.0,
+        900.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.3",
+      "metric": "total_assets_mb",
+      "actual": 3.165081024169922,
+      "window": [
+        0.0,
+        12.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.4",
+      "metric": "time_to_first_render_s",
+      "actual": 0.38510000000009315,
+      "window": [
+        0.0,
+        1.5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.1",
+      "metric": "heap_peak_mb",
+      "actual": 5.106374740600586,
+      "window": [
+        0.0,
+        320.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.3",
+      "metric": "draw_calls",
+      "actual": 5.0,
+      "window": [
+        0.0,
+        150.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.4",
+      "metric": "triangles_k",
+      "actual": 3.278,
+      "window": [
+        0.0,
+        400.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.5",
+      "metric": "texture_memory_mb",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        96.0
+      ],
+      "status": "PASS"
+    }
+  ],
+  "largest_gap": null,
+  "artifacts": [
+    "/tmp/r18-perf.json"
+  ],
+  "next_owner": "lead",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 0
+}

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node tools/validate/w1-physics.mjs",
     "contact-sheet": "node tools/visual/contact-sheet.mjs",
-    "progress": "python3 -m http.server 8080"
+    "progress": "python3 -m http.server 8080",
+    "render-components": "node tools/visual/render-components.mjs"
   },
   "dependencies": {
     "three": "^0.185.1"

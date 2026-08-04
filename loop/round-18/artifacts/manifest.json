@@ -1,0 +1,25 @@
+{
+  "generated_by": "tools/visual/render-components.mjs",
+  "bar_ref": "BAR-VISUAL.md §3",
+  "view_size": 512,
+  "sheet_cell_note": "512×512 composed of the four §3 views at 256×256 each (R18 decision)",
+  "global_bans_audited": {
+    "ref": "BAR-VISUAL.md §6",
+    "materials_checked": 7,
+    "auditor_self_test_cases": 4,
+    "violations": []
+  },
+  "rendered": [
+    {
+      "id": "kart-body",
+      "sheetCell": "kart-body.png",
+      "views": [
+        "kart-body.front.png",
+        "kart-body.three-quarter-front-left.png",
+        "kart-body.side.png",
+        "kart-body.top.png"
+      ]
+    }
+  ],
+  "not_implemented": []
+}
