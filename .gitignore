@@ -9,6 +9,9 @@ build/out/
 
 # telemetry 輸出是每輪產物，只 commit 進 loop/round-{N}/artifacts/
 telemetry/
+# 元件算繪圖同理：build/visual/ 是可重生的工作產出（contact-sheet 腳本讀
+# 這裡），保存版進 loop/round-{N}/artifacts/
+build/visual/
 !loop/round-*/artifacts/
 
 # contact sheet 標籤對照表絕對不得進版控 —— critic 可能讀到
