@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-02T13:32:12Z",
+  "updated": "2026-08-05T15:24:12Z",
   "wave": "W3",
-  "round": 17,
-  "element": "contact-sheet-script",
+  "round": 21,
+  "element": "steer-screen-regression + progress-dashboard",
   "status": "done",
   "last_verdict": null,
-  "note": "R17：tools/visual/contact-sheet.mjs 完成（2048×3072、種子打亂、key 隔離、placeholder）。12 元件 ref 刻意全 null——refs/clay 8 張場景合成圖對不齊 BAR-VISUAL 12 元件，配對判斷已停手寫入 loop/BACKLOG.md 待 Lead 裁決。typecheck/build PASS。"
+  "note": "轉向螢幕空間 CDP 回歸（test:steer-screen）；progress/index.html 加 FROZEN/BACKLOG，parseBacklogOpen 改依狀態行過濾（16 待裁決 + 2 格式異常）；ui-hud 驗收未決寫 BACKLOG；清 round-17/tmp-*。"
 }

@@ -67,6 +67,19 @@
     border: 1px dashed var(--line); border-radius: 8px;
     padding: 1rem; color: var(--dim); font-size: .82rem;
   }
+  .list {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 9px; padding: .7rem .9rem;
+    display: grid; gap: .35rem; font-size: .82rem;
+  }
+  .list .item { color: var(--fg); }
+  .list .item code {
+    font-size: .78rem; background: rgba(127,127,127,.14);
+    padding: .05rem .3rem; border-radius: 3px;
+  }
+  .list .count { color: var(--dim); font-size: .74rem; margin-bottom: .2rem; }
+  .list.warn { border-color: var(--busy); }
+  .list.warn .count { color: var(--busy); }
   .err {
     border: 1px solid var(--fail); border-radius: 8px; padding: .85rem 1rem;
     color: var(--fail); font-size: .84rem;
@@ -95,6 +108,16 @@
 <section>
   <h2>預算消耗</h2>
   <div id="budget"></div>
+</section>
+
+<section>
+  <h2>FROZEN</h2>
+  <div id="frozen"></div>
+</section>
+
+<section>
+  <h2>BACKLOG 待裁決</h2>
+  <div id="backlog"></div>
 </section>
 
 <section>
@@ -188,17 +211,147 @@ function renderBudget(budget) {
   }
 }
 
+async function getText(p) {
+  const r = await fetch(p + '?t=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error(p + ' → HTTP ' + r.status);
+  return r.text();
+}
+
+/** 從 FROZEN.md 抽出 `- \`path\`    # note` 條目（機械解析，不做裁決）。 */
+function parseFrozen(md) {
+  const items = [];
+  for (const line of md.split('\n')) {
+    const m = line.match(/^- `([^`]+)`\s*(?:#\s*(.*))?$/);
+    if (m) items.push({ path: m[1], note: (m[2] || '').trim() });
+  }
+  return items;
+}
+
+/**
+ * 從 BACKLOG.md「## 待裁決」區段抽出活動佇列。
+ *
+ * 該節是累積日誌，不是活動佇列——已結案條目也會留在裡面。
+ * 規則：每個 ### 往下找第一行 `- **狀態**：`；
+ * - 狀態含「待裁決」且標題未被 ~~刪除線~~ 包住 → open
+ * - 找不到可辨識狀態行 → anomalous（單獨列，避免假陰性靜靜消失）
+ * - 其餘（已修正／已裁決／已完成…）→ 丟棄
+ */
+function parseBacklogOpen(md) {
+  const lines = md.split('\n');
+  let inOpen = false;
+  const entries = [];
+  let current = null;
+
+  const flush = () => {
+    if (current) entries.push(current);
+    current = null;
+  };
+
+  for (const line of lines) {
+    if (/^## /.test(line)) {
+      flush();
+      inOpen = /^## 待裁決/.test(line);
+      continue;
+    }
+    if (!inOpen) continue;
+    const heading = line.match(/^### (.+)$/);
+    if (heading) {
+      flush();
+      current = { title: heading[1].trim(), status: null };
+      continue;
+    }
+    if (current && current.status === null) {
+      const status = line.match(/^- \*\*狀態\*\*：\s*(.*)$/);
+      if (status) current.status = status[1].trim();
+    }
+  }
+  flush();
+
+  const struck = (title) => /^~~.+~~/.test(title);
+  const open = [];
+  const anomalous = [];
+  for (const entry of entries) {
+    if (entry.status === null) {
+      anomalous.push(entry.title);
+      continue;
+    }
+    if (entry.status.includes('待裁決') && !struck(entry.title)) {
+      open.push(entry.title);
+    }
+  }
+  return { open, anomalous };
+}
+
+function renderFrozen(items) {
+  const box = document.getElementById('frozen');
+  box.replaceChildren();
+  if (items.length === 0) {
+    box.append(el('div', 'empty', 'FROZEN.md 目前沒有凍結路徑。'));
+    return;
+  }
+  const list = el('div', 'list');
+  list.append(el('div', 'count', items.length + ' 條凍結路徑'));
+  for (const it of items) {
+    const row = el('div', 'item');
+    const code = document.createElement('code');
+    code.textContent = it.path;
+    row.append(code);
+    if (it.note) row.append(document.createTextNode(' — ' + it.note));
+    list.append(row);
+  }
+  box.append(list);
+}
+
+function renderBacklog(parsed) {
+  const box = document.getElementById('backlog');
+  box.replaceChildren();
+  const open = parsed.open || [];
+  const anomalous = parsed.anomalous || [];
+
+  if (open.length === 0 && anomalous.length === 0) {
+    box.append(el('div', 'empty', '待裁決清單是空的。'));
+    return;
+  }
+
+  if (open.length === 0) {
+    box.append(el('div', 'empty', '沒有狀態含「待裁決」的活動條目。'));
+  } else {
+    const list = el('div', 'list');
+    list.append(el('div', 'count', open.length + ' 條待裁決'));
+    for (const title of open) list.append(el('div', 'item', title));
+    box.append(list);
+  }
+
+  if (anomalous.length > 0) {
+    const warn = el('div', 'list warn');
+    warn.style.marginTop = '.7rem';
+    warn.append(
+      el(
+        'div',
+        'count',
+        anomalous.length + ' 條格式異常（找不到「- **狀態**：」——假陰性風險，不要忽略）',
+      ),
+    );
+    for (const title of anomalous) warn.append(el('div', 'item', title));
+    box.append(warn);
+  }
+}
+
 async function refresh() {
   const fatal = document.getElementById('fatal');
   try {
-    const [budget, ...states] = await Promise.all([
+    const [budget, frozenMd, backlogMd, ...states] = await Promise.all([
       getJSON('../loop/budget.json'),
+      getText('../loop/FROZEN.md'),
+      getText('../loop/BACKLOG.md'),
       ...FILES.map(getJSON)
     ]);
     fatal.replaceChildren();
     renderWaves(states);
     renderTools(states);
     renderBudget(budget);
+    renderFrozen(parseFrozen(frozenMd));
+    renderBacklog(parseBacklogOpen(backlogMd));
     document.getElementById('stamp').textContent = new Date().toLocaleTimeString('zh-TW', { hour12: false });
   } catch (e) {
     const box = el('div', 'err');
