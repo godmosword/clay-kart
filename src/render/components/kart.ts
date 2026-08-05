@@ -16,7 +16,7 @@
  * 抽格只實作在 `characters/driver-face.ts` 的 `setExpressionTime()` 裡面，
  * 這裡純轉發——量化寫兩份，遲早有一份會漏掉。
  */
-import { Group } from 'three';
+import { Box3, Group } from 'three';
 import { createDriverFace } from '../../characters/driver-face.js';
 import { createKartBody } from './kart-body.js';
 import { createKartWheelSet, WHEEL_ROLLING_RADIUS } from './kart-wheels.js';
@@ -24,36 +24,40 @@ import { createKartWheelSet, WHEEL_ROLLING_RADIUS } from './kart-wheels.js';
 export { WHEEL_ROLLING_RADIUS };
 
 /**
- * 臉在車頭的擺放。
+ * 臉在車頭的擺放——**眼睛與笑口分開擺在兩個曲面上**。
  *
- * 參考圖（`refs/clay/characters/小紅賽車.jpg`）上臉是**壓在前擋斜面上的一塊
- * 獨立黏土**，笑口再往下落在引擎蓋／保險桿上——不是畫在車殼上的貼圖。
- * 這裡的傾角對齊 `clay/profile.ts` 前擋那段輪廓：由 `(z=0.56, y=0.70)` 升到
- * `(z=0.30, y=1.00)`，也就是往後仰約 40°。擠出件的倒角會把實際表面再往外
- * 推一圈，所以擺放點比輪廓座標再往前上方一點，臉才是「壓上去」不是「埋進去」。
+ * 參考圖（`refs/clay/characters/小紅賽車.jpg`）上，白色臉盤與大圓眼壓在前擋
+ * 斜面，笑口是另一塊黏土壓在前保險桿，中間隔著一整個引擎蓋的落差。
+ * R20 把整張臉當剛性一塊掛上去，笑口因此沉進引擎蓋、正面看不到，違反
+ * `CHARACTERS.md §4` 與 `BAR-VISUAL §5.3`。傾角試過三檔都無解——甲蟲車的
+ * 車頭有兩個朝向差很多的曲面，一塊平板貼不住兩個。R21 把臉拆成兩部分。
  *
- * ## 已知缺口：笑口被引擎蓋擋住
- *
- * `driver-face` 是**一整塊平板**，笑口就在眼睛正下方約 0.2 單位處；而
- * `kart-body` 是甲蟲車，前擋之下立刻接一段幾乎水平的引擎蓋。兩者剛性組合
- * 時，眼睛擺得好看笑口就沉進引擎蓋，笑口露出來眼睛就得抬到車頂高度——
- * 試過傾角 `-0.25`／`-0.6`／`-0.85` 三檔，`-0.85` 能讓笑口浮出蓋面，但變成
- * 朝上，正面仍然看不到，而且臉整個像躺著。
- *
- * 這是**元件層級的造型問題，不是擺放參數問題**（參考圖上的臉能同時做到，
- * 是因為眼睛在前擋、笑口在保險桿，中間隔著一整個引擎蓋的落差，等於臉不是
- * 剛性的一塊）。接線這一輪不改元件造型——會分不清回歸是接線造成還是改造型
- * 造成。這裡選的是眼睛讀得最清楚的一檔，笑口缺口記進 `loop/BACKLOG.md`，
- * 由下一輪 `driver-face` 處理。`CHARACTERS.md §4` 的「大圓眼 + 明確笑口」
- * 目前只做到前半。
+ * 眼睛的傾角對齊 `clay/profile.ts` 前擋那段輪廓：由 `(z=0.56, y=0.70)` 升到
+ * `(z=0.30, y=1.00)`，往後仰約 40°。擠出件的倒角會把實際表面再往外推一圈，
+ * 所以擺放點比輪廓座標再往前上方一點，臉才是「壓上去」不是「埋進去」。
  */
-const FACE_MOUNT = { y: 0.95, z: 0.52 } as const;
+const EYES_MOUNT = { y: 0.95, z: 0.52 } as const;
 
-/** 往後仰的角度（弧度）。負值＝頂端往車尾倒，跟前擋斜面同向。 */
-const FACE_TILT_X = -0.6;
+/** 眼睛往後仰的角度（弧度）。負值＝頂端往車尾倒，跟前擋斜面同向。 */
+const EYES_TILT_X = -0.6;
+
+/**
+ * 笑口在鼻頭正面的高度，以及要從鼻頭最前端往內縮多少。
+ *
+ * `z` 不寫死：鼻頭實際位置是 `kart-body` 的包圍盒算出來的（輪廓擠出的倒角
+ * 會把表面往外推，照輪廓座標擺會埋進殼裡——`kart-body.ts` 的頭燈也踩過同一
+ * 個坑）。往內縮一點點，笑口才是壓在鼻頭上而不是浮在前面。
+ */
+const MOUTH_MOUNT = { y: 0.4, inset: 0.06 } as const;
+
+/** 笑口略為朝上，貼合鼻頭下半段往內收的弧度。 */
+const MOUTH_TILT_X = 0.22;
 
 /** 臉相對車身的大小。參考圖上臉幾乎佔滿車頭正面。 */
 const FACE_SCALE = 1.3;
+
+/** 笑口比眼睛再小一階：保險桿的可用面積比前擋窄。 */
+const MOUTH_SCALE = 1.5;
 
 /** 滿舵時前輪的視覺轉向角（弧度）。純表演，不影響物理。 */
 const MAX_VISUAL_STEER = 0.42;
@@ -83,16 +87,32 @@ export function createKart(options: KartVisualOptions = {}): KartVisual {
 
   // `exactOptionalPropertyTypes` 下不能把 `undefined` 當「沒給」傳下去，
   // 所以有值才建那個欄位，讓預設值留在 `kart-body.ts` 那一層。
-  group.add(createKartBody(options.bodyColor === undefined ? {} : { bodyColor: options.bodyColor }));
+  const body = createKartBody(
+    options.bodyColor === undefined ? {} : { bodyColor: options.bodyColor },
+  );
+  group.add(body);
 
   const wheels = createKartWheelSet();
   group.add(wheels.group);
 
+  // 鼻頭最前端。跟 `kart-body.ts` 擺頭燈同一個做法：從實際包圍盒取表面位置，
+  // 不相信輪廓座標——倒角會把表面往外推一圈。
+  const noseZ = new Box3().setFromObject(body).max.z;
+
   const face = createDriverFace();
-  face.group.position.set(0, FACE_MOUNT.y, FACE_MOUNT.z);
-  face.group.rotation.x = FACE_TILT_X;
-  face.group.scale.setScalar(FACE_SCALE);
-  group.add(face.group);
+
+  // 眼睛：前擋斜面。
+  face.eyes.position.set(0, EYES_MOUNT.y, EYES_MOUNT.z);
+  face.eyes.rotation.x = EYES_TILT_X;
+  face.eyes.scale.setScalar(FACE_SCALE);
+  group.add(face.eyes);
+
+  // 笑口：鼻頭正面，另一個曲面。`createDriverFace()` 預設把兩者組成完整一張
+  // 臉，這裡改掛到車身上並各自定位——所以 `face.group` 不加進場景。
+  face.mouth.position.set(0, MOUTH_MOUNT.y, noseZ - MOUTH_MOUNT.inset);
+  face.mouth.rotation.x = MOUTH_TILT_X;
+  face.mouth.scale.setScalar(MOUTH_SCALE);
+  group.add(face.mouth);
 
   return {
     group,

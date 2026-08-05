@@ -16,9 +16,10 @@
 - **W2 以預算型停止收尾**，不是全項 PASS。`BAR-FEEL` 46 項中 42 項 PASS，
   硬門檻 `4.5` 過；`4.4`／`4.6`／`4.7`／`4.10`（drift 的次要項目）自 R5 起擱置，
   落差記在 [loop/BACKLOG.md](loop/BACKLOG.md)
-- **R20 把畫面拍下來之後發現的兩個缺陷**：轉向在畫面上是反的（**已修正**）、
-  `driver-face` 裝上車後笑口被引擎蓋擋住（待處理）。
-  另外黏土管線的效能待優化，主導成本是 VSM 陰影而不是材質
+- **R20 把畫面拍下來之後發現的兩個缺陷，都已修正**：轉向在畫面上是反的（R20）、
+  `driver-face` 裝上車後笑口被引擎蓋擋住（R21）。
+  黏土管線的效能仍待優化——陰影參數已調（5×、零視覺代價），
+  但「貼片取代即時投影」留給元件 #10
 
 > **W1 的驗證漏過了轉向方向。** 當時驗的是「送鍵盤事件後 yaw 真的改變」，
 > 驗的是有沒有變，不是往哪邊變。這類缺陷只有把畫面跟輸入擺在一起看才會現形，
@@ -75,8 +76,7 @@ node tools/visual/render-components.mjs     # 產我方半邊
 node tools/visual/ref-tiles.mjs             # 產參考半邊（Lead 裁決的裁切）
 node tools/visual/contact-sheet.mjs         # 12 格盲測圖，key 另存不進版控
 
-# 2) 笑口被引擎蓋擋住：src/characters/driver-face.ts + components/kart.ts
-#    （轉向反向已於 R20 修正，見 loop/BACKLOG.md）
+# 2) R20/R21 發現的兩個缺陷都已修完，見 loop/BACKLOG.md
 ```
 
 **視覺 builder 才需要 Opus。** 裁決與接線用不到；剩下 9 個元件的美術工作才是
