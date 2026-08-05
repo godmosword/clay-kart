@@ -8,7 +8,7 @@
     {
       "id": "4.2",
       "metric": "vehicle_transform_hz",
-      "actual": 1.0812213476343093,
+      "actual": 5.818853083992148,
       "window": [
         58.0,
         62.0
@@ -18,7 +18,7 @@
     {
       "id": "4.3",
       "metric": "camera_hz",
-      "actual": 1.0812213476343093,
+      "actual": 5.818853083992148,
       "window": [
         58.0,
         62.0
@@ -28,7 +28,7 @@
     {
       "id": "2.1",
       "metric": "fps_p50",
-      "actual": 1.1415985974721945,
+      "actual": 5.91191715277337,
       "window": [
         58.0,
         62.0
@@ -38,7 +38,7 @@
     {
       "id": "2.2",
       "metric": "fps_p05",
-      "actual": 0.501341195251493,
+      "actual": 3.6448933259527068,
       "window": [
         55.0,
         62.0
@@ -48,7 +48,7 @@
     {
       "id": "5.2",
       "metric": "heap_growth_per_lap_mb",
-      "actual": 1.0657005310058594,
+      "actual": 0.0633544921875,
       "window": [
         0.0,
         2.0
@@ -58,7 +58,7 @@
     {
       "id": "2.3",
       "metric": "frame_time_p99_ms",
-      "actual": 2490.3209999999917,
+      "actual": 422.2269999999978,
       "window": [
         0.0,
         22.0
@@ -68,12 +68,12 @@
     {
       "id": "2.4",
       "metric": "long_frame_count",
-      "actual": 3.0,
+      "actual": 26.0,
       "window": [
         0.0,
         3.0
       ],
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": "2.5",
@@ -88,7 +88,7 @@
     {
       "id": "3.1",
       "metric": "first_interactive_s",
-      "actual": 0.038300000000279395,
+      "actual": 0.054400000000023284,
       "window": [
         0.0,
         3.0
@@ -98,7 +98,7 @@
     {
       "id": "3.2",
       "metric": "initial_bundle_kb_gz",
-      "actual": 147.4306640625,
+      "actual": 147.431640625,
       "window": [
         0.0,
         900.0
@@ -108,7 +108,7 @@
     {
       "id": "3.3",
       "metric": "total_assets_mb",
-      "actual": 3.356464385986328,
+      "actual": 3.3605051040649414,
       "window": [
         0.0,
         12.0
@@ -118,7 +118,7 @@
     {
       "id": "3.4",
       "metric": "time_to_first_render_s",
-      "actual": 0.41489999999990684,
+      "actual": 0.559,
       "window": [
         0.0,
         1.5
@@ -128,7 +128,7 @@
     {
       "id": "5.1",
       "metric": "heap_peak_mb",
-      "actual": 12.513457298278809,
+      "actual": 14.614514350891113,
       "window": [
         0.0,
         320.0
@@ -138,7 +138,7 @@
     {
       "id": "5.3",
       "metric": "draw_calls",
-      "actual": 126.0,
+      "actual": 122.0,
       "window": [
         0.0,
         150.0
@@ -148,7 +148,7 @@
     {
       "id": "5.4",
       "metric": "triangles_k",
-      "actual": 82.27,
+      "actual": 76.462,
       "window": [
         0.0,
         400.0
@@ -168,7 +168,7 @@
   ],
   "largest_gap": {
     "id": "4.2",
-    "delta": "actual=1.08122, below lower bound 58",
+    "delta": "actual=5.81885, below lower bound 58",
     "priority_rank": 1
   },
   "artifacts": [
