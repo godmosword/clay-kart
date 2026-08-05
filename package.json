@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node tools/validate/w1-physics.mjs",
+    "test:steer-screen": "npm run build && node tools/visual/steer-screen.mjs",
     "contact-sheet": "node tools/visual/contact-sheet.mjs",
     "progress": "python3 -m http.server 8080",
     "render-components": "node tools/visual/render-components.mjs"
