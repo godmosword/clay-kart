@@ -115,6 +115,26 @@ artifacts：`perf-baseline-boxcar.json`／`perf-clay-noshadow.json`／`perf-prox
 可以確定的是：**陰影設定是首要的優化對象**，而且這件事在接線之前完全看不到——
 拍攝台一次只算一個元件、一張 512² 圖，量不到這個。
 
+## 追加：轉向反向已修正（同一輪）
+
+發現當下寫成「待裁決」，理由是修正點不在 Lead 的寫入範圍。裁決之後改為當輪修掉，
+關鍵是**修哪一層**：
+
+第一版契約把 `steer` 定義成「`steer > 0` = 畫面往右」，那樣讀起來直覺，但代價是
+`src/physics/world.ts` **與 `src/ai/controller.ts` 同時違規**——`controller.ts` 的
+`steer = clamp(yawError / STEER_ERROR_RANGE)` 本來就把 steer 當成「要把 yaw 改多少」，
+翻符號會讓每台 AI 車往目標的反方向轉，`BAR-FEEL §12.1`–`§12.4`（R15 全數 PASS）
+整組垮掉。
+
+所以規範定義改釘在模擬側（**`steer > 0` 使 yaw 增加**），畫面左右交給 `src/ui/`
+翻譯——輸入層本來就是把玩家意圖翻成模擬輸入的那一層。修正因此是
+`player-input.ts` 的兩個具名常數，`src/physics/`、`src/ai/` 一行未動。
+
+驗證：`shots/game-hold-right-fixed.png`（按住 →）車偏內側、
+`shots/game-hold-left-fixed.png`（按住 ←）車偏外側，正好是修正前兩張的鏡像；
+`BAR-FEEL` 重跑 42/46 PASS，FAIL 的仍是 `4.4`/`4.6`/`4.7`/`4.10` 那四個自 R5
+擱置的 drift 次要項目，數值與 R15 相同（`VERDICT-feel.json`）。
+
 ## 完成的定義
 
 - [x] `BAR-VISUAL §5.1–§5.12` 12 條全數補齊

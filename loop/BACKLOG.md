@@ -203,8 +203,27 @@
   得多，但那等於承認契約的符號定義在輸入端 —— 這是裁決，不是順手
 - **契約缺口（已補）**：`src/contract/sim.ts` 的 `WorldInput.steer` 原本只寫
   「轉向輸入：-1 到 1」，**沒有定義哪邊是右**。兩邊各自實作各自合理，合起來
-  就反了。R20 已在契約補上方向定義（Lead 專屬檔案），修正歸屬依該定義判斷
-- **狀態**：待裁決（契約已定義方向，實作端的一行修正待指派）
+  就反了
+- **裁決：定義釘在 yaw，修正落在輸入層。** 第一版契約寫「`steer > 0` = 畫面
+  往右」，讀起來直覺，但那樣會讓 `src/physics/world.ts` **與 `src/ai/controller.ts`
+  同時變成違規**——`controller.ts` 的 `steer = clamp(yawError / STEER_ERROR_RANGE)`
+  本來就把 steer 當成「要把 yaw 改多少」，翻符號會讓每台 AI 車往目標的反方向
+  轉，`BAR-FEEL §12.1`–`§12.4`（R15 全數 PASS）整組垮掉。為了一個比較順口的
+  符號約定去動已經通過驗收的模擬，是把成本放錯地方。
+  規範定義因此改為 **`steer > 0` 使 yaw 增加**（模擬側語意），畫面上的左右
+  由 `src/ui/` 翻譯——那本來就是輸入層存在的理由
+- **修正內容**：`src/ui/player-input.ts` 的按鍵對應改用具名常數
+  `STEER_SCREEN_LEFT = 1` / `STEER_SCREEN_RIGHT = -1`，並在該處寫明為什麼
+  「右 = -1」看起來反了卻是對的。`src/physics/`、`src/ai/` 一行未動
+- **驗證**：
+  - 實機截圖，同 build 同秒數只有按鍵不同：`shots/game-hold-right-fixed.png`
+    （按住 →）車偏**內側**、`shots/game-hold-left-fixed.png`（按住 ←）車偏
+    **外側**，正好是修正前兩張的鏡像
+  - `BAR-FEEL` 零回歸：`ghost-replay` + `validate/feel.py` 重跑，46 項中 42 項
+    PASS，FAIL 的仍是 `4.4`／`4.6`／`4.7`／`4.10` 這四個自 R5 起擱置的 drift
+    次要項目，數值與 R15 相同（`VERDICT-feel.json`）。物理沒動，本來就該如此，
+    但「本來就該如此」不構成證據，所以還是跑了
+- **狀態**：**已修正（R20）**
 
 ### driver-face 裝到車上之後笑口看不到
 
