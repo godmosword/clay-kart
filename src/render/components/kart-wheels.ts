@@ -21,6 +21,23 @@ import { TIRE } from '../clay/palette.js';
 const TREAD_RADIUS = 0.24;
 const TREAD_THICKNESS = 0.115;
 
+/**
+ * 滾動半徑。接進遊戲後自轉角速度 = 速度 / 這個值——寫死在呼叫端會在
+ * 胎厚一改就悄悄不同步，所以由本檔案匯出。
+ */
+export const WHEEL_ROLLING_RADIUS = TREAD_RADIUS + TREAD_THICKNESS;
+
+/**
+ * 輪軸位置。`components/kart-body.ts` 的擋泥板照這些座標外鼓，接遊戲時
+ * 的輪組也用這些值——兩邊各寫一份遲早會漂移。
+ */
+export const WHEEL_AXLE = {
+  x: 0.6,
+  y: 0.36,
+  frontZ: 0.72,
+  rearZ: -0.7,
+} as const;
+
 /** 輪寬方向的壓扁量——黏土輪子比橡膠輪胎胖，但不能胖到變成球。 */
 const WHEEL_WIDTH_SCALE = 0.82;
 
@@ -78,23 +95,53 @@ export function createKartWheel(): Group {
 }
 
 /**
- * 四顆輪子，擺在 `kart-body` 的輪軸位置上。
+ * 遊戲用的四顆輪組。
  *
- * 位置與 `components/kart-body.ts` 的 `AXLE_*` 常數對齊；那邊的擋泥板就是
- * 照這些位置外鼓的。之後接進遊戲時，自轉與懸吊都套在這一層。
+ * `CHARACTERS.md §3`：「輪子自轉、懸吊 → 60fps，**屬載具，不是角色**」。
+ * 所以這裡回傳的兩支控制方法都吃連續值，**不做任何抽格**——抽格只發生在
+ * `src/characters/` 那側。
+ *
+ * 自轉與轉向分兩層 `Group`：外層繞 Y 轉向、內層繞 X 自轉。寫成同一個
+ * `Object3D` 的兩軸尤拉角看似省事，但兩軸都不為零時的合成順序會讓轉向中的
+ * 輪子看起來在歪著滾。
  */
-export function createKartWheelSet(): Group {
-  const set = new Group();
-  set.name = 'kart-wheels';
+export interface KartWheelSet {
+  group: Group;
+  /** 累積滾動角（弧度）。呼叫端算 `距離 / WHEEL_ROLLING_RADIUS`。 */
+  setSpin(radians: number): void;
+  /** 前輪轉向角（弧度）。後輪不轉。 */
+  setSteer(radians: number): void;
+}
 
-  const axleY = 0.36;
-  const axleX = 0.6;
-  for (const z of [0.72, -0.7]) {
+export function createKartWheelSet(): KartWheelSet {
+  const group = new Group();
+  group.name = 'kart-wheels';
+
+  const spinners: Group[] = [];
+  const steerers: Group[] = [];
+
+  for (const z of [WHEEL_AXLE.frontZ, WHEEL_AXLE.rearZ]) {
     for (const side of [1, -1]) {
-      const wheel = createKartWheel();
-      wheel.position.set(side * axleX, axleY, z);
-      set.add(wheel);
+      const steer = new Group();
+      steer.position.set(side * WHEEL_AXLE.x, WHEEL_AXLE.y, z);
+
+      const spin = new Group();
+      spin.add(createKartWheel());
+      steer.add(spin);
+
+      group.add(steer);
+      spinners.push(spin);
+      if (z === WHEEL_AXLE.frontZ) steerers.push(steer);
     }
   }
-  return set;
+
+  return {
+    group,
+    setSpin(radians: number): void {
+      for (const spin of spinners) spin.rotation.x = radians;
+    },
+    setSteer(radians: number): void {
+      for (const steer of steerers) steer.rotation.y = radians;
+    },
+  };
 }

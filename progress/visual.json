@@ -2,11 +2,11 @@
   "tool": "claude-code",
   "worktree": "../ck-visual",
   "branch": "feat/visual",
-  "updated": "2026-08-02T20:10:00Z",
+  "updated": "2026-08-05T00:00:00Z",
   "wave": "W3",
-  "round": 19,
-  "element": "kart-wheels + driver-face",
+  "round": 20,
+  "element": "game-integration + ref-pairing + BAR-VISUAL §5.1–§5.12",
   "status": "done",
-  "last_verdict": "PASS",
-  "note": "R19 加上 kart-wheels 與 driver-face——刻意挑同一台車的另外兩個元件，因為地基宣稱「全 12 元件共用一套材質語言」，同車三件擺在一起是一眼可驗的。輪子：厚實圓環胎面 + 奶油輪框 + 紅輪轂，輪軸對齊 kart-body 擋泥板；審查用單顆、遊戲用四顆組。臉：臉盤 + 四層壓上去的大圓眼 + 笑口 + 舌頭，眼球做成接近半球而非貼平圓片（CHARACTERS.md §4 要求任何角度都要看得到眼睛，貼平的側視就消失）。目錄分界依 CHARACTERS.md §3 的判準：輪子屬載具 60fps 放 src/render/，臉屬純表演 12fps 放 src/characters/；setExpressionTime() 內建 floor(t*12)/12 量化，呼叫端傳原始時間即可。§6 稽核 17 個材質 0 違規、self-test 4 案例仍有效；perf-probe 無退化。R18 建立 W3 視覺地基並用 kart-body 端到端驗證。共用件（src/render/clay/）：黏土材質（程序生成指紋/壓棒痕法線貼圖，決定性種子，影像資料全域單例、按密度 clone，§6 禁令用程式夾住而非靠註解）、全域光照鑽機（§5.0 柔和大面積弱方向主光 + 高均勻暖白環境 + VSM 短柔接地陰影，刻意不提供逐元件調光把手，因為 §3 明文禁止逐元件調光）、§3 拍攝台（四角度 512×512、#8a8a8a 無漸層、依包圍球自動框定讓大小件構圖可比）、側面輪廓擠出基元。工具：tools/visual/render-components.mjs（headless Chrome + CDP，沿用 R16 做法，不新增 npm 依賴；同時產 §3 四角度圖與 contact sheet 用的 2×2 合成格，解決兩份規格的版面張力）。§6 全域禁令在管線裡實際稽核並會擋下產出，且有 self-test 確認稽核本身抓得到違規（4 種違規案例全中；7 個真實材質 0 違規）。perf-probe 重跑無退化。已知限制：地基尚未接進遊戲 renderer.ts，BAR-PERF 量到的仍是 W1 方塊車，不反映黏土成本。"
+  "last_verdict": "FAIL",
+  "note": "R20 一次處理 W3 卡住的三件事，全部是 Lead 才能做的裁決或跨範圍的接線。(1) BAR-VISUAL §5.1–§5.12 12 條個別條款補齊，統一格式材質/色/比例/一眼判斷。(2) 12 組參考半邊裁決：10 配對 2 暫緩，判準寫進 §7.1（合 §5.0/§6、元件主體佔主要面積、放大不超過 1.4×），座標寫進 tools/visual/ref-pairing.json，新增 ref-tiles.mjs 算成 512² 正規化半邊（裁切/alpha 壓平/放大上限強制），contact-sheet.mjs 一行未改。item-boxes 與 ui-hud 暫緩，因為 refs 真的沒有素材：唯一箱體候選（恐龍車多多的糖果）有鏡面反光違反 §6——拿違反禁令的圖當標準比沒有分數更糟。另外整批排除 阿酷鑽地車.jpg：那是塑膠玩具照片不是黏土，已記 BACKLOG。(3) 黏土地基接進遊戲：新增 components/kart.ts 組整車並把 §3 的兩種更新率分流在同一處，renderer.ts 換掉方塊車與 HemisphereLight，賽道/草地/護欄只換材質與色票不動幾何（registry 仍是 create:null，換材質不等於做完元件），光照鑽機每幀跟著玩家平移（不是逐元件調光，燈參數未動）。新增 game-shot.mjs 拍真的跑起來的遊戲——接線立刻抓到兩個拍攝台看不到的缺陷：轉向在畫面上是反的（按→往左轉；兩條獨立證據：headless 模擬 steer=+1 時 vel 往 +X、實機截圖車偏外側護欄。根因是契約沒定義哪邊是右，已在 sim.ts 補上定義；實作修正落在 physics/ui 兩個非 Lead 寫入範圍，故未動），以及 driver-face 裝上車後笑口被引擎蓋擋住（違反 CHARACTERS.md §4，已寫進 §5.3 並記 BACKLOG）。perf FAIL 且如實記錄：同機器三種設定 51.81 → 14.01（黏土關陰影）→ 1.17 fps（黏土開 VSM 陰影），材質與幾何約 3.7×、VSM 陰影再 12×，主導成本是陰影不是材質；但量測環境是容器內 SwiftShader 無 GPU，同一支 probe 在這台機器量 W1 方塊車只有 51.8fps 而 R19 在原機器是 59.88fps，跨機器絕對值不可比、只有同機器比例可信。§6 稽核 17 個材質 0 違規、self-test 4 案例仍有效；typecheck/build exit 0。"
 }

@@ -42,11 +42,23 @@ const HALF_WIDTH = BODY_WIDTH / 2;
  */
 const DECAL_X = HALF_WIDTH + 0.005;
 
-export function createKartBody(): Group {
+export interface KartBodyOptions {
+  /**
+   * 車身主色。預設就是小紅賽車的磚紅（`CHARACTERS.md §2` #1）。
+   *
+   * 存在的理由只有一個：接進遊戲後場上會有多台車，全部同一支紅色的話玩家
+   * 分不出自己在開哪一台。**其餘五位車手是各自的造型**（`CHARACTERS.md §2`），
+   * 不是換色的小紅賽車——這個參數是那之前的臨時識別手段，值一律取自
+   * `clay/palette.ts` 已核准的 token，不要現場調色。
+   */
+  bodyColor?: number;
+}
+
+export function createKartBody(options: KartBodyOptions = {}): Group {
   const body = new Group();
   body.name = 'kart-body';
 
-  const red = createClayMaterial({ color: XIAOHONG.body, textureScale: 0.85 });
+  const red = createClayMaterial({ color: options.bodyColor ?? XIAOHONG.body, textureScale: 0.85 });
   const blue = createClayMaterial({ color: XIAOHONG.skirt, textureScale: 1.1 });
   const cream = createClayMaterial({ color: XIAOHONG.cream, textureScale: 2.2 });
   const numberBlue = createClayMaterial({ color: XIAOHONG.numberBlue, textureScale: 3.4 });

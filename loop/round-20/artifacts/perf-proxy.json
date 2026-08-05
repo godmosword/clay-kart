@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "fixture": "lap-a",
+    "tick_hz": 120,
+    "total_ticks": 7200,
+    "measurement_seconds": 5,
+    "build_sha": "ced72a81f42498e01df1af87d64238abcd3b12e2",
+    "seed": 20260730,
+    "device": "proxy",
+    "device_note": "Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement",
+    "measurement_method": "External requestAnimationFrame and WebGL draw instrumentation. renderer.draw updates vehicle transforms and camera before each observed WebGL frame.",
+    "character_animation": "not_applicable_no_character_animation"
+  },
+  "metrics": {
+    "canvas_count": 1,
+    "raf_callbacks": 5,
+    "rendered_frames": 5,
+    "gl_draw_calls": 614,
+    "triangles": 388118,
+    "elapsed_s": 4.624399999999907,
+    "fps_p50": 1.1415985974721945,
+    "fps_p05": 0.501341195251493,
+    "frame_time_p99_ms": 2490.3209999999917,
+    "long_frame_count": 3,
+    "vehicle_transform_hz": 1.0812213476343093,
+    "camera_hz": 1.0812213476343093,
+    "character_anim_hz": null,
+    "character_anim_status": "not_applicable_no_character_animation",
+    "first_interactive_s": 0.038300000000279395,
+    "time_to_first_render_s": 0.41489999999990684,
+    "heap_peak_mb": 12.513457298278809,
+    "heap_growth_per_lap_mb": 1.0657005310058594,
+    "draw_calls": 126,
+    "triangles_k": 82.27,
+    "gc_pause_max_ms": null,
+    "texture_memory_mb": null,
+    "initial_bundle_kb_gz": 147.4306640625,
+    "total_assets_mb": 3.356464385986328
+  }
+}

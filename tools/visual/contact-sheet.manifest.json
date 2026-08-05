@@ -1,78 +1,78 @@
 {
   "seed": 17,
-  "comment": "R17：12 元件槽位已列齊，但 refs/clay ↔ 元件的配對刻意留空。不要在這份檔案自行填入「看起來合理」的合成圖裁切或場景圖對應——那是 Lead 裁決（見 loop/BACKLOG.md R17）。ours 路徑是未來 ck-visual 產圖的假設位置，視覺 builder 尚未產出前一律走 placeholder。",
+  "comment": "R20 Lead 裁決：12 組的參考半邊來源寫在 tools/visual/ref-pairing.json，理由逐項寫在 BAR-VISUAL.md §7.1。ref 指向 tools/visual/ref-tiles.mjs 產出的 512² 正規化半邊（裁切、alpha 壓平、放大上限都在那支腳本裡強制），所以本檔案仍然只吃檔案路徑，contact-sheet.mjs 一行都不用改。item-boxes 與 ui-hud 刻意留 null：refs/clay 沒有撐得起的素材，寧可少兩組分數也不拿不合 §6 或會糊掉的圖去湊。ours 路徑是 tools/visual/render-components.mjs 的輸出位置，未實作的元件走 placeholder。",
   "components": [
     {
       "id": "kart-body",
-      "ref": null,
+      "ref": "build/visual/refs/kart-body.png",
       "ours": "build/visual/kart-body.png",
-      "note": "unpaired — Lead 裁決參考來源"
+      "note": "整張圖就是小紅賽車的 3/4 視角，車佔滿畫面，不需要裁"
     },
     {
       "id": "kart-wheels",
-      "ref": null,
+      "ref": "build/visual/refs/kart-wheels.png",
       "ours": "build/visual/kart-wheels.png",
-      "note": "unpaired — Lead 裁決參考來源"
+      "note": "右側疊起來的胎堆：胎面、胎壁、奶油色內圈都看得清楚，且與車輪同一套材質"
     },
     {
       "id": "driver-face",
-      "ref": null,
+      "ref": "build/visual/refs/driver-face.png",
       "ours": "build/visual/driver-face.png",
-      "note": "unpaired — characters/*.jpg 是否可用待 Lead 裁決，Cursor 不自決"
+      "note": "臉盤大圓眼與保險桿上的笑口都在框內——正是 §5.3 要求同時看得到的兩件事"
     },
     {
       "id": "track-surface",
-      "ref": null,
+      "ref": "build/visual/refs/track-surface.png",
       "ours": "build/visual/track-surface.png",
-      "note": "unpaired — Lead 裁決參考來源"
+      "note": "路面加車道虛線，是 refs 裡唯一一塊夠大的純路面"
     },
     {
       "id": "track-barriers",
-      "ref": null,
+      "ref": "build/visual/refs/track-barriers.png",
       "ours": "build/visual/track-barriers.png",
-      "note": "unpaired — Lead 裁決參考來源"
+      "note": "紅白相間的路緣石，§5.5 的「一段一段接起來」在這裡最清楚"
     },
     {
       "id": "foliage",
-      "ref": null,
+      "ref": "build/visual/refs/foliage.png",
       "ours": "build/visual/foliage.png",
-      "note": "unpaired — Lead 裁決參考來源"
+      "note": "團塊堆疊的樹冠、短粗樹幹、草叢與小花全在同一框，正是 §5.6 的三項"
     },
     {
       "id": "skybox-lighting",
-      "ref": null,
+      "ref": "build/visual/refs/skybox-lighting.png",
       "ours": "build/visual/skybox-lighting.png",
-      "note": "unpaired — cloud-*.png 是否對得上待 Lead 裁決"
+      "note": "唯一一張單獨的黏土雲，且原本就是 512² 中性背景，符合 §3 拍攝規範；有 alpha，需壓平到中性灰"
     },
     {
       "id": "drift-sparks",
-      "ref": null,
+      "ref": "build/visual/refs/drift-sparks.png",
       "ours": "build/visual/drift-sparks.png",
-      "note": "unpaired — refs/clay 無對應素材"
+      "note": "車尾那幾團奶油白黏土排氣團塊，是 refs 裡唯一「被捏出來的屑/團」而不是火花的素材"
     },
     {
       "id": "item-boxes",
       "ref": null,
       "ours": "build/visual/item-boxes.png",
-      "note": "unpaired — refs/clay 無對應素材"
+      "note": "deferred（R20 Lead 裁決）—— refs/clay 裡沒有任何箱體素材。恐龍車多多.jpg 的糖果是候選，但那些糖果有明顯的透亮/鏡面反光，違反 §6 全域禁令——拿違反禁令的圖當標準會讓這一組的分數失去意義"
     },
     {
       "id": "shadows-contact",
-      "ref": null,
+      "ref": "build/visual/refs/shadows-contact.png",
       "ours": "build/visual/shadows-contact.png",
-      "note": "unpaired — 場景合成圖內嵌，Cursor 不裁切"
+      "note": "車體下緣與沙地的接地陰影完整落在框內，長度、柔度、對比都可直接比對 §5.10"
     },
     {
       "id": "water-sea",
-      "ref": null,
+      "ref": "build/visual/refs/water-sea.png",
       "ours": "build/visual/water-sea.png",
-      "note": "unpaired — sea.png/ocean.png 候選，Cursor 不自決用哪張"
+      "note": "1024² 可平鋪黏土海面，整張就是這個元件的標準"
     },
     {
       "id": "ui-hud",
       "ref": null,
       "ours": "build/visual/ui-hud.png",
-      "note": "unpaired — refs/clay 無 HUD 參考"
+      "note": "deferred（R20 Lead 裁決）—— refs/clay 完全沒有 HUD 素材，且 HUD 是 2D 疊層，跟其餘 11 個 3D 元件不在同一個比較基礎上。要評分需要先另外產一張黏土風 HUD 參考——那是獨立工作，不在 R20 範圍"
     }
   ]
 }
