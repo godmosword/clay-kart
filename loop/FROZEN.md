@@ -28,6 +28,32 @@ Lead 事後抓到的，不是任何自動化機制擋下來的）。
 - `tools/validate/feel.py`         # R15 PASS 42/46, BAR-FEEL §2,§3,§5,§6,§7,§8,§12
 - `tools/validate/test_feel.py`    # 同上，保護 feel.py 的測試一併凍結
 
+> **窄幅開閘（R22，Lead 裁決，僅此一次、僅此範圍）**
+>
+> Codex 在 `a074615` 補了 tier1/tier3 drift probe，`4.4 tier3_charge_time_s` 的
+> raw probe 已有真實數值（3.5083s），但 `feel.py` 沒有讀新欄位所以仍顯示 `0.0`。
+> 它正確地停在閘門前沒有自行修改，回報 blocked——**這道閘第一次被實際使用，
+> 行為完全符合設計**。
+>
+> **准許的兩件事，其餘一律不准：**
+> 1. 拿掉 `--round` / `--output` 的預設值，改為必填（見 BACKLOG 的 provenance 條目）
+> 2. `_drift_metrics()` 讀取 tier3 probe 的欄位，讓 `4.4` 反映實際量到的值
+>
+> **明文禁止：** 不得更動任何窗口；不得新增任何 fallback／替代值／`configured_*`
+> 之類的頂替分支（R14 就是這個形狀）；不得改動其餘 45 項的推導方式。
+> **`4.4` 若落在 `[3.3, 3.7]` 之外就誠實 FAIL**——這輪的目的是讓它反映真值，
+> 不是讓它通過。
+>
+> **交件要求：** VERDICT 必須附上同輪 committed 的 telemetry，不得再出現
+> `artifacts` 指向容器暫存路徑而倉庫內無法重建的情況。
+>
+> **為什麼要加這些條件：** `a074615` 同一個 commit 裡調整了漂移物理常數
+> （`MINI_TURBO_GAIN_BY_TIER` 三個 tier 全改、新增只給 tier 2 的
+> `MINI_TURBO_VELOCITY_KICK_BY_TIER`）。剛調完受測物的一方，緊接著要改判它的
+> 那把尺——這正是 FROZEN 存在的理由，所以開閘但不撤閘。
+>
+> 收尾後 `feel.py` / `test_feel.py` 回到完全凍結，不需要再次裁決。
+
 四項 FAIL（`4.4`/`4.6`/`4.7`/`4.10`）全在 `§4` drift，根因都不在 validator：
 `4.4`/`4.6`/`4.7` 研判是 fixture 覆蓋率（只跑過單一 tier2 釋放路徑），
 `4.10` 是物理層缺少漂移中的持續速度損耗機制——兩者要動的是
