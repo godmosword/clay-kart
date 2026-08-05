@@ -746,8 +746,109 @@ async function rubberbandProbe() {
   };
 }
 
+const DRIFT_COVERAGE_ACCELERATION_TICKS = 120;
+const DRIFT_COVERAGE_HOLD_TICKS = Object.freeze({ 1: 110, 3: 432 });
+
+function driftCoverageInput(releaseTick, drift, tick, steer) {
+  if (tick < DRIFT_COVERAGE_ACCELERATION_TICKS) {
+    return {
+      throttle: 1,
+      steer: 0,
+      brake: false,
+      reverse: false,
+      drift: false,
+      jump: false,
+    };
+  }
+  return {
+    throttle: 1,
+    steer,
+    brake: false,
+    reverse: false,
+    drift: drift && tick < releaseTick,
+    jump: false,
+  };
+}
+
+function distance2d(from, to) {
+  return Math.hypot(to.pos[0] - from.pos[0], to.pos[2] - from.pos[2]);
+}
+
+function meanValues(values) {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+async function driftCoverageProbe(tier) {
+  const holdTicks = DRIFT_COVERAGE_HOLD_TICKS[tier];
+  const releaseTick = DRIFT_COVERAGE_ACCELERATION_TICKS + holdTicks;
+  const totalTicks = releaseTick + 2 * TICK_HZ + 1;
+  const steer = tier === 3 ? 0.2 : -0.2;
+  const worldOptions = tier === 3 ? { playerStartAngle: Math.PI / 2 } : undefined;
+  const [drift, straight] = await Promise.all([
+    replayTicks(
+      totalTicks,
+      (tick) => driftCoverageInput(releaseTick, true, tick, steer),
+      `drift-tier-${tier}`,
+      `${fixture.seed}-drift-tier-${tier}`,
+      { worldOptions },
+    ),
+    replayTicks(
+      totalTicks,
+      (tick) => driftCoverageInput(releaseTick, false, tick, steer),
+      `drift-tier-${tier}-baseline`,
+      `${fixture.seed}-drift-tier-${tier}-baseline`,
+      { worldOptions },
+    ),
+  ]);
+  const releaseEvent = drift.events.find((event) => (
+    event.type === 'miniturbo_release' && event.data?.tier === tier
+  ));
+  if (!releaseEvent) {
+    throw new Error(`drift tier-${tier} probe did not release the requested tier`);
+  }
+  const driftReleaseFrame = drift.frames.find((frame) => frame.tick === releaseEvent.tick);
+  const driftAfterFrame = drift.frames.find((frame) => frame.tick === releaseEvent.tick + 2 * TICK_HZ);
+  const straightReleaseFrame = straight.frames.find((frame) => frame.tick === releaseEvent.tick);
+  const straightAfterFrame = straight.frames.find((frame) => frame.tick === releaseEvent.tick + 2 * TICK_HZ);
+  if (!driftReleaseFrame || !driftAfterFrame || !straightReleaseFrame || !straightAfterFrame) {
+    throw new Error(`drift tier-${tier} probe is too short for the two-second baseline`);
+  }
+  const driftDistance = distance2d(driftReleaseFrame, driftAfterFrame);
+  const straightDistance = distance2d(straightReleaseFrame, straightAfterFrame);
+  const tierUp = drift.events.find((event) => (
+    event.type === 'drift_tier_up' && event.data?.tier === tier
+  ));
+  const driftStartTick = drift.events.find((event) => event.type === 'drift_start')?.tick ?? null;
+  return {
+    name: `drift-tier-${tier}`,
+    tier,
+    drift_start_tick: driftStartTick,
+    tier_up_tick: tierUp?.tick ?? null,
+    charge_time_s: driftStartTick !== null && tierUp
+      ? (tierUp.tick - driftStartTick) / TICK_HZ
+      : null,
+    release_tick: releaseEvent.tick,
+    drift_distance: driftDistance,
+    straight_distance: straightDistance,
+    car_lengths_gained: (driftDistance - straightDistance) / CAR_LENGTH,
+    deterministic_byte_identical: JSON.stringify(drift) === JSON.stringify(
+      await replayTicks(
+        totalTicks,
+        (tick) => driftCoverageInput(releaseTick, true, tick, steer),
+        `drift-tier-${tier}`,
+        `${fixture.seed}-drift-tier-${tier}`,
+        { worldOptions },
+      ),
+    ),
+  };
+}
+
 const driftReplays = await Promise.all([replayOnce(), replayOnce(), replayOnce()]);
 const baseline = await replayOnce((input) => ({ ...input, drift: false }));
+const driftCoverageProbes = await Promise.all([
+  driftCoverageProbe(1),
+  driftCoverageProbe(3),
+]);
 const collisionProbes = await Promise.all([
   collisionProbe('wall-30deg', -0.95),
   collisionProbe('wall-head-on', 1),
@@ -831,7 +932,6 @@ const straightAfterFrame = baseline.frames.find((frame) => frame.tick === releas
 if (!driftReleaseFrame || !driftAfterFrame || !straightReleaseFrame || !straightAfterFrame) {
   throw new Error('fixture is too short for the two-second tier-2 baseline');
 }
-const distance2d = (from, to) => Math.hypot(to.pos[0] - from.pos[0], to.pos[2] - from.pos[2]);
 const driftDistance = distance2d(driftReleaseFrame, driftAfterFrame);
 const straightDistance = distance2d(straightReleaseFrame, straightAfterFrame);
 const baselines = {
@@ -842,6 +942,14 @@ const baselines = {
     car_lengths_gained: (driftDistance - straightDistance) / CAR_LENGTH,
   },
 };
+for (const probe of driftCoverageProbes) {
+  baselines[String(probe.tier)] = {
+    release_tick: probe.release_tick,
+    drift_distance: probe.drift_distance,
+    straight_distance: probe.straight_distance,
+    car_lengths_gained: probe.car_lengths_gained,
+  };
+}
 const activeDriftFrames = driftReplays[0].frames.filter((frame) => frame.drift_state !== 'none');
 if (activeDriftFrames.length === 0) throw new Error('fixture did not produce drift frames');
 const driftStartTick = activeDriftFrames[0].tick;
@@ -849,13 +957,13 @@ const driftEndTick = activeDriftFrames.at(-1).tick;
 const baselineWindowFrames = baseline.frames.filter(
   (frame) => frame.tick >= driftStartTick && frame.tick <= driftEndTick,
 );
-const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
-const driftSpeedMean = mean(activeDriftFrames.map((frame) => frame.speed));
-const baselineSpeedMean = mean(baselineWindowFrames.map((frame) => frame.speed));
+const driftSpeedMean = meanValues(activeDriftFrames.map((frame) => frame.speed));
+const baselineSpeedMean = meanValues(baselineWindowFrames.map((frame) => frame.speed));
 if (baselineSpeedMean <= 0) throw new Error('baseline drift window has no speed');
 const driftSpeedRetention = driftSpeedMean / baselineSpeedMean;
 for (const replay of driftReplays) {
   replay.meta.baselines = baselines;
+  replay.meta.drift_coverage_probes = driftCoverageProbes;
   replay.meta.drift_speed_retention = driftSpeedRetention;
   replay.meta.steering_radius_samples = steeringRadiusSamples;
   replay.meta.collision_probes = collisionProbes;

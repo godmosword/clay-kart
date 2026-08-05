@@ -68,8 +68,15 @@ const DRIFT_TIER1_TIME = 0.85;
 const DRIFT_TIER2_TIME = 2.0;
 const DRIFT_TIER3_TIME = 3.5;
 const DRIFT_YAW_RATE_RATIO = 1.4;
+// Charging keeps the kart responsive but bleeds a small amount of ground
+// speed every fixed tick instead of letting engine acceleration erase drift
+// cost.  Tier-2 release gets a short velocity kick so the change does not
+// preserve the base acceleration target.
+const DRIFT_CHARGE_DRAG_US2 = 1.6;
+const DRIFT_RELEASE_DRAG_US2 = 1.4;
 const MINI_TURBO_DURATION = 1.05;
-const MINI_TURBO_GAIN_BY_TIER = [0, 0.85, 2.5, 3.4] as const;
+const MINI_TURBO_GAIN_BY_TIER = [0, 1.1, 3.0, 5.5] as const;
+const MINI_TURBO_VELOCITY_KICK_BY_TIER = [0, 0, 0.8, 0] as const;
 const START_LINE_LEAVE_ANGLE = 0.25;
 const START_LINE_RETURN_ANGLE = Math.PI * 1.75;
 const START_LINE_CROSS_ANGLE = Math.PI * 0.25;
@@ -430,6 +437,9 @@ class Kart {
     this.#driftCharge = 1;
     this.#releaseTimer = releaseDuration;
     this.#boostSpeed = (MINI_TURBO_GAIN_BY_TIER[tier] * CAR_LENGTH) / releaseDuration;
+    const velocityKick = MINI_TURBO_VELOCITY_KICK_BY_TIER[tier];
+    this.#vx += Math.sin(this.#yaw) * velocityKick;
+    this.#vz += Math.cos(this.#yaw) * velocityKick;
     this.#driftBufferedActivation = false;
     this.#driftBufferPending = false;
   }
@@ -479,7 +489,9 @@ class Kart {
     const speedFactor = speedRatio * (1 - speedCurveBlend)
       + Math.sqrt(speedRatio) * speedCurveBlend;
     const steeringRate = steeringInput * MAX_STEER_YAW_RATE * speedFactor * controlRatio * driftRatio;
-    this.#yawRate = steeringRate;
+    // Prevent denormal-scale yaw rates at near-zero speed from becoming a
+    // false one-tick "settle" event in telemetry.
+    this.#yawRate = Math.abs(steeringRate) < 1e-9 ? 0 : steeringRate;
     this.#yaw = wrapAngle(this.#yaw + this.#yawRate * dt);
     if (this.#yaw > Math.PI) this.#yaw -= Math.PI * 2;
   }
@@ -543,6 +555,22 @@ class Kart {
       const scale = speedLimit / cappedGroundSpeed;
       this.#vx *= scale;
       this.#vz *= scale;
+    }
+    const shouldApplyDriftDrag = (this.#driftState === 'charging' && this.#throttle > 0)
+      || (this.#driftState === 'released'
+        && this.#driftTier >= 2
+        && this.#releaseTimer < MINI_TURBO_DURATION * 0.5);
+    if (shouldApplyDriftDrag) {
+      const groundSpeedAfterCap = Math.hypot(this.#vx, this.#vz);
+      const drag = this.#driftState === 'charging'
+        ? DRIFT_CHARGE_DRAG_US2
+        : DRIFT_RELEASE_DRAG_US2;
+      const groundSpeedAfterDrag = Math.max(0, groundSpeedAfterCap - drag * dt);
+      if (groundSpeedAfterCap > 0) {
+        const scale = groundSpeedAfterDrag / groundSpeedAfterCap;
+        this.#vx *= scale;
+        this.#vz *= scale;
+      }
     }
   }
 
