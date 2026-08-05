@@ -175,6 +175,81 @@
 
 ## 待裁決
 
+### ui-hud — 元件掛在 Cursor 名下，但沒有可執行的驗收標準
+- **輪次**：R20 暫緩後持續；Cursor 確認後再記一筆
+- **現況**：`BAR-VISUAL.md §4` #12 `ui-hud`、`budget.json` cap `180000`、worktree
+  指 `ck-plumb`／Cursor。R20 已把它與 `item-boxes` 一併**暫緩盲測**
+  （`refs/clay` 完全沒有 HUD 素材；HUD 是 2D 疊層，跟其餘 11 個 3D 元件
+  不在同一個比較基礎上——見 `loop/round-20/artifacts/refs/report.json`）。
+- **為什麼現在不能派工實作**：`BAR-VISUAL §1` 的 PASS 門檻是「盲測得分 ≥ 4」，
+  這一組沒有參考半邊，做得出 HUD 也無法依現行 bar 判決。派下去等於重演
+  R17「停下來寫 BACKLOG、不要自己湊」——只是這次連可湊的素材都沒有。
+- **目標（待 Lead 裁決其一）**：
+  1. 另產一張黏土風 HUD 參考半邊，納入盲測 A/B；或
+  2. 為 `ui-hud` 另定非盲測驗收（例如對照 `CHARACTERS.md`／§5.0 的機械檢查）；或
+  3. 正式移出 W3 12 元件／改 cap／改 owner
+- **已嘗試**：無實作。Cursor 依 `LOOP-OPS.md §4.4` 停手，不自決驗收方式。
+- **來源**：`BAR-VISUAL.md §1`/§4；R20 `refs/report.json`；`loop/budget.json` `ui-hud`
+- **狀態**：待裁決——**未裁決前不要開 TASK 叫 Cursor 做 HUD**
+
+### kart-wheels 的參考半邊比我們的輸出還差，這一組的 PASS 沒有意義
+
+- **輪次**：R21（第一次真的跑起來的視覺 critic）
+- **現況**：盲測 A/B 的結果是 **我們 4 分、參考 2 分**，critic 選了我們這一邊，
+  理由是「左側清楚呈現厚胎、奶油輪框與紅輪轂，右側主要是場景胎垛」
+- **為什麼這是問題不是好消息**：`BAR-VISUAL §7.1` 的判準第 1 條寫著
+  「**參考半邊本身就是標準**；拿一張違反全域禁令的圖當標準，這一組的分數會失去
+  意義」。這裡發生的是同一件事的另一個版本——參考半邊沒有違反 `§6`，但它
+  **撐不起 `§5.2` 的標準**：那是 `小紅賽車.jpg` 右側疊起來的場景胎堆，
+  不是一顆能看清胎面／胎壁／輪轂三塊分件的輪子。`§2` 的尺度裡 2 分是
+  「只有形狀對，材質完全不同」——critic 是這樣評那張**參考**的
+- **影響**：`kart-wheels` 現在名義上 PASS（我們 ≥ 4），但那個 PASS 是拿弱參考
+  換來的，不構成品質證據。`§1` 說「critic 分不出來視為最佳結果」，這一組不是
+  分不出來，是參考比我們差——兩者在分數上長得像，意義完全相反
+- **R20 裁決當時的理由仍然成立**：`refs/clay` 裡確實沒有更好的輪子素材，
+  R20 選它不是疏忽。問題是判準第 2 條（「元件主體佔畫面主要面積」）當時是
+  用肉眼判的，沒有 critic 的分數可以回頭檢查
+- **可能的處置（都是裁決，不自決）**：比照 `item-boxes`／`ui-hud` 改列暫緩、
+  換一張角色圖的輪子特寫重裁、或另補一張參考。**不建議**就這樣收下這個 PASS
+- **來源**：`loop/round-21/CRITIC-NOTES.md`、`loop/round-21/VERDICT-visual.json`
+- **狀態**：待裁決
+
+### BAR-VISUAL §7.1 是盲測的答案卷 —— critic 被要求讀的檔案裡寫著哪半邊是 ref
+
+- **輪次**：R21 收尾（要跑 critic 時發現）
+- **現況**：`prompts/codex-visual-critic.md` 的提示詞第一句是「讀取 `BAR-VISUAL.md`
+  與 contact-sheet.png」。而 R20 把 12 組參考半邊的裁決表寫進了
+  **`BAR-VISUAL.md §7.1`**，逐項列出每一組的來源檔案與裁切位置：
+
+  > | 1 | kart-body | `characters/小紅賽車.jpg` | 整張 | 車就佔滿畫面，不需要裁 |
+  > | 7 | skybox-lighting | `cloud-a.png` | 整張 | 唯一單獨的黏土雲 |
+  > | 11 | water-sea | `sea.png` | 整張 | 1024² 可平鋪黏土海面 |
+
+  照著讀完，critic 一眼就知道哪半邊是參考、哪半邊是我們的——**盲測不盲了**
+- **這正是 LOOP-OPS §8 與 critic 提示詞裡預先寫下的失敗模式**：
+  「critic 一直說 PASS = contact sheet 沒有隨機打亂，critic 認得出哪張是我們的。
+  檢查打亂邏輯與標籤對照表是否外洩」。打亂邏輯本身沒問題（R17 已驗證
+  mulberry32 種子決定、與畫面內容無關），`contact-sheet.key.json` 也確實被
+  `.gitignore` 排除——**外洩的是第三條路：標籤對照表被寫進了標準文件本身**。
+  執行前檢查清單只列了「key 不在可讀路徑」與「檔名/EXIF 無線索」兩項，
+  沒有涵蓋這一條
+- **為什麼會發生**：`BAR-VISUAL.md` 同時被當成兩種東西用——**評分標準**
+  （critic 讀）與**製作決策記錄**（Lead 寫）。§7.1 是後者，卻放在前者裡面
+- **R21 的處置（暫行，非裁決）**：這一輪的 critic 拿到的是**去掉 §7 與 §7.1 的
+  副本**，跑在只有三個檔案（`BAR-VISUAL.md` 副本、`contact-sheet.png`、
+  `verdict.schema.json`）的隔離目錄裡，看不到 repo 的 `loop/`、`tools/`、
+  `refs/`、git 歷史，也看不到 `loop/round-2*/artifacts/` 底下我們自己的單張
+  元件算繪圖（那些圖同樣足以反推哪半邊是我們的）
+- **建議修法（不是指令）**：把 §7.1 整節搬出 `BAR-VISUAL.md`，移到 Lead 專屬的
+  製作記錄（例如 `loop/ref-pairing-verdict.md`），`BAR-VISUAL.md` 只留評分標準。
+  同時在 `prompts/codex-visual-critic.md` 的執行前檢查加上第三條：
+  **「critic 的可讀範圍內沒有任何檔案指出哪一半是參考」**，並明確要求隔離目錄
+  而不是整個 repo
+- **殘留、已知但未處理**：§5.1–§5.12 的引言仍寫著「依據是⋯⋯以及 R18/R19
+  三個元件的實際產出」，等於告訴 critic 只有三個元件有真圖。影響很小
+  （未實作的格子是空白 placeholder，看圖就知道），沒有為了它再動標準本文
+- **狀態**：待裁決
+
 ### round-20/VERDICT-feel.json 的 round 欄位是 3，artifacts 指向已消失的暫存路徑
 
 - **輪次**：R21 收尾（填 `FROZEN.md` 時發現）
@@ -249,7 +324,17 @@
     PASS，FAIL 的仍是 `4.4`／`4.6`／`4.7`／`4.10` 這四個自 R5 起擱置的 drift
     次要項目，數值與 R15 相同（`VERDICT-feel.json`）。物理沒動，本來就該如此，
     但「本來就該如此」不構成證據，所以還是跑了
-- **狀態**：**已修正（R20）**
+- **狀態**：**已修正（R20）**。自動化回歸缺口另見下方「轉向螢幕空間無自動化」
+  ——修正本身靠截圖證明；符號再被翻一次時，原本沒有任何檢查會叫。
+
+### ~~轉向螢幕空間無自動化 —— W1 同款驗證洞仍開著~~ — 已補上
+- **輪次**：R20 收尾後由 Cursor 補
+- **現況（已解決）**：`npm run test:steer-screen`（`tools/visual/steer-screen.mjs`）
+  用 raw CDP 送 `ArrowRight`／`ArrowLeft`，讀 `window.__CLAY_STEER_PROBE__`
+  （bootstrap 每幀用與 renderer 相同的 follow-cam 算式寫入），斷言車體位移在
+  **起始相機 local +X** 上的投影符號：右鍵 > +0.25、左鍵 < -0.25。
+  實測 PASS（right≈+1.20，left≈-0.52）。只驗 yaw 有變的舊洞不再是唯一防線。
+- **狀態**：已處理。是否把 `player-input.ts` 因此改列 FROZEN 由 Lead 裁決。
 
 ### driver-face 裝到車上之後笑口看不到
 
