@@ -175,6 +175,32 @@
 
 ## 待裁決
 
+### round-20/VERDICT-feel.json 的 round 欄位是 3，artifacts 指向已消失的暫存路徑
+
+- **輪次**：R21 收尾（填 `FROZEN.md` 時發現）
+- **現況**：`loop/round-20/VERDICT-feel.json` 有兩個 provenance 缺陷：
+  1. `"round": 3` —— `tools/validate/feel.py` 的 `--round` 預設值就是 `3`
+     （`round_number: int = 3`，`--output` 預設 `loop/round-3/VERDICT.json`）。
+     R20 重跑時沒帶 `--round 20`，於是一份放在 `round-20/`、記錄 R20 重跑結果的
+     檔案，對外宣稱自己是 R3 的判決
+  2. `"artifacts": ["/tmp/claude-0/-home-user-clay-kart/.../scratchpad/feel.json"]`
+     —— 那個容器已經不存在，**倉庫裡沒有這一輪的 telemetry**，這份 VERDICT
+     無法從 repo 內獨立重新驗證。`verdict.schema.json` 開頭寫明「必須自我完備」
+- **不是造假**：逐項比對 R15 的 `VERDICT.json`，`4.5`/`4.9`/`4.10`/`5.5`/`5.6`/
+  `5.7`/`12.4` 七項有 ULP 級（~1e-15）浮點差異，其餘完全相同——這是真的重新跑過
+  的樣子，不是複製一份改檔名。R20 TASK 說的「物理沒動所以零回歸」是實話
+- **影響**：`FROZEN.md` 的規則 2（「該輪的 telemetry / artifact 已 commit」）因此
+  不能引 R20，只能引 R15（`loop/round-15/artifacts/lap-a.json` 有 commit）。
+  已在 `FROZEN.md` 註明。更廣的影響是：只要 builder 忘記帶 `--round`，往後每一份
+  feel VERDICT 都會宣稱自己是 R3，而這個錯誤在檔案內容裡看不出來——要跟目錄名
+  交叉比對才會發現
+- **不自己修的原因**：`tools/validate/` 是 Codex（`ck-physics`）的可寫範圍，
+  Lead 不越界。而且 `feel.py` 這輪剛進 `FROZEN.md`，正好走一次這道閘該有的流程
+- **建議修法（不是指令）**：把 `--round` / `--output` 的預設值拿掉改成必填，
+  讓「忘記帶」變成明確錯誤而不是靜默寫錯數字；R20 那份是否補跑一次帶
+  telemetry 的乾淨版本另議
+- **狀態**：待裁決——不阻擋 W3，記錄下來避免之後把 R3 當成 R20 的證據引用
+
 ### 轉向在畫面上是反的 —— 按 → 車子往左轉
 
 - **輪次**：R20（接線時發現）
