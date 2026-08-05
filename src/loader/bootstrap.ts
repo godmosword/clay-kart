@@ -14,9 +14,11 @@ import {
   type SimWorld,
   type WorldInput,
 } from '@contract/sim';
+import { sampleFollowCam, type SteerProbeSample } from '@ui/steer-screen-math';
 
 export { TICK_HZ, TICK_DT, advance } from '@contract/sim';
 export type { KartState, LapState, Renderer, SimSnapshot, SimWorld, WorldInput } from '@contract/sim';
+export type { SteerProbeSample } from '@ui/steer-screen-math';
 
 /** 每幀最多追幾個 tick，避免分頁切回來時的死亡螺旋。純屬瀏覽器迴圈的節流參數。 */
 const MAX_TICKS_PER_FRAME = 8;
@@ -30,6 +32,17 @@ const MAX_TICKS_PER_FRAME = 8;
  */
 export interface InputSource {
   poll(tickIndex: number): WorldInput;
+}
+
+/** CDP 轉向回歸讀取的 probe。只暴露取樣，不暴露 setInput／改模擬的路徑。 */
+export interface ClaySteerProbe {
+  latest(): SteerProbeSample | null;
+}
+
+declare global {
+  interface Window {
+    __CLAY_STEER_PROBE__?: ClaySteerProbe;
+  }
 }
 
 const NO_OP_INPUT: InputSource = { poll: () => ({}) };
@@ -49,6 +62,12 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
 
   let last = performance.now() / 1000;
   let accumulator = 0;
+  let latestProbe: SteerProbeSample | null = null;
+
+  // 給 tools/visual/steer-screen.mjs：驗「按 → 車往畫面右」而不只是 yaw 有變。
+  window.__CLAY_STEER_PROBE__ = {
+    latest: () => latestProbe,
+  };
 
   const frame = () => {
     const now = performance.now() / 1000;
@@ -64,7 +83,15 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
     if (accumulator >= TICK_DT) accumulator = 0;
 
     const snap: SimSnapshot = world.snapshot();
-    renderer.draw(snap, accumulator / TICK_DT);
+    const alpha = accumulator / TICK_DT;
+    renderer.draw(snap, alpha);
+
+    const kart = snap.karts[snap.playerIndex];
+    if (kart) {
+      // probe 用未插值快照：回歸比的是持鍵前後位移符號，不需要亞幀精度。
+      latestProbe = sampleFollowCam(kart.pos, kart.yaw, snap.t);
+    }
+
     requestAnimationFrame(frame);
   };
 
