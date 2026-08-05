@@ -31,6 +31,7 @@
     "shadows-contact": { "cap": 360000, "spent": 0 },
     "water-sea": { "cap": 240000, "spent": 0 },
     "ui-hud": { "cap": 180000, "spent": 0, "$comment": "ck-plumb/Cursor 便宜檔位，不是 Opus+ultracode，調整幅度較保守（1.5x）" },
-    "audio": { "cap": 130000, "spent": 0, "$comment": "沿用 podcast 既有資產，成本低，調整幅度較保守（1.3x）" }
+    "audio": { "cap": 130000, "spent": 0, "$comment": "沿用 podcast 既有資產，成本低，調整幅度較保守（1.3x）" },
+    "game-integration": { "cap": null, "spent": null, "$comment": "R20：把 R18/R19 的黏土地基接進遊戲 renderer，外加 12 組參考半邊裁決與 BAR-VISUAL §5.1–§5.12。不是 BAR-VISUAL §4 的 12 個元件之一，所以不設 cap——這是接線與裁決，不是可以反覆 loop 的美術元件。spent 記 null 而不是編一個數字：本輪在單一 session 內跑完，沒有可獨立重建的 token 拆分證據，跟 sim-determinism／acceleration-curve／perf-validator 一樣是記帳缺口，非阻斷。R20 量到的效能資料（同機器上黏土車比方塊車慢 44×，其中 VSM 陰影佔 12×）應該用來重估其餘 9 個元件的 cap——目前那組數字仍是 W2 中位數乘 2 的猜測。" }
   }
 }

@@ -10,6 +10,27 @@ import type { InputSource, WorldInput } from '@loader/bootstrap';
 
 type Action = 'throttle' | 'brake' | 'steerLeft' | 'steerRight' | 'reverse' | 'jump' | 'drift';
 
+/**
+ * 「畫面往左轉」對應的 `WorldInput.steer` 值。
+ *
+ * **這個 `+1` 看起來反了，但它是對的**，理由見 `@contract/sim` 的
+ * `WorldInput.steer`：規範定義是 `steer > 0` 使 `yaw` 增加，而
+ * `forward = (sin yaw, cos yaw)` 加上追尾相機沿 `+forward` 看出去時，
+ * three.js 右手座標系讓 `+X` 落在**畫面左側**——所以 yaw 增加在畫面上是左轉。
+ *
+ * 契約明文把「哪個按鍵是右轉」劃給輸入層，這裡就是那個翻譯點，
+ * 而且是**唯一**一個：模擬側與 AI 側都只認 yaw，不認畫面。
+ *
+ * R20 之前這裡寫反（`ArrowRight → +1`），效果是按 → 車子往畫面左邊轉。
+ * 當時沒抓到是因為 W1 的驗證只確認「送鍵盤事件後 yaw 真的改變」，
+ * 驗的是有沒有變，不是往哪邊變；而遊戲畫面直到 R20 才第一次被拍下來。
+ *
+ * 改這兩個常數的符號 = 改玩家的操作方向。要改之前先讀契約那段，
+ * 確認你要改的是「按鍵對應」而不是「模擬語意」——後者不在這一層。
+ */
+const STEER_SCREEN_LEFT = 1;
+const STEER_SCREEN_RIGHT = -1;
+
 const KEY_TO_ACTION: Readonly<Record<string, Action>> = {
   ArrowUp: 'throttle',
   KeyW: 'throttle',
@@ -89,8 +110,8 @@ export function createPlayerInput(mount: HTMLElement): PlayerInput {
       const steerLeft = held.has('steerLeft');
       const steerRight = held.has('steerRight');
       let steer = 0;
-      if (steerLeft && !steerRight) steer = -1;
-      else if (steerRight && !steerLeft) steer = 1;
+      if (steerLeft && !steerRight) steer = STEER_SCREEN_LEFT;
+      else if (steerRight && !steerLeft) steer = STEER_SCREEN_RIGHT;
 
       return {
         throttle: held.has('throttle') ? 1 : 0,

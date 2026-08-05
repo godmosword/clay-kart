@@ -1,0 +1,101 @@
+{
+  "$comment": "BAR-VISUAL §1 盲測 A/B 的參考半邊裁決（R20，Lead）。判準與逐項理由寫在 BAR-VISUAL.md §7.1，這裡只放機器要用的座標。crop 省略＝整張圖。單位為來源圖的像素，原點左上。deferred 的組不配參考半邊——寧可少一組分數，也不要拿一張撐不起 512² 或本身不合 §5.0 的圖去湊，那種分數比沒有分數更糟。",
+  "tile_size": 512,
+  "background": "#8a8a8a",
+  "max_upscale": 1.4,
+  "components": [
+    {
+      "id": "kart-body",
+      "source": "refs/clay/characters/小紅賽車.jpg",
+      "why": "整張圖就是小紅賽車的 3/4 視角，車佔滿畫面，不需要裁"
+    },
+    {
+      "id": "kart-wheels",
+      "source": "refs/clay/characters/小紅賽車.jpg",
+      "crop": {
+        "x": 960,
+        "y": 620,
+        "size": 440
+      },
+      "why": "右側疊起來的胎堆：胎面、胎壁、奶油色內圈都看得清楚，且與車輪同一套材質"
+    },
+    {
+      "id": "driver-face",
+      "source": "refs/clay/characters/小紅賽車.jpg",
+      "crop": {
+        "x": 430,
+        "y": 620,
+        "size": 620
+      },
+      "why": "臉盤大圓眼與保險桿上的笑口都在框內——正是 §5.3 要求同時看得到的兩件事"
+    },
+    {
+      "id": "track-surface",
+      "source": "refs/clay/characters/鈴鈴清潔車.jpg",
+      "crop": {
+        "x": 1000,
+        "y": 1030,
+        "size": 370
+      },
+      "why": "路面加車道虛線，是 refs 裡唯一一塊夠大的純路面"
+    },
+    {
+      "id": "track-barriers",
+      "source": "refs/clay/characters/小紅賽車.jpg",
+      "crop": {
+        "x": 0,
+        "y": 1020,
+        "size": 380
+      },
+      "why": "紅白相間的路緣石，§5.5 的「一段一段接起來」在這裡最清楚"
+    },
+    {
+      "id": "foliage",
+      "source": "refs/clay/characters/安安救護車.jpg",
+      "crop": {
+        "x": 0,
+        "y": 60,
+        "size": 540
+      },
+      "why": "團塊堆疊的樹冠、短粗樹幹、草叢與小花全在同一框，正是 §5.6 的三項"
+    },
+    {
+      "id": "skybox-lighting",
+      "source": "refs/clay/cloud-a.png",
+      "why": "唯一一張單獨的黏土雲，且原本就是 512² 中性背景，符合 §3 拍攝規範；有 alpha，需壓平到中性灰"
+    },
+    {
+      "id": "drift-sparks",
+      "source": "refs/clay/characters/嘟嘟小紅車.jpg",
+      "crop": {
+        "x": 1120,
+        "y": 560,
+        "size": 415
+      },
+      "why": "車尾那幾團奶油白黏土排氣團塊，是 refs 裡唯一「被捏出來的屑/團」而不是火花的素材"
+    },
+    {
+      "id": "item-boxes",
+      "deferred": "refs/clay 裡沒有任何箱體素材。恐龍車多多.jpg 的糖果是候選，但那些糖果有明顯的透亮/鏡面反光，違反 §6 全域禁令——拿違反禁令的圖當標準會讓這一組的分數失去意義"
+    },
+    {
+      "id": "shadows-contact",
+      "source": "refs/clay/characters/安安救護車.jpg",
+      "crop": {
+        "x": 250,
+        "y": 700,
+        "size": 700
+      },
+      "why": "車體下緣與沙地的接地陰影完整落在框內，長度、柔度、對比都可直接比對 §5.10"
+    },
+    {
+      "id": "water-sea",
+      "source": "refs/clay/sea.png",
+      "why": "1024² 可平鋪黏土海面，整張就是這個元件的標準"
+    },
+    {
+      "id": "ui-hud",
+      "deferred": "refs/clay 完全沒有 HUD 素材，且 HUD 是 2D 疊層，跟其餘 11 個 3D 元件不在同一個比較基礎上。要評分需要先另外產一張黏土風 HUD 參考——那是獨立工作，不在 R20 範圍"
+    }
+  ]
+}

@@ -1,8 +1,20 @@
 /**
- * W1 renderer：封閉賽道、追尾相機、圈數 HUD。
+ * 遊戲 renderer：封閉賽道、追尾相機、圈數 HUD。
  *
- * 黏土材質不在本輪範圍（W3 才做，見 BAR-VISUAL.md）——顏色純粹是為了
- * 區分賽道／草地／護欄，不代表任何美術方向。
+ * ## R20：黏土地基接進遊戲
+ *
+ * R18／R19 做出了共用黏土地基與 `kart-body`／`kart-wheels`／`driver-face`
+ * 三個元件，但只在 `BAR-VISUAL §3` 的拍攝台上單獨拍過，遊戲畫面跑的一直是
+ * W1 的方塊車——`BAR-PERF` 量到的因此也是方塊車的成本，對 W3 沒有參考價值。
+ * 這一版把地基接上：車換成 `components/kart.ts` 的整車，光照換成
+ * `clay/lighting.ts` 的全域鑽機（`§5.0` 鐵律：全場同一套光）。
+ *
+ * **賽道／護欄／草地仍是 placeholder。** 元件 #4 `track-surface`、
+ * #5 `track-barriers`、#6 `foliage` 都還沒實作（`components/registry.ts` 裡
+ * 仍是 `create: null`）。這裡只把它們的材質換成共用黏土材質、顏色改用
+ * `CHARACTERS.md §6` 的 token，幾何完全沒動——否則一台黏土車會站在
+ * 三塊 Lambert 灰板上，光照鑽機的效果根本看不出來。**換材質不等於做完元件**：
+ * 接縫、路緣石、草叢造型都還沒有，那些才是那三個元件的內容。
  *
  * 相機刻意偏離上游 Art Bible 的 3/4 diorama 規格，理由見 BAR-VISUAL.md §0.5：
  * 那是靜態島嶼插圖的視角，套在賽車上玩家會看不到前方賽道。
@@ -10,6 +22,10 @@
 import * as THREE from 'three';
 import type { Renderer, SimSnapshot } from '@loader/bootstrap';
 import { TRACK_GEOMETRY } from '@physics/constants';
+import { createKart, type KartVisual } from './components/kart.js';
+import { applyClayRenderSettings, createClayLighting, enableClayShadows } from './clay/lighting.js';
+import { createClayMaterial } from './clay/material.js';
+import { CAR_PARK, TERRAIN, XIAOHONG } from './clay/palette.js';
 
 const CAMERA_FOV_DEG = 55;
 const CAMERA_FOLLOW_DISTANCE = 8;
@@ -17,10 +33,17 @@ const CAMERA_FOLLOW_DISTANCE = 8;
 const CAMERA_FOLLOW_HEIGHT = 2.1;
 const CAMERA_LOOK_AHEAD = 4;
 
-const KART_HALF_HEIGHT = 0.4;
-/** 玩家車與 AI 對手用不同顏色純粹是為了場上分得清楚，不是角色美術——那是 W3 範圍。 */
-const PLAYER_COLOR = 0xd98f5a;
-const AI_COLOR = 0x5a86d9;
+/** 相機注視點的高度。整車原點在地面，車頂約 1.3，取一半略低處。 */
+const CAMERA_LOOK_HEIGHT = 0.6;
+
+/**
+ * 場上多台車的識別色，全部取自 `clay/palette.ts` 的既有 token。
+ *
+ * 玩家永遠是小紅賽車的磚紅（`CHARACTERS.md §2` #1）。AI 對手**不是**換色的
+ * 小紅賽車——其餘五位車手各有造型，那是之後的元件——這裡只是在造型做出來
+ * 之前讓玩家分得出哪台是自己的。
+ */
+const AI_LIVERY = [CAR_PARK.accentBlue, CAR_PARK.accentGreen, CAR_PARK.accentLavender];
 
 /** 最短路徑角度插值，避免 yaw 跨越 ±π 時畫面瞬間反向。 */
 function lerpAngle(a: number, b: number, t: number): number {
@@ -40,28 +63,45 @@ function formatTime(seconds: number): string {
   return seconds.toFixed(2) + 's';
 }
 
-class W1Renderer implements Renderer {
+class ClayRenderer implements Renderer {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
   readonly #camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 1, 0.1, 500);
   readonly #hud: HTMLDivElement;
 
   /**
-   * 每台車一個 mesh，索引對齊 `snap.karts`。長度隨快照動態調整——
-   * `draw()` 第一次看到某個索引時才建立對應 mesh，數量由呼叫端的
+   * 全域光照鑽機。每幀跟著玩家車移動——**這不是逐元件調光**（`§3` 禁的是
+   * 那個），燈的參數一個都沒變，只是把整組平移過去。不跟著移動的話
+   * `clay/lighting.ts` 的陰影 frustum（±9 單位）在車開離原點之後就框不到車，
+   * 接地陰影會整個消失。
+   */
+  readonly #lighting = createClayLighting();
+
+  /**
+   * 每台車一組整車視覺，索引對齊 `snap.karts`。長度隨快照動態調整——
+   * `draw()` 第一次看到某個索引時才建立，數量由呼叫端的
    * `createWorld()` options 決定，渲染層不假設固定車數。
    */
-  #kartMeshes: THREE.Mesh[] = [];
+  #karts: KartVisual[] = [];
   #prevPos: Array<[number, number, number] | null> = [];
   #prevYaw: number[] = [];
+  /** 每台車的累積滾動距離，用來驅動輪子自轉。 */
+  #rolled: number[] = [];
+  /** 上一次 `draw()` 看到的模擬時間，用來取得本幀的模擬 dt。 */
+  #prevSimTime: number | null = null;
 
   constructor(mount: HTMLElement) {
     this.#renderer = new THREE.WebGLRenderer({ antialias: true });
     this.#renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    applyClayRenderSettings(this.#renderer);
     mount.appendChild(this.#renderer.domElement);
 
-    this.#scene.background = new THREE.Color(0x8a8a8a);
-    this.#scene.add(new THREE.HemisphereLight(0xffffff, 0x606060, 2.2));
+    // 天空是元件 #7 `skybox-lighting` 的一部分，還沒實作——但 `§3` 的
+    // `#8a8a8a` 中性灰是**拍攝台背景**，那是為了讓元件圖可比，不是遊戲場景
+    // 該長的樣子。這裡放一格 `CHARACTERS.md §6` 的淺水藍當 placeholder，
+    // 雲、漸層、天空球一個都沒有。
+    this.#scene.background = new THREE.Color(TERRAIN.seaLight);
+    this.#scene.add(this.#lighting);
 
     this.#buildGround();
     this.#buildTrack();
@@ -78,38 +118,53 @@ class W1Renderer implements Renderer {
     mount.appendChild(this.#hud);
   }
 
-  /** 賽道外的大面積填充，純粹讓場景不是空的，不代表草地材質。 */
+  /**
+   * 賽道外的大面積填充。**不是元件 #6 `foliage`**——草叢、樹木一個都沒有，
+   * 只是一塊草色的地。材質改用共用黏土材質，才接得住全域光照的陰影。
+   */
   #buildGround(): void {
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(400, 400),
-      new THREE.MeshLambertMaterial({ color: 0x7fae54 }),
+      // 大面積地面的壓痕要拉開，不然整片會變成細密雜訊（`§6` 禁止的那種）。
+      createClayMaterial({ color: TERRAIN.grassMid, textureScale: 60 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01; // 避免與賽道面 z-fight
+    ground.receiveShadow = true;
     this.#scene.add(ground);
   }
 
-  /** 賽道本體：TRACK_GEOMETRY 的半徑 ± 半寬，不是碰撞面。 */
+  /**
+   * 賽道本體：TRACK_GEOMETRY 的半徑 ± 半寬，不是碰撞面。
+   *
+   * **不是元件 #4 `track-surface`**——那個元件要的是路面材質與接縫，這裡只有
+   * 一個平環。顏色改用 `CHARACTERS.md §6` 的步道色而不是柏油灰：黃金樣本
+   * `car-park.png` 的路面就是奶油沙色，柏油灰在黏土世界裡沒有出處。
+   */
   #buildTrack(): void {
     const inner = TRACK_GEOMETRY.radius - TRACK_GEOMETRY.halfWidth;
     const outer = TRACK_GEOMETRY.radius + TRACK_GEOMETRY.halfWidth;
-    const asphalt = new THREE.Mesh(
+    const surface = new THREE.Mesh(
       new THREE.RingGeometry(inner, outer, 96),
-      new THREE.MeshLambertMaterial({ color: 0x707070, side: THREE.DoubleSide }),
+      createClayMaterial({ color: TERRAIN.path, textureScale: 40 }),
     );
-    asphalt.rotation.x = -Math.PI / 2;
-    asphalt.position.set(TRACK_GEOMETRY.centerX, 0, TRACK_GEOMETRY.centerZ);
-    this.#scene.add(asphalt);
+    surface.rotation.x = -Math.PI / 2;
+    surface.position.set(TRACK_GEOMETRY.centerX, 0, TRACK_GEOMETRY.centerZ);
+    surface.receiveShadow = true;
+    this.#scene.add(surface);
   }
 
   /**
    * 視覺上的牆，畫在賽道邊界（radius ± halfWidth），不是往內縮車體半徑
    * 後的碰撞面——否則看起來會像「還沒碰到就彈開」。
+   *
+   * **不是元件 #5 `track-barriers`**——那個元件要的是護欄與路緣石造型，
+   * 這裡只有一圈圓管。顏色換成 car-park 主題的品牌橘（`CHARACTERS.md §6`）。
    */
   #buildBoundaryWalls(): void {
     const wallHeight = 0.5;
     const wallThickness = 0.3;
-    const material = new THREE.MeshLambertMaterial({ color: 0xc0503f });
+    const material = createClayMaterial({ color: CAR_PARK.brandOrange, textureScale: 30 });
 
     for (const radius of [
       TRACK_GEOMETRY.radius - TRACK_GEOMETRY.halfWidth,
@@ -121,29 +176,35 @@ class W1Renderer implements Renderer {
       );
       wall.rotation.x = Math.PI / 2;
       wall.position.set(TRACK_GEOMETRY.centerX, wallHeight, TRACK_GEOMETRY.centerZ);
+      wall.receiveShadow = true;
       this.#scene.add(wall);
     }
   }
 
-  /** 索引 i 的車 mesh 若不存在就先建立——渲染層不預先假設車數。 */
-  #ensureKartMesh(i: number, isPlayer: boolean): THREE.Mesh {
-    let mesh = this.#kartMeshes[i];
-    if (mesh) return mesh;
-    mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1.4, 0.8, 2.4),
-      new THREE.MeshLambertMaterial({ color: isPlayer ? PLAYER_COLOR : AI_COLOR }),
-    );
-    mesh.position.y = KART_HALF_HEIGHT;
-    this.#scene.add(mesh);
-    this.#kartMeshes[i] = mesh;
-    return mesh;
+  /** 索引 i 的車若不存在就先建立——渲染層不預先假設車數。 */
+  #ensureKart(i: number, isPlayer: boolean): KartVisual {
+    let kart = this.#karts[i];
+    if (kart) return kart;
+    const bodyColor = isPlayer
+      ? XIAOHONG.body
+      : (AI_LIVERY[(i - 1 + AI_LIVERY.length) % AI_LIVERY.length] ?? CAR_PARK.accentBlue);
+    kart = createKart({ bodyColor });
+    enableClayShadows(kart.group);
+    this.#scene.add(kart.group);
+    this.#karts[i] = kart;
+    this.#rolled[i] = 0;
+    return kart;
   }
 
   draw(snap: SimSnapshot, alpha: number): void {
     let playerIx = 0, playerIy = 0, playerIz = 0, playerIyaw = 0;
 
+    // 本幀推進的模擬時間。輪子自轉吃距離、表情吃時間，兩者都要它。
+    const simDt = this.#prevSimTime === null ? 0 : Math.max(0, snap.t - this.#prevSimTime);
+    this.#prevSimTime = snap.t;
+
     for (const [i, kart] of snap.karts.entries()) {
-      const mesh = this.#ensureKartMesh(i, i === snap.playerIndex);
+      const visual = this.#ensureKart(i, i === snap.playerIndex);
       const [x, y, z] = kart.pos;
       const prev = this.#prevPos[i] ?? null;
 
@@ -152,8 +213,20 @@ class W1Renderer implements Renderer {
       const iz = prev ? prev[2] + (z - prev[2]) * alpha : z;
       const iyaw = lerpAngle(this.#prevYaw[i] ?? kart.yaw, kart.yaw, alpha);
 
-      mesh.position.set(ix, iy + KART_HALF_HEIGHT, iz);
-      mesh.rotation.y = iyaw;
+      // 整車原點就在車體正下方的地面（見 components/kart-body.ts），
+      // 所以直接吃快照的 y，不再補半個車高。
+      visual.group.position.set(ix, iy, iz);
+      visual.group.rotation.y = iyaw;
+
+      // `CHARACTERS.md §3`：輪子屬載具，60fps 不抽格。
+      const rolled = (this.#rolled[i] ?? 0) + kart.speed * simDt;
+      this.#rolled[i] = rolled;
+      visual.setRolledDistance(rolled);
+      visual.setSteerInput(kart.steerInput);
+
+      // 同 §3：臉屬純表演，12fps——量化在 driver-face 內部做，這裡傳原始時間。
+      visual.setExpressionTime(snap.t);
+
       this.#prevPos[i] = [x, y, z];
       this.#prevYaw[i] = kart.yaw;
 
@@ -165,6 +238,9 @@ class W1Renderer implements Renderer {
       }
     }
 
+    // 光照鑽機跟著玩家走，陰影 frustum 才框得到車。燈的參數不變。
+    this.#lighting.position.set(playerIx, playerIy, playerIz);
+
     const [fx, fz] = forwardVector(playerIyaw);
     this.#camera.position.set(
       playerIx - fx * CAMERA_FOLLOW_DISTANCE,
@@ -173,7 +249,7 @@ class W1Renderer implements Renderer {
     );
     this.#camera.lookAt(
       playerIx + fx * CAMERA_LOOK_AHEAD,
-      playerIy + KART_HALF_HEIGHT,
+      playerIy + CAMERA_LOOK_HEIGHT,
       playerIz + fz * CAMERA_LOOK_AHEAD,
     );
 
@@ -208,5 +284,5 @@ class W1Renderer implements Renderer {
 }
 
 export function createRenderer(mount: HTMLElement): Renderer {
-  return new W1Renderer(mount);
+  return new ClayRenderer(mount);
 }

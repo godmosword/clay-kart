@@ -35,20 +35,58 @@ const BLINK_PERIOD_S = 3.4;
 const BLINK_DURATION_S = 0.14;
 
 export interface DriverFace {
+  /**
+   * 整張臉，`eyes` 與 `mouth` 都掛在底下，相對位置就是元件審查時的樣子。
+   * 拿這個掛上去 = 臉是剛性的一塊。
+   */
   group: Group;
+  /**
+   * 臉盤 + 大圓眼 + 眼皮。
+   *
+   * 跟 `mouth` 分開暴露，是為了讓呼叫端可以**各自擺在車頭的不同曲面上**——
+   * 見下方「為什麼臉要能拆開擺」。
+   */
+  eyes: Group;
+  /** 笑口 + 舌頭。 */
+  mouth: Group;
   /**
    * 更新表情。傳入連續時間，內部量化到 12fps——**呼叫端不需要自己抽格**，
    * 傳原始時間即可，避免每個呼叫點各自實作一次量化而漏掉。
+   *
+   * 不管 `eyes`／`mouth` 被搬到哪個父節點底下都仍然有效：它改的是眼皮的
+   * `visible`，跟階層無關。
    */
   setExpressionTime(seconds: number): void;
 }
 
 /**
- * 建立一張臉。原點在臉盤中心，之後掛到車身前擋的位置。
+ * 建立一張臉。原點在臉盤中心。
+ *
+ * ## 為什麼臉要能拆開擺（R21）
+ *
+ * R20 把臉當成剛性一塊掛上車，結果笑口沉進引擎蓋，正面完全看不到——
+ * 違反 `CHARACTERS.md §4`「**大圓眼 + 明確笑口**是全卡司共通識別」與
+ * `BAR-VISUAL §5.3`。傾角試過 `-0.25`／`-0.6`／`-0.85` 三檔都無解：
+ * 眼睛擺得好看笑口就埋進去，笑口露出來眼睛就得抬到車頂高度。
+ *
+ * 回頭看參考圖 `refs/clay/characters/小紅賽車.jpg` 才發現原因——
+ * 那張臉本來就**不是剛性的一塊**：白色臉盤與大圓眼壓在前擋斜面上，
+ * 笑口是另一塊黏土，壓在前保險桿上，中間隔著一整個引擎蓋的落差。
+ * 甲蟲車的車頭有兩個朝向差很多的曲面，一塊平板貼不住兩個。
+ *
+ * 所以這裡把兩部分分開暴露。**預設仍組成完整一張臉**（`group` 底下），
+ * 元件審查圖因此不變；需要貼合車頭曲面的呼叫端才各自取用。
  */
 export function createDriverFace(): DriverFace {
   const group = new Group();
   group.name = 'driver-face';
+
+  const eyes = new Group();
+  eyes.name = 'driver-face-eyes';
+  const mouth = new Group();
+  mouth.name = 'driver-face-mouth';
+  group.add(eyes);
+  group.add(mouth);
 
   const panelClay = createClayMaterial({ color: FACE.panel, textureScale: 2.4 });
   const eyeWhiteClay = createClayMaterial({ color: FACE.eyeWhite, textureScale: 5 });
@@ -66,7 +104,7 @@ export function createDriverFace(): DriverFace {
   // ── 臉盤 ────────────────────────────────────────────────────────────
   // 圓角厚片，是眼睛的底。參考圖上臉盤本身也是一塊獨立黏土。
   const panel = new Mesh(claySlab(0.78, 0.34, 0.08, { bevelRatio: 0.42 }), panelClay);
-  group.add(panel);
+  eyes.add(panel);
 
   // ── 眼睛 ────────────────────────────────────────────────────────────
   // 明顯凸出臉盤，這樣側面角度仍看得到——§4 的「任何角度都要看得到眼睛」。
@@ -104,25 +142,31 @@ export function createDriverFace(): DriverFace {
     eye.add(lid);
     eyelids.push(lid);
 
-    group.add(eye);
+    eyes.add(eye);
   }
 
   // ── 笑口 ────────────────────────────────────────────────────────────
   // 半圈圓環＝往上彎的弧。`TorusGeometry` 由角度 0 逆時針畫，轉半圈之後
   // 涵蓋 180°→360°，也就是下半圈——正好是笑起來的形狀。
-  const mouth = new Mesh(new TorusGeometry(0.115, 0.032, 10, 22, Math.PI), mouthClay);
-  mouth.rotation.z = Math.PI;
-  mouth.position.set(0, -0.2, 0.04);
-  group.add(mouth);
+  const smile = new Mesh(new TorusGeometry(0.115, 0.032, 10, 22, Math.PI), mouthClay);
+  smile.rotation.z = Math.PI;
+  smile.position.set(0, 0, 0.04);
+  mouth.add(smile);
 
   // 舌頭：塞在笑口下緣，參考圖上是一小片粉紅。
   const tongue = new Mesh(clayBlob(0.05, 12), tongueClay);
-  tongue.position.set(0, -0.255, 0.03);
+  tongue.position.set(0, -0.055, 0.03);
   tongue.scale.set(1.25, 0.62, 0.5);
-  group.add(tongue);
+  mouth.add(tongue);
+
+  // 笑口子群整體下移，讓 `group` 底下的相對位置跟 R20 完全一樣——
+  // 元件審查圖不因為這次拆分而改變。
+  mouth.position.y = -0.2;
 
   return {
     group,
+    eyes,
+    mouth,
     setExpressionTime(seconds: number): void {
       // §3 指定的抽格實作：角色動畫時間軸取 floor(t * 12) / 12。
       const quantized = Math.floor(seconds * CHARACTER_ANIM_HZ) / CHARACTER_ANIM_HZ;

@@ -22,7 +22,35 @@ export const TICK_DT = 1 / TICK_HZ;
 export interface WorldInput {
   /** 標準化油門輸入。 */
   throttle?: number;
-  /** 轉向輸入：-1 到 1。 */
+  /**
+   * 轉向輸入：-1 到 1。
+   *
+   * **規範定義（模擬側）：`steer > 0` 使 `yaw` 增加。**
+   * 專案慣例 `forward = (sin yaw, cos yaw)`，所以 yaw 增加＝車頭從 `+Z`
+   * 轉向 `+X`。這是唯一的規範定義，`src/physics/` 與 `src/ai/` 都以它為準。
+   *
+   * **畫面上的後果（衍生資訊，不是定義）：** 追尾相機沿 `+forward` 看出去
+   * 時，three.js 右手座標系下的 `+X` 落在**畫面左側**（相機 local X =
+   * `(-fz, 0, fx)`，yaw=0 時等於 `(-1,0,0)`）。所以 `steer > 0` 在畫面上
+   * 是**往左**轉。這一點違反直覺，但它是座標系與相機朝向的必然結果，
+   * 不是誰寫錯了。
+   *
+   * **因此「哪個按鍵是右轉」屬於 `src/ui/` 的職責，不屬於這裡。**
+   * 輸入層本來就是把玩家意圖翻譯成模擬輸入的那一層。
+   *
+   * ## 為什麼定義釘在 yaw 而不是畫面
+   *
+   * R20 第一版把定義寫成「`steer > 0` = 畫面往右」，那樣讀起來比較直覺，
+   * 但代價是 `src/physics/world.ts` 與 `src/ai/controller.ts` 同時變成違規：
+   * `controller.ts` 的 `steer = clamp(yawError / STEER_ERROR_RANGE)` 本來就
+   * 把 steer 當成「要把 yaw 改多少」，翻符號會讓每台 AI 車往目標的反方向轉，
+   * `BAR-FEEL §12.1`–`§12.4`（R15 全數 PASS）整組垮掉。
+   *
+   * 為了一個比較順口的符號約定去動已經通過驗收的模擬，是把成本放錯地方。
+   * 模擬側維持不變，翻譯留在輸入層——那本來就是輸入層存在的理由。
+   *
+   * R20 發現的「按 → 車往左轉」是**輸入層的對應寫反了**，已修正。
+   */
   steer?: number;
   /** 按住時強力減速。 */
   brake?: boolean;
