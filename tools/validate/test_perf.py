@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from perf import build_verdict, calculate_metrics
 
 
-def test_character_animation_is_explicitly_not_applicable_until_renderer_exists():
+def test_character_animation_is_required_when_renderer_is_present():
     metrics = calculate_metrics({
         "metrics": {
             "character_anim_hz": None,
@@ -18,8 +18,9 @@ def test_character_animation_is_explicitly_not_applicable_until_renderer_exists(
 
     verdict = build_verdict(metrics)
 
-    assert metrics["character_anim_hz"] is None
-    assert all(check["id"] != "4.1" for check in verdict["checks"])
+    assert metrics["character_anim_hz"] == 0.0
+    check = next(check for check in verdict["checks"] if check["id"] == "4.1")
+    assert check["status"] == "FAIL"
 
 
 def test_missing_character_status_does_not_turn_into_a_pass():
@@ -45,6 +46,7 @@ def test_measured_character_animation_is_validated_when_present():
 def test_missing_gc_and_texture_measurements_are_explicit_failures():
     verdict = build_verdict(calculate_metrics({
         "metrics": {
+            "character_anim_hz": 12,
             "character_anim_status": "not_applicable_no_character_animation",
             "vehicle_transform_hz": 60,
             "camera_hz": 60,

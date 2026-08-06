@@ -318,6 +318,12 @@ function browserProbeScript() {
     inputTimers: [],
     textureBytes: 0,
     textureContexts: new Map(),
+    characterAnimation: {
+      active: true,
+      calls: 0,
+      changes: [],
+      lastBin: null,
+    },
   };
   state.reset = () => {
     for (const timer of state.inputTimers) clearTimeout(timer);
@@ -331,6 +337,31 @@ function browserProbeScript() {
     state.triangles = 0;
     state.heapSamples = [];
     state.measurementStart = performance.now();
+    state.characterAnimation = {
+      active: true,
+      calls: 0,
+      changes: [],
+      lastBin: null,
+    };
+  };
+  const originalFloor = Math.floor;
+  Math.floor = function(value) {
+    const result = originalFloor(value);
+    const animation = state.characterAnimation;
+    if (animation?.active && Number.isFinite(value) && value >= 0 && value <= 120) {
+      // driver-face.ts is the only application call that uses this exact
+      // quantisation operation.  The stack filter keeps bootstrap's tick
+      // accumulator and Three.js geometry helpers out of the observation.
+      const stack = new Error().stack ?? '';
+      if (stack.includes('setExpressionTime')) {
+        animation.calls += 1;
+        if (animation.lastBin !== result) {
+          animation.changes.push({ bin: result, now: performance.now() });
+          animation.lastBin = result;
+        }
+      }
+    }
+    return result;
   };
   state.scheduleInput = (segments, tickHz) => {
     const held = new Set();
@@ -664,6 +695,14 @@ async function measureBrowser() {
         const heap = state?.heapSamples ?? [];
         const drawCallsPerFrame = state?.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
         const trianglesPerFrame = state?.frameTriangles ? [...state.frameTriangles.values()] : [];
+        const animation = state?.characterAnimation ?? {};
+        const animationChanges = Array.isArray(animation.changes) ? animation.changes : [];
+        const firstAnimationChange = animationChanges[0];
+        const lastAnimationChange = animationChanges.at(-1);
+        const animationElapsed = firstAnimationChange && lastAnimationChange
+          ? (lastAnimationChange.now - firstAnimationChange.now) / 1000
+          : 0;
+        const animationUpdates = Math.max(0, animationChanges.length - 1);
         const frameSamples = raf.slice(1).map((entry, index) => {
           const previous = raf[index];
           const frame = entry.frame ?? {};
@@ -698,8 +737,15 @@ async function measureBrowser() {
           long_frame_count: frameIntervals.filter((ms) => ms > 33).length,
           vehicle_transform_hz: renderedHz,
           camera_hz: renderedHz,
-          character_anim_hz: null,
-          character_anim_status: 'not_applicable_no_character_animation',
+          character_anim_hz: animationElapsed > 0 ? animationUpdates / animationElapsed : null,
+          character_anim_status: animationUpdates > 0 ? 'measured_render_quantisation' : 'measurement_unavailable',
+          character_anim_calls: Number(animation.calls ?? 0),
+          character_anim_updates: animationUpdates,
+          character_anim_measurement: {
+            method: 'Math.floor stack probe for driver-face setExpressionTime',
+            sample_count: animationChanges.length,
+            elapsed_s: animationElapsed,
+          },
           first_interactive_s: navigation?.domContentLoadedEventEnd ? navigation.domContentLoadedEventEnd / 1000 : null,
           time_to_first_render_s: state?.firstRenderAt === null ? null : (state.firstRenderAt - state.documentStart) / 1000,
           heap_peak_mb: heap.length ? Math.max(...heap) : null,
@@ -803,7 +849,7 @@ const report = {
     device,
     device_note: 'Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement',
     measurement_method: 'External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
-    character_animation: 'not_applicable_no_character_animation',
+    character_animation: 'measured_render_quantisation',
   },
   metrics: {
     ...measurementMetrics,
