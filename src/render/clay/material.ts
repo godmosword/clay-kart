@@ -40,6 +40,33 @@ const PURE_LIMIT = 0.04;
  */
 const TEXTURE_REPEAT = 1;
 
+/**
+ * 一個壓痕循環該佔多少世界單位。**跨元件的尺度基準，只有這一個。**
+ *
+ * 以車身校準：`BAR-FEEL §1.1` 的車長 2.4，`kart-body` 用 `textureScale` 1，
+ * 而 `RoundedBoxGeometry` 的 UV 大致是每面 0..1，所以車身長邊上一個循環
+ * ≈ 2.4 單位。那是目前唯一被 critic 評過並拿到 4 分的尺度，因此當基準。
+ *
+ * `BAR-VISUAL §5.4` 對 `track-surface` 明文寫著：「壓痕的世界尺度必須與
+ * 車身一致。**面積大就把貼圖拉伸是最常見的破綻**，一拉伸，路面看起來就比
+ * 車『大一號』，兩者不像同一套材質。」
+ *
+ * 在此之前每個大面積表面都是手調一個 `textureScale` 常數，實際上對不齊：
+ * 地面 400 單位配 60 → 一個循環 6.67 單位，是車身的 2.8 倍。用眼睛調參數
+ * 調不出跨元件一致，得用算的。
+ */
+export const PRESS_REPEAT_WORLD_UNITS = 2.4;
+
+/**
+ * 給定一個表面在世界裡跨多少單位，回傳讓壓痕維持基準尺度所需的
+ * `textureScale`。前提是該 geometry 的 UV 大致 0..1 鋪滿該跨距——
+ * UV 已經自帶世界尺度的 geometry（例如 `track-surface` 的環）不要用這個，
+ * 直接傳 `textureScale: 1`。
+ */
+export function pressRepeatFor(worldSpan: number): number {
+  return worldSpan / PRESS_REPEAT_WORLD_UNITS;
+}
+
 export interface ClayMaterialOptions {
   /** 染色黏土的顏色。會被 `§6` 的純黑/純白禁令夾住。 */
   color: number;

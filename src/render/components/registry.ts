@@ -9,6 +9,7 @@ import type { Group } from 'three';
 import { createDriverFace } from '../../characters/driver-face.js';
 import { createKartBody } from './kart-body.js';
 import { createKartWheel } from './kart-wheels.js';
+import { createTrackSurface } from './track-surface.js';
 
 /** 元件 id 直接沿用 `BAR-VISUAL §4` 的命名，不要另創。 */
 export type ComponentId =
@@ -47,7 +48,7 @@ export const COMPONENTS: readonly ComponentEntry[] = [
     scope: '大圓眼 + 笑口，12fps 抽格',
     create: () => createDriverFace().group,
   },
-  { id: 'track-surface', scope: '賽道路面材質與接縫', create: null },
+  { id: 'track-surface', scope: '賽道路面材質與接縫', create: createTrackSurface },
   { id: 'track-barriers', scope: '護欄、路緣石', create: null },
   { id: 'foliage', scope: '樹木、草叢', create: null },
   { id: 'skybox-lighting', scope: '天空與全域柔和均勻光', create: null },

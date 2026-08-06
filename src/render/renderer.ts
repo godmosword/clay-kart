@@ -24,6 +24,7 @@ import type { Renderer, SimSnapshot } from '@loader/bootstrap';
 import { TRACK_GEOMETRY } from '@physics/constants';
 import { createKart, type KartVisual } from './components/kart.js';
 import { applyClayRenderSettings, createClayLighting, enableClayShadows } from './clay/lighting.js';
+import { createTrackSurfaceRing } from './components/track-surface.js';
 import { createClayMaterial } from './clay/material.js';
 import { CAR_PARK, TERRAIN, XIAOHONG } from './clay/palette.js';
 
@@ -135,22 +136,23 @@ class ClayRenderer implements Renderer {
   }
 
   /**
-   * 賽道本體：TRACK_GEOMETRY 的半徑 ± 半寬，不是碰撞面。
+   * 賽道本體：`TRACK_GEOMETRY` 的半徑 ± 半寬，不是碰撞面。
    *
-   * **不是元件 #4 `track-surface`**——那個元件要的是路面材質與接縫，這裡只有
-   * 一個平環。顏色改用 `CHARACTERS.md §6` 的步道色而不是柏油灰：黃金樣本
-   * `car-park.png` 的路面就是奶油沙色，柏油灰在黏土世界裡沒有出處。
+   * **這裡就是元件 #4 `track-surface`。** R23 之前這裡是一個 `RingGeometry`
+   * 平環加手調的 `textureScale: 40`，兩個問題：`RingGeometry` 的 UV 是放射狀
+   * 的 0..1，內圈周長 2π·24 與外圈 2π·36 差 50%，壓痕會被不均勻拉伸；而
+   * `textureScale: 40` 換算下來一個壓痕循環約 1.8 世界單位，跟車身的 2.4
+   * 對不齊——`§5.4` 的比例條款明文點名這是「最常見的破綻」。
+   *
+   * 現在改用 `createTrackSurfaceRing()`：UV 走真實弧長，路面高出草地形成
+   * 看得到的接縫，兩側有奶油沙邊帶與中線虛線。
    */
   #buildTrack(): void {
-    const inner = TRACK_GEOMETRY.radius - TRACK_GEOMETRY.halfWidth;
-    const outer = TRACK_GEOMETRY.radius + TRACK_GEOMETRY.halfWidth;
-    const surface = new THREE.Mesh(
-      new THREE.RingGeometry(inner, outer, 96),
-      createClayMaterial({ color: TERRAIN.path, textureScale: 40 }),
+    const surface = createTrackSurfaceRing(
+      TRACK_GEOMETRY.radius,
+      TRACK_GEOMETRY.halfWidth,
     );
-    surface.rotation.x = -Math.PI / 2;
     surface.position.set(TRACK_GEOMETRY.centerX, 0, TRACK_GEOMETRY.centerZ);
-    surface.receiveShadow = true;
     this.#scene.add(surface);
   }
 
