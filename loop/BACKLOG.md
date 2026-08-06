@@ -276,6 +276,39 @@
   telemetry 的乾淨版本另議
 - **狀態**：待裁決——不阻擋 W3，記錄下來避免之後把 R3 當成 R20 的證據引用
 
+### 同一類疏漏的第四種變體：證據上了 main，程式碼沒上
+
+- **輪次**：R22（Lead 驗證時發現）
+- **現況**：`87b4fe4` 把 R22 的 `VERDICT-feel.json`、`VERDICT-perf.json` 與
+  25 萬行的 `artifacts/lap-a.json` 提交到 main，但產生它們的程式碼
+  （`world.ts` 的漂移阻力、`ghost-replay.mjs` 的 tier1/tier3 probe、
+  `feel.py` 的 tier3 讀取）還留在 `feat/physics`
+- **後果**：main 上有一份 **46/46 PASS** 的判決，而 main 自己跑不出來。
+  用當時 main 的 `world.ts` 與 `feel.py` 重跑同一個 fixture 得到
+  **42 PASS / 4 FAIL**，17 個指標對不上（`4.4`/`4.6`/`4.7` 仍是 `0.0`、
+  `4.10` 仍是 `1.0073` FAIL）
+- **為什麼這個變體比前三種難發現**：
+
+  | 變體 | 輪次 | main 上看起來像 |
+  |---|---|---|
+  | commit 了但沒併進 main | ×5 | 缺東西 |
+  | 連 commit 都沒做 | R17 | 缺東西 |
+  | 判決的 artifact 指向已消失的暫存路徑 | R20 | 判決在，證據不可重建 |
+  | **證據上了 main、程式碼沒上** | **R22** | **完整而且全綠** |
+
+  前三種的共同特徵是「看起來不完整」，會觸發追問。第四種看起來是**做完了而且
+  通過了**——除非有人真的用 main 的程式碼重跑一次，否則不會發現
+- **現有檢查抓不到**：`git status --short` 三個 worktree 全乾淨（程式碼確實
+  commit 了）；`merge-base --is-ancestor` 會顯示 `feat/physics` 未併入，但那在
+  builder 還沒收尾的輪次裡是**正常狀態**，不構成警訊。真正的訊號是
+  「main 上有 round-N 的 VERDICT，但 round-N 的程式碼不在 main」
+- **建議的新檢查（待裁決）**：收尾時若 `loop/round-N/` 出現新的 `VERDICT-*.json`，
+  就用 main 自己的程式碼重跑一次並逐項比對。這輪是手動做的（結果：合併前
+  42/46 對不上、合併後零差異），要不要做成腳本另議
+- **處置**：已合併 `feat/physics`（`43efe59`），main 現在重跑得到 46/46 PASS
+  與已提交判決逐項零差異
+- **狀態**：待裁決——處置已完成，是否要把上述檢查制度化尚未決定
+
 ### BAR-PERF §2.5 一變成真量測，在黏土 build 上就超標 8.7 倍
 
 - **輪次**：R22（Lead 驗證 `a074615` 時做證偽測試撞到）

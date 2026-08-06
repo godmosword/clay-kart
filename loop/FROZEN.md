@@ -28,7 +28,22 @@ Lead 事後抓到的，不是任何自動化機制擋下來的）。
 - `tools/validate/feel.py`         # R15 PASS 42/46, BAR-FEEL §2,§3,§5,§6,§7,§8,§12
 - `tools/validate/test_feel.py`    # 同上，保護 feel.py 的測試一併凍結
 
-> **窄幅開閘（R22，Lead 裁決，僅此一次、僅此範圍）**
+> **閘已關回（R22 收尾，`43efe59`）。** 兩件准許的事都完成且經 Lead 獨立驗證：
+> main 重跑 `ghost-replay` + `feel.py` 得到 46/46 PASS，與已提交的
+> `loop/round-22/VERDICT-feel.json` **逐項零差異**；缺 `--round`／`--output`
+> 時 exit 2。`feel.py` / `test_feel.py` 即刻恢復完全凍結。下方保留原始開閘
+> 條件作為紀錄，**不再有效**——要再改需重新裁決。
+>
+> 合規審查結果：窗口一項未動；無 fallback／`configured_*` 頂替分支
+> （`tier3_probe["charge_time_s"]` 用直接下標，缺欄位 KeyError 而非靜靜頂替；
+> probe 不存在時 `4.4` 維持 `0.0` 誠實 FAIL）；其餘 45 項推導未動。
+> `4.4 = 3.5083333` 經核實是真量測——`TICK_HZ=120`，probe 記的
+> `drift_start_tick=121`、`tier_up_tick=542`，`421/120` 落在設定門檻 3.5s
+> 之後恰好一個 tick 的偵測延遲，不是把常數頂替進去。
+>
+> ---
+>
+> **窄幅開閘（R22，Lead 裁決，僅此一次、僅此範圍）—— 已於上方關閉**
 >
 > Codex 在 `a074615` 補了 tier1/tier3 drift probe，`4.4 tier3_charge_time_s` 的
 > raw probe 已有真實數值（3.5083s），但 `feel.py` 沒有讀新欄位所以仍顯示 `0.0`。
