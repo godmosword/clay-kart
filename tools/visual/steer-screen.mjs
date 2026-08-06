@@ -3,13 +3,17 @@
  * 轉向螢幕空間回歸（R20 缺陷的自動化防護）。
  *
  * W1 只驗「CDP 送鍵後 yaw 有變」——按 → 車往畫面左轉也會 PASS。
- * 這支腳本改驗：持鍵前後，車體位移在**起始相機 local +X**（畫面右邊）
- * 上的投影符號必須與按鍵一致。
+ * 這支腳本改驗：持鍵期間，車體位移在**起始相機 local +X**（畫面右邊）
+ * 上的投影，以**模擬時間** `snap.t` 正規化成每秒速率：
  *
- *   ArrowRight + throttle → screenLateral > +threshold
- *   ArrowLeft  + throttle → screenLateral < -threshold
+ *   ArrowRight + throttle → lateral / simDt > +RATE_THRESHOLD
+ *   ArrowLeft  + throttle → lateral / simDt < -RATE_THRESHOLD
+ *
+ * 用模擬時間而不是牆鐘：機器被壓住時分子分母一起縮，門檻不受負載影響，
+ * 且仍保留量值檢查（不是退化成純符號比對）。
  *
  * 沿用 game-shot.mjs 的 raw CDP + headless Chrome，不新增 npm 依賴。
+ * 正式 build 預設不裝 probe——本腳本以 `?steerProbe=1` 開啟。
  *
  * Usage:
  *   npm run build && node tools/visual/steer-screen.mjs
@@ -26,10 +30,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../..');
 const BUILD_ROOT = resolve(REPO_ROOT, 'build/out');
 
-/** 持鍵時長。太短位移不夠穩，太長會撞牆改變符號語意。 */
-const HOLD_SECONDS = 0.55;
-/** 位移投影門檻（世界單位）。符號對了之後量級遠大於此；翻符號會變號失敗。 */
-const LATERAL_THRESHOLD = 0.25;
+/** 目標模擬持鍵時長（秒，讀 probe.t）。牆鐘只當上限，不斷言牆鐘位移。 */
+const TARGET_SIM_SECONDS = 0.45;
+/** 牆鐘等待上限——超過仍拿不到足夠 simDt 就失敗（模擬卡住）。 */
+const MAX_WALL_WAIT_MS = 8_000;
+/**
+ * 每模擬秒的橫向位移門檻（世界單位 / 模擬秒）。
+ * 正常轉向約 1–2；翻符號會變號；純抖動遠低於此。
+ */
+const RATE_THRESHOLD = 0.5;
 
 const KEY_CODES = {
   ArrowUp: 38,
@@ -224,29 +233,47 @@ function screenLateral(start, end) {
 }
 
 async function runTrial(session, steerKey) {
-  // 先加速一點，避免靜止時側向分量太小
+  // 先加速一點，避免靜止時側向分量太小（這段用牆鐘喚醒即可）
   await keyDown(session, 'ArrowUp');
   await sleep(400);
 
   let start = null;
   for (let i = 0; i < 50; i++) {
     start = await readProbe(session);
-    if (start?.pos) break;
+    if (start?.pos && typeof start.t === 'number') break;
     await sleep(50);
   }
-  if (!start?.pos) throw new Error('steer probe never became ready');
+  if (!start?.pos || typeof start.t !== 'number') {
+    throw new Error('steer probe never became ready');
+  }
 
   await keyDown(session, steerKey);
-  await sleep(HOLD_SECONDS * 1000);
-  const end = await readProbe(session);
+
+  // 等到模擬時間前進夠多再取樣——負載高時牆鐘會拉長，但 simDt 目標不變。
+  const deadline = Date.now() + MAX_WALL_WAIT_MS;
+  let end = start;
+  while (Date.now() < deadline) {
+    await sleep(50);
+    const sample = await readProbe(session);
+    if (!sample?.pos || typeof sample.t !== 'number') continue;
+    end = sample;
+    if (end.t - start.t >= TARGET_SIM_SECONDS) break;
+  }
+
   await keyUp(session, steerKey);
   await keyUp(session, 'ArrowUp');
   await sleep(100);
 
-  if (!end?.pos) throw new Error('steer probe missing at end of trial');
+  const simDt = end.t - start.t;
+  if (!(simDt >= TARGET_SIM_SECONDS * 0.8)) {
+    throw new Error(
+      `sim time did not advance enough under ${steerKey}: simDt=${simDt} (need ≥ ${TARGET_SIM_SECONDS * 0.8})`,
+    );
+  }
   const lateral = screenLateral(start, end);
+  const rate = lateral / simDt;
   const yawDelta = end.yaw - start.yaw;
-  return { steerKey, lateral, yawDelta, start, end };
+  return { steerKey, lateral, rate, simDt, yawDelta, start, end };
 }
 
 async function main() {
@@ -286,7 +313,8 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await session.call('Page.navigate', { url: `http://127.0.0.1:${port}/index.html` });
+    const gameUrl = `http://127.0.0.1:${port}/index.html?steerProbe=1`;
+    await session.call('Page.navigate', { url: gameUrl });
 
     let ready = false;
     for (let attempt = 0; attempt < 150; attempt += 1) {
@@ -301,12 +329,12 @@ async function main() {
       }
       await sleep(100);
     }
-    if (!ready) throw new Error('game never mounted canvas + steer probe');
+    if (!ready) throw new Error('game never mounted canvas + steer probe (need ?steerProbe=1)');
 
     // 每次 trial 重新載入，避免前一次轉向殘留姿態
     const trials = [];
     for (const steerKey of ['ArrowRight', 'ArrowLeft']) {
-      await session.call('Page.navigate', { url: `http://127.0.0.1:${port}/index.html` });
+      await session.call('Page.navigate', { url: gameUrl });
       for (let attempt = 0; attempt < 150; attempt += 1) {
         const probe = await session.call('Runtime.evaluate', {
           expression:
@@ -328,31 +356,33 @@ async function main() {
     if (!right || !left) throw new Error('missing trials');
 
     const failures = [];
-    // 按 → 必須往畫面右邊（lateral > +threshold）
-    if (!(right.lateral > LATERAL_THRESHOLD)) {
+    // 按 →：每模擬秒往畫面右邊
+    if (!(right.rate > RATE_THRESHOLD)) {
       failures.push(
-        `ArrowRight: expected screenLateral > ${LATERAL_THRESHOLD}, got ${right.lateral.toFixed(4)} (yawΔ=${right.yawDelta.toFixed(4)})`,
+        `ArrowRight: expected lateral/simDt > ${RATE_THRESHOLD}, got ${right.rate.toFixed(4)} ` +
+          `(lateral=${right.lateral.toFixed(4)}, simDt=${right.simDt.toFixed(4)}, yawΔ=${right.yawDelta.toFixed(4)})`,
       );
     }
-    // 按 ← 必須往畫面左邊
-    if (!(left.lateral < -LATERAL_THRESHOLD)) {
+    // 按 ←：每模擬秒往畫面左邊
+    if (!(left.rate < -RATE_THRESHOLD)) {
       failures.push(
-        `ArrowLeft: expected screenLateral < ${-LATERAL_THRESHOLD}, got ${left.lateral.toFixed(4)} (yawΔ=${left.yawDelta.toFixed(4)})`,
+        `ArrowLeft: expected lateral/simDt < ${-RATE_THRESHOLD}, got ${left.rate.toFixed(4)} ` +
+          `(lateral=${left.lateral.toFixed(4)}, simDt=${left.simDt.toFixed(4)}, yawΔ=${left.yawDelta.toFixed(4)})`,
       );
     }
     // 兩邊符號必須相反——防止「兩邊都幾乎不動卻碰巧過門檻」
-    if (!(Math.sign(right.lateral) === 1 && Math.sign(left.lateral) === -1)) {
+    if (!(Math.sign(right.rate) === 1 && Math.sign(left.rate) === -1)) {
       failures.push(
-        `expected opposite screen signs, got right=${right.lateral.toFixed(4)} left=${left.lateral.toFixed(4)}`,
+        `expected opposite screen rate signs, got right=${right.rate.toFixed(4)} left=${left.rate.toFixed(4)}`,
       );
     }
 
     const report = {
       ok: failures.length === 0,
-      threshold: LATERAL_THRESHOLD,
-      holdSeconds: HOLD_SECONDS,
-      right: { lateral: right.lateral, yawDelta: right.yawDelta },
-      left: { lateral: left.lateral, yawDelta: left.yawDelta },
+      rateThreshold: RATE_THRESHOLD,
+      targetSimSeconds: TARGET_SIM_SECONDS,
+      right: { rate: right.rate, lateral: right.lateral, simDt: right.simDt, yawDelta: right.yawDelta },
+      left: { rate: left.rate, lateral: left.lateral, simDt: left.simDt, yawDelta: left.yawDelta },
       failures,
     };
     console.log(JSON.stringify(report, null, 2));

@@ -104,23 +104,39 @@ export function createPlayerInput(mount: HTMLElement): PlayerInput {
   }
   mount.appendChild(overlay);
 
+  // advance() 每 tick 同步讀完就丟——重用同一份，避免 120Hz 每秒 120 次配置。
+  const polled: {
+    throttle: number;
+    steer: number;
+    brake: boolean;
+    reverse: boolean;
+    jump: boolean;
+    drift: boolean;
+  } = {
+    throttle: 0,
+    steer: 0,
+    brake: false,
+    reverse: false,
+    jump: false,
+    drift: false,
+  };
+
   return {
     poll(_tickIndex: number): WorldInput {
-      // 每次回傳完整欄位，避免「停止傳送」被誤解成維持前值
+      // 每次寫滿完整欄位，避免「停止傳送」被誤解成維持前值
       const steerLeft = held.has('steerLeft');
       const steerRight = held.has('steerRight');
       let steer = 0;
       if (steerLeft && !steerRight) steer = STEER_SCREEN_LEFT;
       else if (steerRight && !steerLeft) steer = STEER_SCREEN_RIGHT;
 
-      return {
-        throttle: held.has('throttle') ? 1 : 0,
-        steer,
-        brake: held.has('brake'),
-        reverse: held.has('reverse'),
-        jump: held.has('jump'),
-        drift: held.has('drift'),
-      };
+      polled.throttle = held.has('throttle') ? 1 : 0;
+      polled.steer = steer;
+      polled.brake = held.has('brake');
+      polled.reverse = held.has('reverse');
+      polled.jump = held.has('jump');
+      polled.drift = held.has('drift');
+      return polled;
     },
     dispose(): void {
       window.removeEventListener('keydown', onKeyDown);
