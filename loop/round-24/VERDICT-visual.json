@@ -1,0 +1,105 @@
+{
+  "round": 24,
+  "wave": "W3",
+  "element": "visual-contact-sheet",
+  "verdict": "FAIL",
+  "bar_ref": "BAR-VISUAL.md §1, §5",
+  "checks": [
+    {
+      "id": "kart-wheels",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    },
+    {
+      "id": "kart-body",
+      "metric": "clay_score_1to5",
+      "actual": 3,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "driver-face",
+      "metric": "clay_score_1to5",
+      "actual": 3,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "track-surface",
+      "metric": "clay_score_1to5",
+      "actual": 3,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "track-barriers",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "foliage",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "skybox-lighting",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "drift-sparks",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "item-boxes",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "shadows-contact",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "water-sea",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "ui-hud",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    }
+  ],
+  "largest_gap": {
+    "id": "kart-body",
+    "delta": "已實作的四個元件有三個落在 3 分（門檻 4）。kart-body 與 driver-face 較 R21 各降一分，而同一張參考圖在兩輪之間從 2 分變 4 分——critic 的單輪變異幅度大於 PASS/FAIL 的間距，這個分數本身的可信度先於任何造型結論。",
+    "priority_rank": 1
+  },
+  "artifacts": [
+    "loop/round-24/artifacts/contact-sheet.png",
+    "loop/round-24/CRITIC-NOTES.md"
+  ],
+  "next_owner": "lead",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 0
+}
