@@ -56,19 +56,10 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | None]:
     values = doc.get("metrics", doc)
     if not isinstance(values, dict):
         values = {}
-    character_status = values.get("character_anim_status")
     metrics: dict[str, float | None] = {}
     for _, metric, _, _, _ in WINDOWS:
         raw = values.get(metric)
-        if (
-            metric == "character_anim_hz"
-            and raw is None
-            and character_status == "not_applicable_no_character_animation"
-        ):
-            # The renderer has no character animation yet. Keep this honest and
-            # omit §4.1 from the verdict until W3 supplies a measurable signal.
-            metrics[metric] = None
-        elif metric in REQUIRED_MEASUREMENTS:
+        if metric in REQUIRED_MEASUREMENTS:
             metrics[metric] = _required_finite(raw)
         else:
             metrics[metric] = _finite(raw)
@@ -95,10 +86,6 @@ def build_verdict(
     for metric_id, metric_name, low, high, priority in WINDOWS:
         actual = metrics.get(metric_name)
         if actual is None:
-            if metric_name == "character_anim_hz":
-                # The renderer has no character animation yet; this is the
-                # one documented not-applicable metric in BAR-PERF.
-                continue
             # Keep the schema's numeric `actual` field while making the
             # missing measurement visible in the failure explanation.  This
             # is deliberately not treated as a measured zero.
