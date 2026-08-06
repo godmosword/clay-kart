@@ -4,6 +4,7 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { arch, cpus, hostname, platform, release, totalmem } from 'node:os';
 import { gzipSync } from 'node:zlib';
 import { dirname, join, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -16,6 +17,7 @@ import {
 const fixturePath = process.argv[2] ?? 'fixtures/lap-a.json';
 const outputPath = process.argv[3] ?? 'loop/round-16/artifacts/perf-proxy.json';
 const device = process.argv[4] ?? 'proxy';
+const environment = process.argv[5] ?? process.env.PERF_ENV ?? 'local';
 const MEASUREMENT_SECONDS = 5;
 const fixture = await readFixture(fixturePath);
 const TICK_HZ = 120;
@@ -217,25 +219,93 @@ async function readTracingStream(session, stream) {
   return trace;
 }
 
-function gcPauseMaxMs(traceText) {
+function traceEvents(traceText) {
   let trace;
   try {
     trace = JSON.parse(traceText);
   } catch {
-    return 0;
+    return [];
   }
-  const events = Array.isArray(trace?.traceEvents) ? trace.traceEvents : [];
-  return events.reduce((maximum, event) => {
-    if (typeof event?.name !== 'string' || !/gc|garbage/i.test(event.name)) return maximum;
-    const durationMs = Number(event.dur) / 1000;
-    return Number.isFinite(durationMs) ? Math.max(maximum, durationMs) : maximum;
-  }, 0);
+  return Array.isArray(trace?.traceEvents) ? trace.traceEvents : [];
+}
+
+function gcTraceEvents(events) {
+  return events
+    .filter((event) => typeof event?.name === 'string' && /gc|garbage/i.test(event.name))
+    .map((event) => ({
+      name: event.name,
+      startMs: Number(event.ts) / 1000,
+      durationMs: Number(event.dur) / 1000,
+    }))
+    .filter((event) => Number.isFinite(event.startMs) && Number.isFinite(event.durationMs) && event.durationMs > 0);
+}
+
+function gcPauseMaxMs(gcEvents) {
+  return gcEvents.reduce(
+    (maximum, event) => Math.max(maximum, event.durationMs),
+    0,
+  );
+}
+
+function unionOverlapMs(intervals, startMs, endMs) {
+  const clipped = intervals
+    .map((interval) => ({
+      startMs: Math.max(startMs, interval.startMs),
+      endMs: Math.min(endMs, interval.startMs + interval.durationMs),
+    }))
+    .filter((interval) => interval.endMs > interval.startMs)
+    .sort((left, right) => left.startMs - right.startMs);
+  let total = 0;
+  let current = null;
+  for (const interval of clipped) {
+    if (!current) {
+      current = interval;
+      continue;
+    }
+    if (interval.startMs > current.endMs) {
+      total += current.endMs - current.startMs;
+      current = interval;
+    } else {
+      current.endMs = Math.max(current.endMs, interval.endMs);
+    }
+  }
+  if (current) total += current.endMs - current.startMs;
+  return total;
+}
+
+function traceEventName(event) {
+  return event?.name === '__r16_trace_anchor__'
+    || event?.args?.name === '__r16_trace_anchor__'
+    || event?.args?.data?.name === '__r16_trace_anchor__';
+}
+
+function traceAnchorMs(events) {
+  const anchor = events.find(traceEventName);
+  const timestampMs = Number(anchor?.ts) / 1000;
+  return Number.isFinite(timestampMs) ? timestampMs : null;
+}
+
+function environmentMetadata(chromePath) {
+  const cpu = cpus()[0];
+  return {
+    name: environment,
+    hostname: hostname(),
+    platform: `${platform()} ${release()}`,
+    arch: arch(),
+    node_version: process.version,
+    cpu_model: cpu?.model ?? null,
+    cpu_count: cpus().length,
+    memory_total_mb: totalmem() / (1024 * 1024),
+    chrome_path: chromePath,
+    containerized: environment === 'container',
+  };
 }
 
 function browserProbeScript() {
   return String.raw`(() => {
   const state = {
     raf: [],
+    activeFrame: null,
     glFrames: new Set(),
     frameDrawCalls: new Map(),
     frameTriangles: new Map(),
@@ -253,6 +323,7 @@ function browserProbeScript() {
     for (const timer of state.inputTimers) clearTimeout(timer);
     state.inputTimers = [];
     state.raf = [];
+    state.activeFrame = null;
     state.glFrames = new Set();
     state.frameDrawCalls = new Map();
     state.frameTriangles = new Map();
@@ -294,9 +365,24 @@ function browserProbeScript() {
   };
   const originalRaf = window.requestAnimationFrame.bind(window);
   window.requestAnimationFrame = (callback) => originalRaf((timestamp) => {
-    state.raf.push({ timestamp, now: performance.now() });
+    const frame = {
+      index: state.raf.length,
+      timestamp,
+      start: performance.now(),
+      drawMs: 0,
+      callbackEnd: null,
+      scriptMs: 0,
+    };
+    state.raf.push({ timestamp, now: frame.start, frame });
     if (performance.memory) state.heapSamples.push(performance.memory.usedJSHeapSize / (1024 * 1024));
-    return callback(timestamp);
+    state.activeFrame = frame;
+    try {
+      return callback(timestamp);
+    } finally {
+      frame.callbackEnd = performance.now();
+      frame.scriptMs = Math.max(0, frame.callbackEnd - frame.start - frame.drawMs);
+      state.activeFrame = null;
+    }
   });
   const patchGl = (prototype) => {
     if (!prototype || prototype.__r16PerfPatched) return;
@@ -442,28 +528,40 @@ function browserProbeScript() {
       };
     }
     prototype.drawElements = function(mode, count, ...args) {
+      const frame = state.activeFrame;
+      const drawStart = performance.now();
       state.glDrawCalls += 1;
-      const frame = state.raf.length;
-      state.glFrames.add(frame);
-      state.frameDrawCalls.set(frame, (state.frameDrawCalls.get(frame) ?? 0) + 1);
+      const frameIndex = frame?.index ?? state.raf.length - 1;
+      state.glFrames.add(frameIndex);
+      state.frameDrawCalls.set(frameIndex, (state.frameDrawCalls.get(frameIndex) ?? 0) + 1);
       if (state.firstRenderAt === null) state.firstRenderAt = performance.now();
       if (mode === this.TRIANGLES) {
         state.triangles += count / 3;
-        state.frameTriangles.set(frame, (state.frameTriangles.get(frame) ?? 0) + count / 3);
+        state.frameTriangles.set(frameIndex, (state.frameTriangles.get(frameIndex) ?? 0) + count / 3);
       }
-      return originalDrawElements.call(this, mode, count, ...args);
+      try {
+        return originalDrawElements.call(this, mode, count, ...args);
+      } finally {
+        if (frame) frame.drawMs += performance.now() - drawStart;
+      }
     };
     prototype.drawArrays = function(mode, first, count, ...args) {
+      const frame = state.activeFrame;
+      const drawStart = performance.now();
       state.glDrawCalls += 1;
-      const frame = state.raf.length;
-      state.glFrames.add(frame);
-      state.frameDrawCalls.set(frame, (state.frameDrawCalls.get(frame) ?? 0) + 1);
+      const frameIndex = frame?.index ?? state.raf.length - 1;
+      state.glFrames.add(frameIndex);
+      state.frameDrawCalls.set(frameIndex, (state.frameDrawCalls.get(frameIndex) ?? 0) + 1);
       if (state.firstRenderAt === null) state.firstRenderAt = performance.now();
       if (mode === this.TRIANGLES) {
         state.triangles += count / 3;
-        state.frameTriangles.set(frame, (state.frameTriangles.get(frame) ?? 0) + count / 3);
+        state.frameTriangles.set(frameIndex, (state.frameTriangles.get(frameIndex) ?? 0) + count / 3);
       }
-      return originalDrawArrays.call(this, mode, first, count, ...args);
+      try {
+        return originalDrawArrays.call(this, mode, first, count, ...args);
+      } finally {
+        if (frame) frame.drawMs += performance.now() - drawStart;
+      }
     };
   };
   patchGl(WebGLRenderingContext.prototype);
@@ -516,9 +614,18 @@ async function measureBrowser() {
     await sleep(1500);
     const segments = fixtureSegmentsForWindow();
     await session.call('Tracing.start', {
-      categories: 'disabled-by-default-v8.gc',
+      categories: 'disabled-by-default-v8.gc,blink.user_timing',
       transferMode: 'ReturnAsStream',
     });
+    const traceAnchorResult = await session.call('Runtime.evaluate', {
+      expression: `(() => {
+        const now = performance.now();
+        performance.mark('__r16_trace_anchor__');
+        return now;
+      })()`,
+      returnByValue: true,
+    });
+    const traceAnchorPageMs = Number(traceAnchorResult?.result?.value);
     await session.call('Runtime.evaluate', {
       expression: `window.__R16_PERF__?.reset(); window.__R16_PERF__?.scheduleInput(${JSON.stringify(segments)}, ${TICK_HZ});`,
       returnByValue: true,
@@ -528,7 +635,13 @@ async function measureBrowser() {
     await session.call('Tracing.end');
     const traceEvent = await tracingComplete;
     const traceText = traceEvent.stream ? await readTracingStream(session, traceEvent.stream) : '';
-    const measuredGcPauseMaxMs = gcPauseMaxMs(traceText);
+    const events = traceEvents(traceText);
+    const gcEvents = gcTraceEvents(events);
+    const maxGcEvent = gcEvents.reduce(
+      (maximum, event) => (!maximum || event.durationMs > maximum.durationMs ? event : maximum),
+      null,
+    );
+    const traceAnchorTraceMs = traceAnchorMs(events);
     const result = await session.call('Runtime.evaluate', {
       expression: `(() => {
         const state = window.__R16_PERF__;
@@ -551,6 +664,27 @@ async function measureBrowser() {
         const heap = state?.heapSamples ?? [];
         const drawCallsPerFrame = state?.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
         const trianglesPerFrame = state?.frameTriangles ? [...state.frameTriangles.values()] : [];
+        const frameSamples = raf.slice(1).map((entry, index) => {
+          const previous = raf[index];
+          const frame = entry.frame ?? {};
+          const callbackStart = Number(frame.start ?? entry.now);
+          const callbackEnd = Number(frame.callbackEnd ?? callbackStart);
+          const drawMs = Number(frame.drawMs ?? 0);
+          const scriptWallMs = Number(frame.scriptMs ?? 0);
+          return {
+            frame_ordinal: index + 1,
+            interval_start_ms: previous.now,
+            interval_end_ms: entry.now,
+            frame_time_ms: entry.now - previous.now,
+            callback_start_ms: callbackStart,
+            callback_end_ms: callbackEnd,
+            draw_ms: drawMs,
+            script_wall_ms: scriptWallMs,
+          };
+        }).filter((frame) => Number.isFinite(frame.frame_time_ms) && frame.frame_time_ms >= 0);
+        const nearestRankIndex = frameSamples.length ? Math.min(frameSamples.length - 1, Math.ceil(frameSamples.length * 0.99) - 1) : -1;
+        const nearestRankFrames = [...frameSamples].sort((left, right) => left.frame_time_ms - right.frame_time_ms);
+        const p99Frame = nearestRankIndex >= 0 ? nearestRankFrames[nearestRankIndex] : null;
         return {
           canvas_count: document.querySelectorAll('canvas').length,
           raf_callbacks: raf.length,
@@ -573,6 +707,11 @@ async function measureBrowser() {
           draw_calls: drawCallsPerFrame.length ? Math.max(...drawCallsPerFrame) : 0,
           triangles_k: trianglesPerFrame.length ? Math.max(...trianglesPerFrame) / 1000 : 0,
           texture_memory_mb: (state?.textureBytes ?? 0) / (1024 * 1024),
+          frame_breakdown: {
+            method: 'nearest_rank_p99_frame_interval',
+            sample_count: frameSamples.length,
+            p99_frame: p99Frame,
+          },
         };
       })()`,
       returnByValue: true,
@@ -581,7 +720,60 @@ async function measureBrowser() {
     if (!measured || measured.canvas_count < 1 || measured.rendered_frames < 1) {
       throw new Error(`headless renderer produced no measurable WebGL frames: ${JSON.stringify(measured)}`);
     }
-    return { ...measured, gc_pause_max_ms: measuredGcPauseMaxMs };
+    const traceOffsetMs = Number.isFinite(traceAnchorPageMs) && traceAnchorTraceMs !== null
+      ? traceAnchorTraceMs - traceAnchorPageMs
+      : null;
+    const p99Frame = measured.frame_breakdown?.p99_frame;
+    let frameBreakdown = {
+      ...measured.frame_breakdown,
+      trace_gc_events: gcEvents.length,
+      trace_anchor: {
+        status: traceOffsetMs === null ? 'unavailable' : 'aligned',
+        page_now_ms: Number.isFinite(traceAnchorPageMs) ? traceAnchorPageMs : null,
+        trace_ts_ms: traceAnchorTraceMs,
+      },
+    };
+    if (p99Frame && traceOffsetMs !== null) {
+      const intervalStartMs = p99Frame.interval_start_ms + traceOffsetMs;
+      const intervalEndMs = p99Frame.interval_end_ms + traceOffsetMs;
+      const callbackStartMs = p99Frame.callback_start_ms + traceOffsetMs;
+      const callbackEndMs = p99Frame.callback_end_ms + traceOffsetMs;
+      const gcMs = unionOverlapMs(gcEvents, intervalStartMs, intervalEndMs);
+      const callbackGcMs = unionOverlapMs(gcEvents, callbackStartMs, callbackEndMs);
+      const scriptMs = Math.max(0, p99Frame.script_wall_ms - callbackGcMs);
+      const drawMs = p99Frame.draw_ms;
+      const unattributedMs = Math.max(0, p99Frame.frame_time_ms - drawMs - scriptMs - gcMs);
+      const share = (value) => p99Frame.frame_time_ms > 0 ? value / p99Frame.frame_time_ms * 100 : 0;
+      frameBreakdown = {
+        ...frameBreakdown,
+        p99_frame: {
+          ...p99Frame,
+          script_ms: scriptMs,
+          gc_ms: gcMs,
+          unattributed_ms: unattributedMs,
+          shares_pct: {
+            draw: share(drawMs),
+            script: share(scriptMs),
+            gc: share(gcMs),
+            unattributed: share(unattributedMs),
+          },
+        },
+        attribution_note: 'draw_ms is JS-side WebGL submission time; script_ms excludes draw and trace-aligned GC; unattributed includes browser/vsync/GPU wait.',
+      };
+    } else {
+      frameBreakdown = {
+        ...frameBreakdown,
+        attribution_note: 'GC could not be aligned to the p99 frame because the trace anchor was unavailable.',
+      };
+    }
+    return {
+      ...measured,
+      chrome_path: chromePath,
+      gc_pause_max_ms: gcPauseMaxMs(gcEvents),
+      gc_pause_max_event: maxGcEvent,
+      frame_breakdown: frameBreakdown,
+      trace_gc_event_count: gcEvents.length,
+    };
   } finally {
     session?.close();
     child.kill('SIGTERM');
@@ -592,14 +784,21 @@ async function measureBrowser() {
 }
 
 const measured = await measureBrowser();
+const { chrome_path: chromePath, ...measurementMetrics } = measured;
 const assets = await assetMetrics();
+const build = {
+  sha: process.env.PERF_BUILD_SHA ?? buildSha(),
+  assets,
+};
 const report = {
   meta: {
     fixture: fixture.fixture,
     tick_hz: TICK_HZ,
     total_ticks: fixture.ticks,
     measurement_seconds: MEASUREMENT_SECONDS,
-    build_sha: buildSha(),
+    build_sha: build.sha,
+    build,
+    environment: environmentMetadata(chromePath),
     seed: fixture.seed,
     device,
     device_note: 'Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement',
@@ -607,7 +806,7 @@ const report = {
     character_animation: 'not_applicable_no_character_animation',
   },
   metrics: {
-    ...measured,
+    ...measurementMetrics,
     ...assets,
   },
 };
