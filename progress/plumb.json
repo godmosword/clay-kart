@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-05T15:24:12Z",
+  "updated": "2026-08-06T15:25:52Z",
   "wave": "W3",
-  "round": 21,
-  "element": "steer-screen-regression + progress-dashboard",
+  "round": 24,
+  "element": "sim-clock-catchup + touch-gate + pairing-dashboard",
   "status": "done",
   "last_verdict": null,
-  "note": "轉向螢幕空間 CDP 回歸（test:steer-screen）；progress/index.html 加 FROZEN/BACKLOG，parseBacklogOpen 改依狀態行過濾（16 待裁決 + 2 格式異常）；ui-hud 驗收未決寫 BACKLOG；清 round-17/tmp-*。"
+  "note": "修長幀丟模擬時間（MAX_TICKS=24、積欠留到下幀、catch-up 上限 0.25s 且記入 __CLAY_TIME_STATS__）；桌機不掛觸控 overlay；progress 加 §7.2 配對稽核（3/3/4）。test:steer-screen PASS。"
 }

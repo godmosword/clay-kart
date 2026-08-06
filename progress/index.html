@@ -80,6 +80,9 @@
   .list .count { color: var(--dim); font-size: .74rem; margin-bottom: .2rem; }
   .list.warn { border-color: var(--busy); }
   .list.warn .count { color: var(--busy); }
+  .list .item[data-v="合格"] { color: var(--ok); }
+  .list .item[data-v="保留"] { color: var(--busy); }
+  .list .item[data-v="不合格"] { color: var(--fail); }
   .err {
     border: 1px solid var(--fail); border-radius: 8px; padding: .85rem 1rem;
     color: var(--fail); font-size: .84rem;
@@ -118,6 +121,11 @@
 <section>
   <h2>BACKLOG 待裁決</h2>
   <div id="backlog"></div>
+</section>
+
+<section>
+  <h2>BAR-VISUAL §7.2 配對稽核</h2>
+  <div id="pairing"></div>
 </section>
 
 <section>
@@ -337,13 +345,67 @@ function renderBacklog(parsed) {
   }
 }
 
+/**
+ * 從 BAR-VISUAL.md「### §7.2」表格抽出配對稽核列。
+ * 判定欄位去掉 markdown 粗體標記後歸類為 合格／保留／不合格。
+ */
+function parsePairingAudit(md) {
+  const lines = md.split('\n');
+  let inSection = false;
+  const items = [];
+  for (const line of lines) {
+    if (/^### /.test(line)) {
+      inSection = /^### §7\.2\b/.test(line) || /^### §7\.2 /.test(line);
+      continue;
+    }
+    if (!inSection) continue;
+    if (/^### /.test(line) || /^## /.test(line)) break;
+    const m = line.match(/^\|\s*\**([a-z0-9-]+)\**\s*\|\s*\**([^*|]+)\**\s*\|/i);
+    if (!m) continue;
+    const id = m[1].trim();
+    if (id === '元件') continue;
+    const verdict = m[2].trim().replace(/\*/g, '');
+    if (!['合格', '保留', '不合格'].includes(verdict)) continue;
+    items.push({ id, verdict });
+  }
+  const counts = { 合格: 0, 保留: 0, 不合格: 0 };
+  for (const it of items) counts[it.verdict] += 1;
+  return { items, counts };
+}
+
+function renderPairing(parsed) {
+  const box = document.getElementById('pairing');
+  box.replaceChildren();
+  const items = parsed.items || [];
+  if (items.length === 0) {
+    box.append(el('div', 'empty', 'BAR-VISUAL.md §7.2 尚無可解析的配對稽核列。'));
+    return;
+  }
+  const c = parsed.counts;
+  const list = el('div', 'list');
+  list.append(
+    el(
+      'div',
+      'count',
+      `${c['合格']} 合格 · ${c['保留']} 保留 · ${c['不合格']} 不合格（分數可信度看這裡）`,
+    ),
+  );
+  for (const it of items) {
+    const row = el('div', 'item', `${it.id} — ${it.verdict}`);
+    row.dataset.v = it.verdict;
+    list.append(row);
+  }
+  box.append(list);
+}
+
 async function refresh() {
   const fatal = document.getElementById('fatal');
   try {
-    const [budget, frozenMd, backlogMd, ...states] = await Promise.all([
+    const [budget, frozenMd, backlogMd, visualMd, ...states] = await Promise.all([
       getJSON('../loop/budget.json'),
       getText('../loop/FROZEN.md'),
       getText('../loop/BACKLOG.md'),
+      getText('../BAR-VISUAL.md'),
       ...FILES.map(getJSON)
     ]);
     fatal.replaceChildren();
@@ -352,6 +414,7 @@ async function refresh() {
     renderBudget(budget);
     renderFrozen(parseFrozen(frozenMd));
     renderBacklog(parseBacklogOpen(backlogMd));
+    renderPairing(parsePairingAudit(visualMd));
     document.getElementById('stamp').textContent = new Date().toLocaleTimeString('zh-TW', { hour12: false });
   } catch (e) {
     const box = el('div', 'err');
