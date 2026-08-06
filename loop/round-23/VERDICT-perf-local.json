@@ -1,0 +1,180 @@
+{
+  "round": 23,
+  "wave": "W2",
+  "element": "perf-validator",
+  "verdict": "FAIL",
+  "bar_ref": "BAR-PERF.md §2–§5",
+  "checks": [
+    {
+      "id": "4.2",
+      "metric": "vehicle_transform_hz",
+      "actual": 18.698946954039958,
+      "window": [
+        58.0,
+        62.0
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "4.3",
+      "metric": "camera_hz",
+      "actual": 18.698946954039958,
+      "window": [
+        58.0,
+        62.0
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "2.1",
+      "metric": "fps_p50",
+      "actual": 20.408163265306122,
+      "window": [
+        58.0,
+        62.0
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "2.2",
+      "metric": "fps_p05",
+      "actual": 9.63951588951025,
+      "window": [
+        55.0,
+        62.0
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "5.2",
+      "metric": "heap_growth_per_lap_mb",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        2.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "2.3",
+      "metric": "frame_time_p99_ms",
+      "actual": 139.19900000004327,
+      "window": [
+        0.0,
+        22.0
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "2.4",
+      "metric": "long_frame_count",
+      "actual": 86.0,
+      "window": [
+        0.0,
+        3.0
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "2.5",
+      "metric": "gc_pause_max_ms",
+      "actual": 1.567,
+      "window": [
+        0.0,
+        8.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.1",
+      "metric": "first_interactive_s",
+      "actual": 0.13920000000018626,
+      "window": [
+        0.0,
+        3.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.2",
+      "metric": "initial_bundle_kb_gz",
+      "actual": 147.923828125,
+      "window": [
+        0.0,
+        900.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.3",
+      "metric": "total_assets_mb",
+      "actual": 3.370809555053711,
+      "window": [
+        0.0,
+        12.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.4",
+      "metric": "time_to_first_render_s",
+      "actual": 0.9601999999999534,
+      "window": [
+        0.0,
+        1.5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.1",
+      "metric": "heap_peak_mb",
+      "actual": 14.408090591430664,
+      "window": [
+        0.0,
+        320.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.3",
+      "metric": "draw_calls",
+      "actual": 126.0,
+      "window": [
+        0.0,
+        150.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.4",
+      "metric": "triangles_k",
+      "actual": 82.27,
+      "window": [
+        0.0,
+        400.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.5",
+      "metric": "texture_memory_mb",
+      "actual": 4.9169158935546875,
+      "window": [
+        0.0,
+        96.0
+      ],
+      "status": "PASS"
+    }
+  ],
+  "largest_gap": {
+    "id": "4.2",
+    "delta": "actual=18.6989, below lower bound 58",
+    "priority_rank": 1
+  },
+  "artifacts": [
+    "loop/round-23/artifacts/perf-proxy-local.json"
+  ],
+  "next_owner": "claude-code",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 0
+}

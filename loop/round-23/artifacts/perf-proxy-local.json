@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "fixture": "lap-a",
+    "tick_hz": 120,
+    "total_ticks": 7200,
+    "measurement_seconds": 5,
+    "build_sha": "e7cd3763d02ba47654decade0eee233588dc8967",
+    "build": {
+      "sha": "e7cd3763d02ba47654decade0eee233588dc8967",
+      "assets": {
+        "initial_bundle_kb_gz": 147.923828125,
+        "total_assets_mb": 3.370809555053711
+      }
+    },
+    "environment": {
+      "name": "local",
+      "hostname": "Mac.home",
+      "platform": "darwin 25.6.0",
+      "arch": "arm64",
+      "node_version": "v25.8.0",
+      "cpu_model": "Apple M4",
+      "cpu_count": 10,
+      "memory_total_mb": 16384,
+      "chrome_path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "containerized": false
+    },
+    "seed": 20260730,
+    "device": "proxy",
+    "device_note": "Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement",
+    "measurement_method": "External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.",
+    "character_animation": "not_applicable_no_character_animation"
+  },
+  "metrics": {
+    "canvas_count": 1,
+    "raf_callbacks": 95,
+    "rendered_frames": 95,
+    "gl_draw_calls": 11568,
+    "triangles": 7228418,
+    "elapsed_s": 5.0805,
+    "fps_p50": 20.408163265306122,
+    "fps_p05": 9.63951588951025,
+    "frame_time_p99_ms": 139.19900000004327,
+    "long_frame_count": 86,
+    "vehicle_transform_hz": 18.698946954039958,
+    "camera_hz": 18.698946954039958,
+    "character_anim_hz": null,
+    "character_anim_status": "not_applicable_no_character_animation",
+    "first_interactive_s": 0.13920000000018626,
+    "time_to_first_render_s": 0.9601999999999534,
+    "heap_peak_mb": 14.408090591430664,
+    "heap_growth_per_lap_mb": 0,
+    "draw_calls": 126,
+    "triangles_k": 82.27,
+    "texture_memory_mb": 4.9169158935546875,
+    "frame_breakdown": {
+      "method": "nearest_rank_p99_frame_interval",
+      "sample_count": 94,
+      "p99_frame": {
+        "frame_ordinal": 83,
+        "interval_start_ms": 6080.90000000014,
+        "interval_end_ms": 6225.40000000014,
+        "frame_time_ms": 144.5,
+        "callback_start_ms": 6225.40000000014,
+        "callback_end_ms": 6226,
+        "draw_ms": 0.19999999995343387,
+        "script_wall_ms": 0.39999999990686774,
+        "script_ms": 0.39999999990686774,
+        "gc_ms": 0,
+        "unattributed_ms": 143.9000000001397,
+        "shares_pct": {
+          "draw": 0.13840830446604419,
+          "script": 0.27681660893208837,
+          "gc": 0,
+          "unattributed": 99.58477508660187
+        }
+      },
+      "trace_gc_events": 224,
+      "trace_anchor": {
+        "status": "aligned",
+        "page_now_ms": 1754.9000000001397,
+        "trace_ts_ms": 2068418.87
+      },
+      "attribution_note": "draw_ms is JS-side WebGL submission time; script_ms excludes draw and trace-aligned GC; unattributed includes browser/vsync/GPU wait."
+    },
+    "gc_pause_max_ms": 1.567,
+    "gc_pause_max_event": {
+      "name": "V8.GC_MARK_COMPACTOR",
+      "startMs": 2068944.719,
+      "durationMs": 1.567
+    },
+    "trace_gc_event_count": 224,
+    "initial_bundle_kb_gz": 147.923828125,
+    "total_assets_mb": 3.370809555053711
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "fixture": "lap-a",
+    "tick_hz": 120,
+    "total_ticks": 7200,
+    "measurement_seconds": 5,
+    "build_sha": "e7cd3763d02ba47654decade0eee233588dc8967",
+    "build": {
+      "sha": "e7cd3763d02ba47654decade0eee233588dc8967",
+      "assets": {
+        "initial_bundle_kb_gz": 147.923828125,
+        "total_assets_mb": 3.370809555053711
+      }
+    },
+    "environment": {
+      "name": "container",
+      "hostname": "60a577b9ec85",
+      "platform": "linux 6.12.76-linuxkit",
+      "arch": "arm64",
+      "node_version": "v22.18.0",
+      "cpu_model": "unknown",
+      "cpu_count": 10,
+      "memory_total_mb": 7936.203125,
+      "chrome_path": "/ms-playwright/chromium-1187/chrome-linux/chrome",
+      "containerized": true
+    },
+    "seed": 20260730,
+    "device": "proxy",
+    "device_note": "Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement",
+    "measurement_method": "External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.",
+    "character_animation": "not_applicable_no_character_animation"
+  },
+  "metrics": {
+    "canvas_count": 1,
+    "raf_callbacks": 42,
+    "rendered_frames": 42,
+    "gl_draw_calls": 5105,
+    "triangles": 3182220,
+    "elapsed_s": 5.061,
+    "fps_p50": 8.319467554075734,
+    "fps_p05": 4.837929366231662,
+    "frame_time_p99_ms": 224.70000000000002,
+    "long_frame_count": 38,
+    "vehicle_transform_hz": 8.298755186721992,
+    "camera_hz": 8.298755186721992,
+    "character_anim_hz": null,
+    "character_anim_status": "not_applicable_no_character_animation",
+    "first_interactive_s": 0.023900000000023285,
+    "time_to_first_render_s": 0.24610000000000581,
+    "heap_peak_mb": 14.495782852172852,
+    "heap_growth_per_lap_mb": 1.2819976806640625,
+    "draw_calls": 122,
+    "triangles_k": 76.462,
+    "texture_memory_mb": 4.9169158935546875,
+    "frame_breakdown": {
+      "method": "nearest_rank_p99_frame_interval",
+      "sample_count": 41,
+      "p99_frame": {
+        "frame_ordinal": 19,
+        "interval_start_ms": 3868.3000000000175,
+        "interval_end_ms": 4100.600000000006,
+        "frame_time_ms": 232.29999999998836,
+        "callback_start_ms": 4100.600000000006,
+        "callback_end_ms": 4101.3000000000175,
+        "draw_ms": 0,
+        "script_wall_ms": 0.7000000000116415,
+        "script_ms": 0.7000000000116415,
+        "gc_ms": 0,
+        "unattributed_ms": 231.59999999997672,
+        "shares_pct": {
+          "draw": 0,
+          "script": 0.3013344812792409,
+          "gc": 0,
+          "unattributed": 99.69866551872076
+        }
+      },
+      "trace_gc_events": 22,
+      "trace_anchor": {
+        "status": "aligned",
+        "page_now_ms": 1540,
+        "trace_ts_ms": 219112.821
+      },
+      "attribution_note": "draw_ms is JS-side WebGL submission time; script_ms excludes draw and trace-aligned GC; unattributed includes browser/vsync/GPU wait."
+    },
+    "gc_pause_max_ms": 0.564,
+    "gc_pause_max_event": {
+      "name": "V8.GC_SCAVENGER",
+      "startMs": 221333.352,
+      "durationMs": 0.564
+    },
+    "trace_gc_event_count": 22,
+    "initial_bundle_kb_gz": 147.923828125,
+    "total_assets_mb": 3.370809555053711
+  }
+}
