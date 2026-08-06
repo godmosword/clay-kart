@@ -28,6 +28,11 @@ WINDOWS: tuple[tuple[str, str, float, float, int], ...] = (
     ("5.5", "texture_memory_mb", 0.0, 96.0, 6),
 )
 
+# These metrics cannot honestly be inferred as zero.  A zero from a real
+# probe means "no pause/allocation was observed"; a missing value means the
+# probe did not measure the resource at all and must fail explicitly.
+REQUIRED_MEASUREMENTS = frozenset({"gc_pause_max_ms", "texture_memory_mb"})
+
 
 def _finite(value: Any) -> float:
     try:
@@ -35,6 +40,16 @@ def _finite(value: Any) -> float:
     except (TypeError, ValueError):
         return 0.0
     return value if math.isfinite(value) else 0.0
+
+
+def _required_finite(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | None]:
@@ -53,6 +68,8 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | None]:
             # The renderer has no character animation yet. Keep this honest and
             # omit §4.1 from the verdict until W3 supplies a measurable signal.
             metrics[metric] = None
+        elif metric in REQUIRED_MEASUREMENTS:
+            metrics[metric] = _required_finite(raw)
         else:
             metrics[metric] = _finite(raw)
     return metrics
@@ -78,20 +95,30 @@ def build_verdict(
     for metric_id, metric_name, low, high, priority in WINDOWS:
         actual = metrics.get(metric_name)
         if actual is None:
-            # Only an explicit, documented not-applicable metric is skipped;
-            # missing/invalid values were normalized to 0.0 and still fail.
-            continue
-        status = "PASS" if low <= actual <= high else "FAIL"
+            if metric_name == "character_anim_hz":
+                # The renderer has no character animation yet; this is the
+                # one documented not-applicable metric in BAR-PERF.
+                continue
+            # Keep the schema's numeric `actual` field while making the
+            # missing measurement visible in the failure explanation.  This
+            # is deliberately not treated as a measured zero.
+            actual_for_schema = 0.0
+            status = "FAIL"
+            delta = "actual=missing; measurement required"
+            failures.append((priority, -math.inf, metric_id, delta))
+        else:
+            actual_for_schema = actual
+            status = "PASS" if low <= actual <= high else "FAIL"
+            delta = f"actual={actual:g}, below lower bound {low:g}" if actual < low else f"actual={actual:g}, above upper bound {high:g}"
+            if status == "FAIL":
+                failures.append((priority, -_relative_gap(actual, low, high), metric_id, delta))
         checks.append({
             "id": metric_id,
             "metric": metric_name,
-            "actual": actual,
+            "actual": actual_for_schema,
             "window": [low, high],
             "status": status,
         })
-        if status == "FAIL":
-            delta = f"actual={actual:g}, below lower bound {low:g}" if actual < low else f"actual={actual:g}, above upper bound {high:g}"
-            failures.append((priority, -_relative_gap(actual, low, high), metric_id, delta))
     failures.sort()
     verdict = "PASS" if not failures else "FAIL"
     largest_gap = None

@@ -40,3 +40,46 @@ def test_measured_character_animation_is_validated_when_present():
     check = next(check for check in verdict["checks"] if check["id"] == "4.1")
     assert check["actual"] == 12.0
     assert check["status"] == "PASS"
+
+
+def test_missing_gc_and_texture_measurements_are_explicit_failures():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "character_anim_status": "not_applicable_no_character_animation",
+            "vehicle_transform_hz": 60,
+            "camera_hz": 60,
+            "fps_p50": 60,
+            "fps_p05": 60,
+            "heap_growth_per_lap_mb": 1,
+            "frame_time_p99_ms": 1,
+            "long_frame_count": 0,
+            "first_interactive_s": 1,
+            "initial_bundle_kb_gz": 1,
+            "total_assets_mb": 1,
+            "time_to_first_render_s": 1,
+            "heap_peak_mb": 1,
+            "draw_calls": 1,
+            "triangles_k": 1,
+        },
+    }))
+
+    for metric_id in ("2.5", "5.5"):
+        check = next(check for check in verdict["checks"] if check["id"] == metric_id)
+        assert check["actual"] == 0.0
+        assert check["status"] == "FAIL"
+    assert verdict["largest_gap"]["id"] == "2.5"
+    assert "measurement required" in verdict["largest_gap"]["delta"]
+
+
+def test_measured_zero_for_gc_and_texture_is_a_real_pass():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "gc_pause_max_ms": 0,
+            "texture_memory_mb": 0,
+        },
+    }))
+
+    for metric_id in ("2.5", "5.5"):
+        check = next(check for check in verdict["checks"] if check["id"] == metric_id)
+        assert check["actual"] == 0.0
+        assert check["status"] == "PASS"

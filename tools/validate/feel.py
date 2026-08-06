@@ -3,7 +3,7 @@
 
 Usage:
     python3 tools/validate/feel.py telemetry/lap-a.json \
-        --output loop/round-3/VERDICT.json --round 3
+        --output loop/round-N/VERDICT.json --round N
 
 This module is intentionally pure Python: it reads JSON, performs numeric
 checks, and never calls a network service or an LLM.
@@ -417,6 +417,32 @@ def _nan_inf_frames(frames: list[dict[str, Any]]) -> int:
     return count
 
 
+def _drift_metrics(doc: dict[str, Any], frames: list[dict[str, Any]]) -> tuple[float, dict[int, float]]:
+    drift_indices = [index for index, frame in enumerate(frames) if frame.get("drift_state") != "none"]
+    drift_start = drift_indices[0] if drift_indices else None
+    entry_speed = _speed(frames[drift_start - 1]) if drift_start and drift_start > 0 else 0.0
+    charge_times: dict[int, float] = {}
+    for tier in (1, 2, 3):
+        if drift_start is None:
+            charge_times[tier] = 0.0
+        else:
+            charged = next((frame for frame in frames[drift_start:] if int(frame.get("drift_tier", 0)) >= tier), None)
+            charge_times[tier] = _finite(charged.get("t")) - _finite(frames[drift_start].get("t")) if charged else 0.0
+
+    drift_coverage_probes = _meta(doc).get("drift_coverage_probes", [])
+    tier3_probe = next(
+        (
+            probe for probe in drift_coverage_probes
+            if isinstance(probe, dict) and probe.get("name") == "drift-tier-3"
+        ),
+        None,
+    ) if isinstance(drift_coverage_probes, list) else None
+    if tier3_probe is not None:
+        charge_times[3] = _finite(tier3_probe["charge_time_s"])
+
+    return entry_speed, charge_times
+
+
 def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
     """Calculate every BAR-FEEL metric from a telemetry document."""
     frames = _frames(doc)
@@ -465,16 +491,7 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
     reverse_values = [-_longitudinal_speed(frame) for frame in frames]
     reverse_ratio = max(0.0, max(reverse_values, default=0.0)) / BASE_TOP_SPEED
 
-    drift_indices = [index for index, frame in enumerate(frames) if frame.get("drift_state") != "none"]
-    drift_start = drift_indices[0] if drift_indices else None
-    entry_speed = _speed(frames[drift_start - 1]) if drift_start and drift_start > 0 else 0.0
-    charge_times = {}
-    for tier in (1, 2, 3):
-        if drift_start is None:
-            charge_times[tier] = 0.0
-        else:
-            charged = next((frame for frame in frames[drift_start:] if int(frame.get("drift_tier", 0)) >= tier), None)
-            charge_times[tier] = _finite(charged.get("t")) - _finite(frames[drift_start].get("t")) if charged else 0.0
+    entry_speed, charge_times = _drift_metrics(doc, frames)
 
     release_events = _events(doc, "miniturbo_release")
     collision_events = _collision_events(doc)
@@ -753,9 +770,9 @@ def evaluate(doc: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("telemetry", type=Path)
-    parser.add_argument("--output", type=Path, default=Path("loop/round-3/VERDICT.json"))
+    parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--artifact", default=None)
-    parser.add_argument("--round", type=int, default=3, dest="round_number")
+    parser.add_argument("--round", type=int, required=True, dest="round_number")
     args = parser.parse_args(argv)
     doc = json.loads(args.telemetry.read_text(encoding="utf-8"))
     verdict = evaluate(doc, round_number=args.round_number, artifact=args.artifact or str(args.telemetry))

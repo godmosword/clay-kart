@@ -153,16 +153,24 @@ class CdpSession {
   #socket;
   #nextId = 0;
   #pending = new Map();
+  #eventWaiters = new Map();
 
   constructor(url) {
     this.#socket = new WebSocket(url);
     this.#socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
-      const pending = this.#pending.get(message.id);
-      if (!pending) return;
-      this.#pending.delete(message.id);
-      if (message.error) pending.reject(new Error(JSON.stringify(message.error)));
-      else pending.resolve(message.result);
+      if (message.id !== undefined) {
+        const pending = this.#pending.get(message.id);
+        if (!pending) return;
+        this.#pending.delete(message.id);
+        if (message.error) pending.reject(new Error(JSON.stringify(message.error)));
+        else pending.resolve(message.result);
+        return;
+      }
+      const waiters = this.#eventWaiters.get(message.method);
+      if (!waiters) return;
+      this.#eventWaiters.delete(message.method);
+      for (const resolveEvent of waiters) resolveEvent(message.params ?? {});
     });
   }
 
@@ -181,9 +189,47 @@ class CdpSession {
     });
   }
 
+  waitForEvent(method) {
+    return new Promise((resolveEvent) => {
+      const waiters = this.#eventWaiters.get(method) ?? [];
+      waiters.push(resolveEvent);
+      this.#eventWaiters.set(method, waiters);
+    });
+  }
+
   close() {
     this.#socket.close();
   }
+}
+
+async function readTracingStream(session, stream) {
+  let trace = '';
+  try {
+    let eof = false;
+    while (!eof) {
+      const chunk = await session.call('IO.read', { handle: stream });
+      trace += chunk.data ?? '';
+      eof = chunk.eof === true;
+    }
+  } finally {
+    await session.call('IO.close', { handle: stream }).catch(() => {});
+  }
+  return trace;
+}
+
+function gcPauseMaxMs(traceText) {
+  let trace;
+  try {
+    trace = JSON.parse(traceText);
+  } catch {
+    return 0;
+  }
+  const events = Array.isArray(trace?.traceEvents) ? trace.traceEvents : [];
+  return events.reduce((maximum, event) => {
+    if (typeof event?.name !== 'string' || !/gc|garbage/i.test(event.name)) return maximum;
+    const durationMs = Number(event.dur) / 1000;
+    return Number.isFinite(durationMs) ? Math.max(maximum, durationMs) : maximum;
+  }, 0);
 }
 
 function browserProbeScript() {
@@ -200,6 +246,8 @@ function browserProbeScript() {
     documentStart: performance.now(),
     measurementStart: performance.now(),
     inputTimers: [],
+    textureBytes: 0,
+    textureContexts: new Map(),
   };
   state.reset = () => {
     for (const timer of state.inputTimers) clearTimeout(timer);
@@ -255,6 +303,144 @@ function browserProbeScript() {
     Object.defineProperty(prototype, '__r16PerfPatched', { value: true });
     const originalDrawElements = prototype.drawElements;
     const originalDrawArrays = prototype.drawArrays;
+    const originalBindTexture = prototype.bindTexture;
+    const originalDeleteTexture = prototype.deleteTexture;
+    const originalTexImage2D = prototype.texImage2D;
+    const originalTexStorage2D = prototype.texStorage2D;
+    const originalCompressedTexImage2D = prototype.compressedTexImage2D;
+    const originalGenerateMipmap = prototype.generateMipmap;
+
+    const contextState = (gl) => {
+      let context = state.textureContexts.get(gl);
+      if (!context) {
+        context = { bound: new Map(), textures: new Map() };
+        state.textureContexts.set(gl, context);
+      }
+      return context;
+    };
+    const textureTarget = (gl, target) => (
+      target >= gl.TEXTURE_CUBE_MAP_POSITIVE_X && target <= gl.TEXTURE_CUBE_MAP_NEGATIVE_Z
+        ? gl.TEXTURE_CUBE_MAP
+        : target
+    );
+    const bytesPerPixel = (gl, format, type) => {
+      const channels = format === gl.RGBA ? 4
+        : format === gl.RGB ? 3
+          : format === gl.RG ? 2
+            : format === gl.RED || format === gl.ALPHA || format === gl.LUMINANCE ? 1
+              : format === gl.LUMINANCE_ALPHA ? 2 : 4;
+      const bytes = type === gl.FLOAT || type === gl.UNSIGNED_INT || type === gl.INT ? 4
+        : type === gl.HALF_FLOAT || type === gl.HALF_FLOAT_OES || type === gl.UNSIGNED_SHORT || type === gl.SHORT ? 2
+          : 1;
+      return channels * bytes;
+    };
+    const textureRecord = (context, texture) => {
+      let record = context.textures.get(texture);
+      if (!record) {
+        record = { levels: new Map() };
+        context.textures.set(texture, record);
+      }
+      return record;
+    };
+    const replaceLevel = (gl, target, level, bytes, width, height, bpp) => {
+      const context = contextState(gl);
+      const texture = context.bound.get(textureTarget(gl, target));
+      if (!texture) return;
+      const record = textureRecord(context, texture);
+      const previous = record.levels.get(level)?.bytes ?? 0;
+      record.levels.set(level, { bytes, width, height, bpp });
+      state.textureBytes += bytes - previous;
+    };
+    const deleteRecord = (gl, texture) => {
+      if (!texture) return;
+      const context = contextState(gl);
+      const record = context.textures.get(texture);
+      if (!record) return;
+      for (const level of record.levels.values()) state.textureBytes -= level.bytes;
+      context.textures.delete(texture);
+    };
+    const sourceDimension = (source, key) => Number(
+      source?.[key] ?? source?.[key === 'width' ? 'videoWidth' : 'videoHeight'] ?? 0,
+    );
+
+    prototype.bindTexture = function(target, texture) {
+      const result = originalBindTexture.call(this, target, texture);
+      contextState(this).bound.set(target, texture);
+      return result;
+    };
+    prototype.deleteTexture = function(texture) {
+      deleteRecord(this, texture);
+      return originalDeleteTexture.call(this, texture);
+    };
+    if (originalTexImage2D) {
+      prototype.texImage2D = function(...args) {
+        const target = args[0];
+        const level = Number(args[1]);
+        let width;
+        let height;
+        let format;
+        let type;
+        if (args.length >= 9) {
+          width = Number(args[3]);
+          height = Number(args[4]);
+          format = args[6];
+          type = args[7];
+        } else {
+          const source = args[5];
+          width = sourceDimension(source, 'width');
+          height = sourceDimension(source, 'height');
+          format = args[3];
+          type = args[4];
+        }
+        const result = originalTexImage2D.apply(this, args);
+        if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+          replaceLevel(this, target, level, width * height * bytesPerPixel(this, format, type), width, height, bytesPerPixel(this, format, type));
+        }
+        return result;
+      };
+    }
+    if (originalTexStorage2D) {
+      prototype.texStorage2D = function(target, levels, internalFormat, width, height) {
+        const result = originalTexStorage2D.call(this, target, levels, internalFormat, width, height);
+        const bpp = internalFormat === this.RGBA8 || internalFormat === this.RGBA16F || internalFormat === this.RGBA32F ? 4
+          : internalFormat === this.RGB8 || internalFormat === this.RGB565 ? 3 : 1;
+        for (let level = 0; level < levels; level += 1) {
+          const levelWidth = Math.max(1, width >> level);
+          const levelHeight = Math.max(1, height >> level);
+          replaceLevel(this, target, level, levelWidth * levelHeight * bpp, levelWidth, levelHeight, bpp);
+        }
+        return result;
+      };
+    }
+    if (originalCompressedTexImage2D) {
+      prototype.compressedTexImage2D = function(...args) {
+        const target = args[0];
+        const level = Number(args[1]);
+        const width = Number(args[3]);
+        const height = Number(args[4]);
+        const data = args[6];
+        const result = originalCompressedTexImage2D.apply(this, args);
+        const bytes = Number(data?.byteLength ?? 0);
+        if (bytes > 0) replaceLevel(this, target, level, bytes, width, height, 0);
+        return result;
+      };
+    }
+    if (originalGenerateMipmap) {
+      prototype.generateMipmap = function(target) {
+        const result = originalGenerateMipmap.call(this, target);
+        const context = contextState(this);
+        const texture = context.bound.get(textureTarget(this, target));
+        const base = texture ? context.textures.get(texture)?.levels.get(0) : null;
+        if (base && base.bpp > 0) {
+          for (let level = 1, width = base.width, height = base.height; width > 1 || height > 1; level += 1) {
+            width = Math.max(1, width >> 1);
+            height = Math.max(1, height >> 1);
+            replaceLevel(this, target, level, width * height * base.bpp, width, height, base.bpp);
+          }
+        }
+        return result;
+      };
+    }
     prototype.drawElements = function(mode, count, ...args) {
       state.glDrawCalls += 1;
       const frame = state.raf.length;
@@ -329,11 +515,20 @@ async function measureBrowser() {
     await session.call('Page.navigate', { url: `http://127.0.0.1:${serverPort}/index.html` });
     await sleep(1500);
     const segments = fixtureSegmentsForWindow();
+    await session.call('Tracing.start', {
+      categories: 'disabled-by-default-v8.gc',
+      transferMode: 'ReturnAsStream',
+    });
     await session.call('Runtime.evaluate', {
       expression: `window.__R16_PERF__?.reset(); window.__R16_PERF__?.scheduleInput(${JSON.stringify(segments)}, ${TICK_HZ});`,
       returnByValue: true,
     });
     await sleep(MEASUREMENT_SECONDS * 1000 + 100);
+    const tracingComplete = session.waitForEvent('Tracing.tracingComplete');
+    await session.call('Tracing.end');
+    const traceEvent = await tracingComplete;
+    const traceText = traceEvent.stream ? await readTracingStream(session, traceEvent.stream) : '';
+    const measuredGcPauseMaxMs = gcPauseMaxMs(traceText);
     const result = await session.call('Runtime.evaluate', {
       expression: `(() => {
         const state = window.__R16_PERF__;
@@ -377,8 +572,7 @@ async function measureBrowser() {
           heap_growth_per_lap_mb: heap.length > 1 ? Math.max(0, heap.at(-1) - heap[0]) : null,
           draw_calls: drawCallsPerFrame.length ? Math.max(...drawCallsPerFrame) : 0,
           triangles_k: trianglesPerFrame.length ? Math.max(...trianglesPerFrame) / 1000 : 0,
-          gc_pause_max_ms: null,
-          texture_memory_mb: null,
+          texture_memory_mb: (state?.textureBytes ?? 0) / (1024 * 1024),
         };
       })()`,
       returnByValue: true,
@@ -387,7 +581,7 @@ async function measureBrowser() {
     if (!measured || measured.canvas_count < 1 || measured.rendered_frames < 1) {
       throw new Error(`headless renderer produced no measurable WebGL frames: ${JSON.stringify(measured)}`);
     }
-    return measured;
+    return { ...measured, gc_pause_max_ms: measuredGcPauseMaxMs };
   } finally {
     session?.close();
     child.kill('SIGTERM');
@@ -409,7 +603,7 @@ const report = {
     seed: fixture.seed,
     device,
     device_note: 'Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement',
-    measurement_method: 'External requestAnimationFrame and WebGL draw instrumentation. renderer.draw updates vehicle transforms and camera before each observed WebGL frame.',
+    measurement_method: 'External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
     character_animation: 'not_applicable_no_character_animation',
   },
   metrics: {
