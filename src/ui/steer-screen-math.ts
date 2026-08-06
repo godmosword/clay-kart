@@ -9,6 +9,9 @@
  * three.js `Matrix4.lookAt(eye, target, up)`：
  *   z = normalize(eye - target)
  *   x = normalize(cross(up, z))   ← 相機 local +X = 畫面右邊
+ *
+ * **熱路徑零配置：** `writeFollowCam(out, …)` 寫進呼叫端持有的緩衝；
+ * 幀迴圈禁止呼叫會 new 的 `sampleFollowCam()`。
  */
 
 /** 與 renderer.ts 同步。改那邊的相機就要改這裡，否則回歸會測錯軸。 */
@@ -29,36 +32,43 @@ export interface SteerProbeSample {
   camRight: [number, number, number];
 }
 
-export function forwardXZ(yaw: number): [number, number] {
-  return [Math.sin(yaw), Math.cos(yaw)];
+/** 一次配置、之後每幀重用。 */
+export function createSteerProbeSample(): SteerProbeSample {
+  return {
+    t: 0,
+    pos: [0, 0, 0],
+    yaw: 0,
+    camPos: [0, 0, 0],
+    camRight: [0, 0, 0],
+  };
 }
 
 /**
- * 由玩家位置／朝向重建 follow-cam 的畫面右軸。
- * `pos` / `yaw` 應為渲染插值後的值（與畫面上看到的一致）。
+ * 由玩家位置／朝向重建 follow-cam 的畫面右軸，寫入 `out`（不 new）。
  */
-export function sampleFollowCam(
+export function writeFollowCam(
+  out: SteerProbeSample,
   pos: readonly [number, number, number],
   yaw: number,
   t = 0,
 ): SteerProbeSample {
-  const [fx, fz] = forwardXZ(yaw);
-  const [kx, ky, kz] = pos;
-  const camPos: [number, number, number] = [
-    kx - fx * FOLLOW_CAM.distance,
-    ky + FOLLOW_CAM.height,
-    kz - fz * FOLLOW_CAM.distance,
-  ];
-  const target: [number, number, number] = [
-    kx + fx * FOLLOW_CAM.lookAhead,
-    ky + FOLLOW_CAM.lookHeight,
-    kz + fz * FOLLOW_CAM.lookAhead,
-  ];
+  const fx = Math.sin(yaw);
+  const fz = Math.cos(yaw);
+  const kx = pos[0];
+  const ky = pos[1];
+  const kz = pos[2];
+
+  const camX = kx - fx * FOLLOW_CAM.distance;
+  const camY = ky + FOLLOW_CAM.height;
+  const camZ = kz - fz * FOLLOW_CAM.distance;
+  const targetX = kx + fx * FOLLOW_CAM.lookAhead;
+  const targetY = ky + FOLLOW_CAM.lookHeight;
+  const targetZ = kz + fz * FOLLOW_CAM.lookAhead;
 
   // z = eye - target
-  let zx = camPos[0] - target[0];
-  let zy = camPos[1] - target[1];
-  let zz = camPos[2] - target[2];
+  let zx = camX - targetX;
+  let zy = camY - targetY;
+  let zz = camZ - targetZ;
   const zLen = Math.hypot(zx, zy, zz) || 1;
   zx /= zLen;
   zy /= zLen;
@@ -73,13 +83,27 @@ export function sampleFollowCam(
   ry /= rLen;
   rz /= rLen;
 
-  return {
-    t,
-    pos: [kx, ky, kz],
-    yaw,
-    camPos,
-    camRight: [rx, ry, rz],
-  };
+  out.t = t;
+  out.yaw = yaw;
+  out.pos[0] = kx;
+  out.pos[1] = ky;
+  out.pos[2] = kz;
+  out.camPos[0] = camX;
+  out.camPos[1] = camY;
+  out.camPos[2] = camZ;
+  out.camRight[0] = rx;
+  out.camRight[1] = ry;
+  out.camRight[2] = rz;
+  return out;
+}
+
+/** 非熱路徑便利函式（會配置）。幀迴圈請用 `writeFollowCam`。 */
+export function sampleFollowCam(
+  pos: readonly [number, number, number],
+  yaw: number,
+  t = 0,
+): SteerProbeSample {
+  return writeFollowCam(createSteerProbeSample(), pos, yaw, t);
 }
 
 /** 車體位移在起始畫面右軸上的投影。>0 = 往畫面右邊，<0 = 往左邊。 */
@@ -90,6 +114,8 @@ export function screenLateral(
   const dx = end.pos[0] - start.pos[0];
   const dy = end.pos[1] - start.pos[1];
   const dz = end.pos[2] - start.pos[2];
-  const [rx, ry, rz] = start.camRight;
+  const rx = start.camRight[0];
+  const ry = start.camRight[1];
+  const rz = start.camRight[2];
   return dx * rx + dy * ry + dz * rz;
 }
