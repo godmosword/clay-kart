@@ -175,6 +175,30 @@
 
 ## 待裁決
 
+### §4.1 的量測靠比對 ck-visual 的函式名，跨 worktree 耦合沒有機械防護
+
+- **輪次**：R25（Lead 驗證 `a4c9756` 時發現）
+- **現況**：`perf-probe.mjs` 量 `character_anim_hz` 的方法是全域替換
+  `Math.floor`，對值域落在 `[0, 120]` 的呼叫做 `new Error().stack`，
+  **比對堆疊字串裡有沒有 `setExpressionTime`**
+- **量測本身是真的**（已獨立驗證）：Lead 重跑得到 12.1258（Codex 報 12.1188），
+  數的是實際的量化 bin 轉換與時間戳，不是常數頂替。**擾動疑慮也已用實測排除**
+  ——同一份 build 背對背 A/B，新版 `fps_p50` 22.73 vs 舊版 22.47，幾乎不動
+- **問題在耦合**：`setExpressionTime` 是 `src/characters/driver-face.ts` 的方法名，
+  屬 **ck-visual** 的範圍；量測它的探針在 **ck-physics**。ck-visual 只要改名
+  或改變量化的實作方式（例如不再走 `Math.floor`），`§4.1` 就會壞掉，
+  而**兩邊都沒有任何機制知道對方依賴自己**
+- **失敗模式是好的**：名字對不上 → `character_anim_updates` 為 0 →
+  `character_anim_hz` 為 null → `perf.py` 現在會 FAIL（`not_applicable` 逃生口
+  已移除）。**會叫，不會靜靜假通過**——這比 R3–R16 的狀態好得多
+- **仍值得處理的原因**：`BAR-PERF §6` 把 `§4` 排在優先序第一，而它現在掛在一個
+  字串比對上。ck-visual 的 builder 不會知道改個方法名會弄壞 perf 驗收
+- **可能的處置（都是裁決）**：在 `driver-face.ts` 留一個明確的註解說明它被
+  perf-probe 依賴／改由 `src/contract/` 定義一個具名的抽格點讓兩邊都指向它／
+  接受現況但把依賴寫進 `FROZEN.md` 或 `loop/README.md` 的收尾檢查
+- **狀態**：待裁決——不阻擋任何事，但這是一條沒人看得見的線
+
+
 ### 視覺 critic 的單輪變異大於 PASS/FAIL 的間距
 
 - **輪次**：R24（第二次跑 critic，跟 R21 對照才看得出來）
