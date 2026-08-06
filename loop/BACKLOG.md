@@ -175,6 +175,32 @@
 
 ## 待裁決
 
+### applyHandPressedRelief 在 RoundedBoxGeometry 上不生效，原因未查明
+
+- **輪次**：R24（做 `track-surface` 時撞到）
+- **現況**：`src/render/clay/geometry.ts` 的 `applyHandPressedRelief()` 沿法線
+  位移頂點。套在草地的 `PlaneGeometry` 上完全正常（成品圖 sd/mean 從 1.98
+  變 9.19），套在路面的 `claySlab()`（`RoundedBoxGeometry`）上**完全沒有效果**
+- **排除過的**：
+  - 不是參數太小：振幅從 0.038 加到 0.25（6.5 倍），路面區域 sd 停在
+    3.00±0.02，側視輪廓仍是一條直線
+  - 不是細分不足：`segments` 從 40 改到 6，輸出**逐位元相同**——連倒角輪廓
+    都沒變，這本身就很奇怪
+  - 不是建置沒吃到修改：把路面顏色改成 `TERRAIN.pond` 重跑，顏色確實變了
+  - 不是數學錯：在 node 裡單獨對 `RoundedBoxGeometry(5, 0.13, 7, 6, 0.0156)`
+    跑同一段位移，6084 個頂點全部移動，y 範圍從 ±0.065 撐到 ±0.095
+  - 不是缺屬性：該 geometry 有 `position` / `normal` / `uv`，早退的守衛不會觸發
+- **繞開方式（已採用）**：把「厚度」與「可見表面」拆成兩塊——`claySlab` 只
+  負責厚度與側面接縫，可見的路面是一張轉平的 `PlaneGeometry` 加起伏。
+  這本來也比較省：`segments: 40` 時 `RoundedBoxGeometry` 是 **236,196 個頂點**，
+  而 `BAR-PERF §5.4` 的整幀預算才 400k 三角形
+- **為什麼記下來而不是繼續追**：繞開的做法在幾何上本來就比較對（可見表面該是
+  一張夠密的網格），繼續追的收益是「知道 three 的哪個行為造成的」，不是
+  「元件會更好」。但這是一個**會再咬人的坑**——之後 `foliage`、
+  `track-barriers`、`shadows-contact` 都可能想對圓角塊體加起伏
+- **狀態**：待裁決——不阻擋 W3，但下次有人想對 `claySlab` 加起伏之前該有答案
+
+
 ### BAR-PERF 沒有通往基準機的量測路徑 —— §2 從來沒有被真正判決過
 
 - **輪次**：R23（Lead 讀 `BAR-PERF §1` 時發現）
