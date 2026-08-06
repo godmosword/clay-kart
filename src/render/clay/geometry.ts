@@ -70,6 +70,105 @@ export function clayBlob(radius: number, segments = 20): BufferGeometry {
 }
 
 /**
+ * 手壓起伏：沿法線做低頻位移，讓大面積表面不是數學平面。
+ *
+ * **為什麼平面需要這個而車身不需要**：法線貼圖靠的是表面朝向與光的夾角
+ * 變化。車身各個面朝向都不同，壓痕吃得到光；而一塊水平躺著、頭上是
+ * `§5.0` 要求的「柔和大面積、弱方向性」主光的路面，整片的入射角幾乎一樣，
+ * 法線貼圖幾乎不產生明暗差——算出來就是一片死平的色塊，也就是 `§5.4`
+ * 一眼判斷要排除的「貼上去的一張材質」。
+ *
+ * 真的被手壓平的一大塊黏土本來就不是平面，它有很淺的波浪。做成幾何而不是
+ * 加強法線貼圖，是因為只有幾何會同時出現在**側視輪廓**與**接縫的陰影**裡，
+ * 而那兩樣正是「壓平的一塊」讀得出來的地方。
+ *
+ * 位移量以世界座標取樣，所以同一塊地形不管切成幾片、用什麼 geometry，
+ * 起伏都對得起來，不會在接縫處錯開。
+ *
+ * 確定性：用整數哈希的 value noise，**沒有 `Math.random()`**——元件審查圖
+ * 必須可以重複產生，`loop/round-21` 那次「與 R19 差異最大 11」的比對
+ * 靠的就是這件事。
+ */
+export interface HandPressedReliefOptions {
+  /** 位移振幅（世界單位）。路面約 0.02，草地可以大一點。 */
+  amplitude: number;
+  /** 主波長（世界單位）。預設對齊壓痕的基準尺度。 */
+  wavelength?: number;
+  /** 物件在世界中的位移，讓相鄰物件的起伏能接上。 */
+  offset?: { x: number; z: number };
+  /**
+   * 只往正向位移（0..amplitude），不往下凹。
+   *
+   * 用在「薄表面疊在一塊實心板上」的情況：往下凹會沉進板子裡，凹處露出的是
+   * 板子平坦的頂面，起伏因此在最需要它的地方消失。往上推也比較接近實情——
+   * 黏土被壓棒推過，留下的是凸起的稜，不是挖出來的溝。
+   */
+  positiveOnly?: boolean;
+}
+
+function hash2(ix: number, iz: number): number {
+  // 整數哈希，回傳 [0, 1)。常數取自常見的 xorshift 混合，無特殊意義。
+  let h = Math.imul(ix, 0x27d4eb2d) ^ Math.imul(iz, 0x165667b1);
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+function valueNoise2(x: number, z: number): number {
+  const ix = Math.floor(x);
+  const iz = Math.floor(z);
+  const fx = x - ix;
+  const fz = z - iz;
+  // smoothstep，避免格點處出現折線
+  const sx = fx * fx * (3 - 2 * fx);
+  const sz = fz * fz * (3 - 2 * fz);
+  const n00 = hash2(ix, iz);
+  const n10 = hash2(ix + 1, iz);
+  const n01 = hash2(ix, iz + 1);
+  const n11 = hash2(ix + 1, iz + 1);
+  const nx0 = n00 + (n10 - n00) * sx;
+  const nx1 = n01 + (n11 - n01) * sx;
+  return (nx0 + (nx1 - nx0) * sz) * 2 - 1;
+}
+
+/** 就地位移 geometry 的頂點並重算法線。回傳同一個 geometry 方便串接。 */
+export function applyHandPressedRelief(
+  geometry: BufferGeometry,
+  options: HandPressedReliefOptions,
+): BufferGeometry {
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  if (!position || !normal) return geometry;
+
+  const wavelength = options.wavelength ?? 2.4;
+  const offsetX = options.offset?.x ?? 0;
+  const offsetZ = options.offset?.z ?? 0;
+
+  for (let i = 0; i < position.count; i++) {
+    const px = position.getX(i);
+    const py = position.getY(i);
+    const pz = position.getZ(i);
+    const wx = (px + offsetX) / wavelength;
+    const wz = (pz + offsetZ) / wavelength;
+    // 兩個八度：低頻是「壓平時留下的波浪」，高頻是壓棒走過的痕。
+    const noise =
+      valueNoise2(wx, wz) * 0.72 + valueNoise2(wx * 2.7, wz * 2.7) * 0.28;
+    const displacement =
+      (options.positiveOnly ? noise * 0.5 + 0.5 : noise) * options.amplitude;
+    position.setXYZ(
+      i,
+      px + normal.getX(i) * displacement,
+      py + normal.getY(i) * displacement,
+      pz + normal.getZ(i) * displacement,
+    );
+  }
+
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/**
  * `§6` 倒角條款的機器可讀檢查。
  *
  * 回傳這組尺寸的合法最小倒角半徑，呼叫端可以拿去對照自己實際用的值。
