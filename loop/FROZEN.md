@@ -78,6 +78,23 @@ Lead 事後抓到的，不是任何自動化機制擋下來的）。
 ### 已完成元件的實作
 
 - `src/ai/controller.ts`           # R15 PASS, BAR-FEEL §12.1–§12.4
+- `src/physics/world.ts`           # R22 PASS 46/46, BAR-FEEL §2–§8, §12
+- `src/physics/constants.ts`       # 同上，world.ts 的調校常數不可分開改
+
+**`BAR-FEEL` 46 項全數 PASS（R22，`43efe59`）**，telemetry 已 commit
+於 `loop/round-22/artifacts/lap-a.json`，Lead 用 main 自己的程式碼重跑
+驗證與已提交判決逐項零差異。W2 的手感這條線做完了。
+
+凍結的直接理由是 **`4.10 drift_speed_retention = 0.9697186`，上限 `0.97`
+——絕對餘裕 `0.00028`，窗口跨度的 0.03%，是全專案最薄的一項**。次薄的
+`4.6` 是 1.88%、`12.3` 是 0.10%。這種厚度下，任何一次「順手調一下手感」
+都可能把它推出窗口而沒人立刻發現。往後要動漂移或加速的調校，先經裁決。
+
+**不為了加厚 `4.10` 而回頭改物理**：那要動 `DRIFT_CHARGE_DRAG_US2`，
+而它與 `MINI_TURBO_GAIN_BY_TIER`、只給 tier 2 的
+`MINI_TURBO_VELOCITY_KICK_BY_TIER` 是一組互相牽制的參數（R22 的
+diff 顯示加阻力會拖垮 `4.5`，那是 `§4` 唯一的硬門檻）。為了餘裕好看去
+重新平衡一組已經 46/46 的參數，風險遠大於收益。改成用閘門守住。
 
 `ai-opponents` 四項行為指標 R15 全數真實 PASS 並經 Lead 獨立驗證。BACKLOG 的 R15
 條目已標明 `12.3` 的 margin 只剩 `0.0167s`，「之後再調整 rubberband/difficulty

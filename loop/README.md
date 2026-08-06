@@ -70,6 +70,31 @@ done
 若某個 worktree 有輸出但這裡完全乾淨，先別急著結案——確認一下 builder
 是不是忘了 commit，而不是這輪真的沒有異動。
 
+**上面兩道都抓不到第三種情況：證據上了 main，程式碼沒上。** R22 與 R23
+連兩輪發生——builder 把 `VERDICT-*.json` 與 telemetry 直接提交到 main，
+而產生它們的程式碼還留在功能分支。結果是 main 上有一份全綠的判決，
+**而 main 自己跑不出來**（R22 那次實測：main 重跑得到 42/46，17 個指標
+對不上已提交的判決）。
+
+前兩道抓不到它的原因很具體：`git status --short` 是乾淨的（程式碼確實
+commit 了，只是在分支上），而 `merge-base` 顯示分支未併入——但那在
+builder 還沒收尾的輪次裡是**正常狀態**，不構成警訊。
+
+前三種變體看起來都是「缺東西」，會觸發追問；這一種看起來是「做完了而且
+全綠」。所以它需要一道問不同問題的檢查：**這份 artifact 說它是用哪個
+commit 產生的，那個 commit 在這裡嗎？**
+
+```bash
+python3 loop/schema/provenance.py
+```
+
+exit 0 才算收尾。它掃 `loop/round-*/artifacts/*.json` 的 `meta.build_sha`，
+逐一確認是 `HEAD` 的祖先。沒有這個欄位的（早期輪次）會列出來但不算失敗
+——列出來是刻意的，沉默的假陰性比吵雜的假陽性危險。
+
+也可以拿去驗歷史上的某個 commit：`--rev 87b4fe4` 會如實指出當時
+`loop/round-22/artifacts/` 的兩份 artifact 的 `build_sha` 不在歷史裡。
+
 ### 遠端衝突規則
 
 `origin` = https://github.com/godmosword/clay-kart
