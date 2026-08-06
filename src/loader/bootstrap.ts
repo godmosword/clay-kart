@@ -29,8 +29,8 @@ export type { SteerProbeSample } from '@ui/steer-screen-math';
  *
  * 舊值 8（≈66.7ms）低於 R23 實測的 frame_time_p99≈139ms——再搭配
  * `accumulator = 0` 丟棄積欠，長幀會變成慢動作而不是掉格。
- * 提到能吃掉 ~150ms 長幀；真正的 spiral 防護改由 MAX_CATCH_UP_SECONDS 承擔
- * （分頁切回累積數秒時才丟時間，且必須記入 timeStats）。
+ * 提到能吃掉 ~200ms 長幀（24 × TICK_DT）；真正的 spiral 防護改由
+ * MAX_CATCH_UP_SECONDS 承擔（分頁切回累積數秒時才丟時間，且必須記入 timeStats）。
  */
 const MAX_TICKS_PER_FRAME = 24;
 
@@ -177,7 +177,9 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
       timeStats.wallElapsed > 0 ? timeStats.simElapsed / timeStats.wallElapsed : 1;
 
     const snap: SimSnapshot = world.snapshot();
-    const alpha = accumulator / TICK_DT;
+    // accumulator 在 catch-up 殘留時可超過一個 TICK_DT（最大約 6）；
+    // alpha > 1 會讓 renderer 外插，長幀時車被畫超前再彈回——正好破壞這次修正。
+    const alpha = Math.min(1, accumulator / TICK_DT);
     renderer.draw(snap, alpha);
 
     // 其餘每幀配置：
