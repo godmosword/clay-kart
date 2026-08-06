@@ -98,11 +98,15 @@ export function createPlayerInput(mount: HTMLElement): PlayerInput {
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('blur', onBlur);
 
-  const overlay = buildTouchOverlay(press, release);
-  if (getComputedStyle(mount).position === 'static') {
-    mount.style.position = 'relative';
+  // 桌機（fine pointer + hover）不掛觸控鈕——會吃掉視覺審查截圖的畫面。
+  // iPad：pointer:coarse / hover:none → 掛上。
+  const overlay = shouldShowTouchControls() ? buildTouchOverlay(press, release) : null;
+  if (overlay) {
+    if (getComputedStyle(mount).position === 'static') {
+      mount.style.position = 'relative';
+    }
+    mount.appendChild(overlay);
   }
-  mount.appendChild(overlay);
 
   // advance() 每 tick 同步讀完就丟——重用同一份，避免 120Hz 每秒 120 次配置。
   const polled: {
@@ -142,10 +146,21 @@ export function createPlayerInput(mount: HTMLElement): PlayerInput {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
-      overlay.remove();
+      overlay?.remove();
       held.clear();
     },
   };
+}
+
+/** 主要目標是 iPad；桌機鍵盤已足夠，掛 overlay 只會污染截圖。 */
+function shouldShowTouchControls(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return (
+    window.matchMedia('(pointer: coarse)').matches ||
+    window.matchMedia('(hover: none)').matches
+  );
 }
 
 function buildTouchOverlay(
