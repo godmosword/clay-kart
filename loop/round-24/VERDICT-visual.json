@@ -9,90 +9,126 @@
       "id": "kart-wheels",
       "metric": "clay_score_1to5",
       "actual": 4,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "PASS"
     },
     {
       "id": "kart-body",
       "metric": "clay_score_1to5",
-      "actual": 3,
-      "window": [4, 5],
-      "status": "FAIL"
+      "actual": 4,
+      "window": [
+        4,
+        5
+      ],
+      "status": "PASS"
     },
     {
       "id": "driver-face",
       "metric": "clay_score_1to5",
-      "actual": 3,
-      "window": [4, 5],
-      "status": "FAIL"
+      "actual": 4,
+      "window": [
+        4,
+        5
+      ],
+      "status": "PASS"
     },
     {
       "id": "track-surface",
       "metric": "clay_score_1to5",
       "actual": 3,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     },
     {
       "id": "track-barriers",
       "metric": "clay_score_1to5",
       "actual": 1,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     },
     {
       "id": "foliage",
       "metric": "clay_score_1to5",
       "actual": 1,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     },
     {
       "id": "skybox-lighting",
       "metric": "clay_score_1to5",
       "actual": 1,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     },
     {
       "id": "drift-sparks",
       "metric": "clay_score_1to5",
       "actual": 1,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     },
     {
       "id": "item-boxes",
       "metric": "clay_score_1to5",
       "actual": 1,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     },
     {
       "id": "shadows-contact",
       "metric": "clay_score_1to5",
       "actual": 1,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     },
     {
       "id": "water-sea",
       "metric": "clay_score_1to5",
       "actual": 1,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     },
     {
       "id": "ui-hud",
       "metric": "clay_score_1to5",
       "actual": 1,
-      "window": [4, 5],
+      "window": [
+        4,
+        5
+      ],
       "status": "FAIL"
     }
   ],
   "largest_gap": {
-    "id": "kart-body",
-    "delta": "已實作的四個元件有三個落在 3 分（門檻 4）。kart-body 與 driver-face 較 R21 各降一分，而同一張參考圖在兩輪之間從 2 分變 4 分——critic 的單輪變異幅度大於 PASS/FAIL 的間距，這個分數本身的可信度先於任何造型結論。",
+    "id": "track-surface",
+    "delta": "三輪中位數 3（門檻 4）。但這一組的參考半邊是柏油灰，違反 §5.4 明文「不用柏油灰」——我們的中位數 3 高於參考的 2，critic 三輪都指出參考較像柏油。在配對修正之前，這個分數不能讀成元件沒做好。其餘三個已實作元件的中位數都是 4，達門檻。",
     "priority_rank": 1
   },
   "artifacts": [

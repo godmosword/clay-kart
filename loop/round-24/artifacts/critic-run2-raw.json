@@ -1,0 +1,102 @@
+{
+  "round": 24,
+  "wave": "W3",
+  "element": "visual-contact-sheet",
+  "verdict": "FAIL",
+  "bar_ref": "BAR-VISUAL.md §5",
+  "checks": [
+    {
+      "id": "r0c0",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r0c1",
+      "metric": "clay_score_1to5",
+      "actual": 3,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r1c0",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r1c1",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r2c0",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r2c1",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r3c0",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r3c1",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    },
+    {
+      "id": "r4c0",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    },
+    {
+      "id": "r4c1",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r5c0",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "r5c1",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    }
+  ],
+  "largest_gap": {
+    "id": "r2c1",
+    "delta": "左右皆為灰色 placeholder，沒有可評的黏土 HUD 視覺內容（1/5）。",
+    "priority_rank": 1
+  },
+  "artifacts": ["contact-sheet.png"],
+  "next_owner": "lead",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 0
+}
