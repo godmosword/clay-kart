@@ -47,6 +47,26 @@ def test_missing_render_telemetry_fails_all_three_section_four_checks():
         assert check["status"] == "FAIL"
 
 
+def test_missing_rendered_frames_does_not_synthesize_section_four_rates():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "render_telemetry_counters": {
+                "vehicleTransformUpdates": 120,
+                "cameraUpdates": 120,
+                "characterAnimationFrames": 24,
+            },
+            "vehicle_transform_hz": None,
+            "camera_hz": None,
+            "character_anim_hz": None,
+        },
+    }))
+
+    for metric_id in ("4.1", "4.2", "4.3"):
+        check = next(check for check in verdict["checks"] if check["id"] == metric_id)
+        assert check["actual"] == 0.0
+        assert check["status"] == "FAIL"
+
+
 def test_measured_character_animation_is_validated_when_present():
     metrics = calculate_metrics({"metrics": {"character_anim_hz": 12}})
 

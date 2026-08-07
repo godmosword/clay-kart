@@ -333,10 +333,12 @@ function browserProbeScript() {
     state.heapSamples = [];
     state.measurementStart = performance.now();
     const telemetry = window.__CLAY_RENDER_TELEMETRY__;
-    state.renderTelemetryStart = telemetry && Number.isFinite(telemetry.vehicleTransformUpdates)
+    state.renderTelemetryStart = telemetry && Number.isFinite(telemetry.renderedFrames)
+      && Number.isFinite(telemetry.vehicleTransformUpdates)
       && Number.isFinite(telemetry.cameraUpdates)
       && Number.isFinite(telemetry.characterAnimationFrames)
       ? {
+        renderedFrames: telemetry.renderedFrames,
         vehicleTransformUpdates: telemetry.vehicleTransformUpdates,
         cameraUpdates: telemetry.cameraUpdates,
         characterAnimationFrames: telemetry.characterAnimationFrames,
@@ -660,7 +662,7 @@ async function measureBrowser() {
         const first = raf[0]?.now ?? state?.measurementStart ?? 0;
         const last = raf.at(-1)?.now ?? first;
         const elapsed = Math.max(0, last - (state?.measurementStart ?? first)) / 1000;
-        const renderedFrames = state?.glFrames?.size ?? 0;
+        const webglFrameCount = state?.glFrames?.size ?? 0;
         const frameIntervals = raf.slice(1).map((entry, index) => entry.now - raf[index].now);
         const fps = frameIntervals.filter((ms) => ms > 0).map((ms) => 1000 / ms);
         const percentile = (values, percent) => {
@@ -672,10 +674,12 @@ async function measureBrowser() {
         };
         const renderTelemetry = window.__CLAY_RENDER_TELEMETRY__;
         const telemetryStart = state?.renderTelemetryStart;
-        const telemetryEnd = renderTelemetry && Number.isFinite(renderTelemetry.vehicleTransformUpdates)
+        const telemetryEnd = renderTelemetry && Number.isFinite(renderTelemetry.renderedFrames)
+          && Number.isFinite(renderTelemetry.vehicleTransformUpdates)
           && Number.isFinite(renderTelemetry.cameraUpdates)
           && Number.isFinite(renderTelemetry.characterAnimationFrames)
           ? {
+            renderedFrames: renderTelemetry.renderedFrames,
             vehicleTransformUpdates: renderTelemetry.vehicleTransformUpdates,
             cameraUpdates: renderTelemetry.cameraUpdates,
             characterAnimationFrames: renderTelemetry.characterAnimationFrames,
@@ -683,6 +687,7 @@ async function measureBrowser() {
           : null;
         const telemetryDeltas = telemetryStart && telemetryEnd
           ? {
+            renderedFrames: telemetryEnd.renderedFrames - telemetryStart.renderedFrames,
             vehicleTransformUpdates: telemetryEnd.vehicleTransformUpdates - telemetryStart.vehicleTransformUpdates,
             cameraUpdates: telemetryEnd.cameraUpdates - telemetryStart.cameraUpdates,
             characterAnimationFrames: telemetryEnd.characterAnimationFrames - telemetryStart.characterAnimationFrames,
@@ -700,6 +705,14 @@ async function measureBrowser() {
             vehicleTransformUpdates: telemetryDeltas.vehicleTransformUpdates / elapsed,
             cameraUpdates: telemetryDeltas.cameraUpdates / elapsed,
             characterAnimationFrames: telemetryDeltas.characterAnimationFrames / elapsed,
+          }
+          : null;
+        const telemetryRenderedFrames = telemetryDeltaValid ? telemetryDeltas.renderedFrames : null;
+        const telemetryRatios = telemetryRenderedFrames > 0
+          ? {
+            vehicleTransformPerFrame: telemetryDeltas.vehicleTransformUpdates / telemetryRenderedFrames,
+            cameraPerFrame: telemetryDeltas.cameraUpdates / telemetryRenderedFrames,
+            characterAnimationPerFrame: telemetryDeltas.characterAnimationFrames / telemetryRenderedFrames,
           }
           : null;
         const navigation = performance.getEntriesByType('navigation')[0];
@@ -730,7 +743,7 @@ async function measureBrowser() {
         return {
           canvas_count: document.querySelectorAll('canvas').length,
           raf_callbacks: raf.length,
-          rendered_frames: renderedFrames,
+          rendered_frames: webglFrameCount,
           gl_draw_calls: state?.glDrawCalls ?? 0,
           triangles: state?.triangles ?? 0,
           elapsed_s: elapsed,
@@ -755,6 +768,7 @@ async function measureBrowser() {
           },
           render_telemetry_status: renderTelemetryStatus,
           render_telemetry_counters: telemetryDeltas,
+          render_telemetry_ratios: telemetryRatios,
           first_interactive_s: navigation?.domContentLoadedEventEnd ? navigation.domContentLoadedEventEnd / 1000 : null,
           time_to_first_render_s: state?.firstRenderAt === null ? null : (state.firstRenderAt - state.documentStart) / 1000,
           heap_peak_mb: heap.length ? Math.max(...heap) : null,
@@ -860,7 +874,7 @@ const report = {
     measurement_method: 'External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
     render_telemetry: {
       global: '__CLAY_RENDER_TELEMETRY__',
-      counters: ['vehicleTransformUpdates', 'cameraUpdates', 'characterAnimationFrames'],
+      counters: ['renderedFrames', 'vehicleTransformUpdates', 'cameraUpdates', 'characterAnimationFrames'],
     },
   },
   metrics: {
