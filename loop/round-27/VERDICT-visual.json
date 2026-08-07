@@ -1,0 +1,105 @@
+{
+  "round": 27,
+  "wave": "W3",
+  "element": "visual-contact-sheet",
+  "verdict": "FAIL",
+  "bar_ref": "BAR-VISUAL.md §1, §5",
+  "checks": [
+    {
+      "id": "kart-body",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    },
+    {
+      "id": "driver-face",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    },
+    {
+      "id": "track-surface",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    },
+    {
+      "id": "kart-wheels",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "track-barriers",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "foliage",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "shadows-contact",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "water-sea",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "skybox-lighting",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "drift-sparks",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "item-boxes",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "ui-hud",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    }
+  ],
+  "largest_gap": {
+    "id": "track-barriers",
+    "delta": "三個已實作且有有效參考的元件全部達門檻（中位數 4）。track-surface 從 R25 的 3 升到 4，critic 三輪理由都轉向正面並明確提到「接縫」。最大落差不再是品質而是覆蓋率——12 個元件仍有 8 個未實作，其中 track-barriers 的參考半邊是 §7.2 判定合格的三組之一，做起來評分立刻可信。",
+    "priority_rank": 1
+  },
+  "artifacts": [
+    "loop/round-27/artifacts/contact-sheet.png",
+    "loop/round-27/CRITIC-NOTES.md"
+  ],
+  "next_owner": "claude-code",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 0
+}
