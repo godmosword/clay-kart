@@ -22,6 +22,7 @@
 import * as THREE from 'three';
 import type { Renderer, SimSnapshot } from '@loader/bootstrap';
 import { TRACK_GEOMETRY } from '@physics/constants';
+import { exposeRenderTelemetry, renderTelemetry } from '@contract/render-telemetry';
 import { createKart, type KartVisual } from './components/kart.js';
 import { applyClayRenderSettings, createClayLighting, enableClayShadows } from './clay/lighting.js';
 import { createTrackSurfaceRing } from './components/track-surface.js';
@@ -103,6 +104,10 @@ class ClayRenderer implements Renderer {
     // 雲、漸層、天空球一個都沒有。
     this.#scene.background = new THREE.Color(TERRAIN.seaLight);
     this.#scene.add(this.#lighting);
+
+    // `BAR-PERF §4` 的量測來源。掛在這裡而不是 `src/loader/`——那是 Cursor
+    // 的範圍，而計數器是 render 端遞增的，掛載點跟遞增點放在一起比較不會漂。
+    exposeRenderTelemetry();
 
     this.#buildGround();
     this.#buildTrack();
@@ -199,6 +204,10 @@ class ClayRenderer implements Renderer {
   }
 
   draw(snap: SimSnapshot, alpha: number): void {
+    // `BAR-PERF §4` 的分母。有它才分得開「抽格」與「慢」：
+    // updates / renderedFrames 該是 1.0，與機器快慢無關。
+    renderTelemetry.renderedFrames += 1;
+
     let playerIx = 0, playerIy = 0, playerIz = 0, playerIyaw = 0;
 
     // 本幀推進的模擬時間。輪子自轉吃距離、表情吃時間，兩者都要它。
@@ -240,10 +249,16 @@ class ClayRenderer implements Renderer {
       }
     }
 
+    // `BAR-PERF §4.2`：載具 transform 實際被寫入的次數。**每幀算一次**，
+    // 不是每台車各算一次——§4.2 判的是「載具有沒有被抽格」，不是場上有幾台車。
+    if (snap.karts.length > 0) renderTelemetry.vehicleTransformUpdates += 1;
+
     // 光照鑽機跟著玩家走，陰影 frustum 才框得到車。燈的參數不變。
     this.#lighting.position.set(playerIx, playerIy, playerIz);
 
     const [fx, fz] = forwardVector(playerIyaw);
+    // `BAR-PERF §4.3`：相機 transform 實際被寫入的次數。**不得抽格**。
+    renderTelemetry.cameraUpdates += 1;
     this.#camera.position.set(
       playerIx - fx * CAMERA_FOLLOW_DISTANCE,
       playerIy + CAMERA_FOLLOW_HEIGHT,

@@ -18,11 +18,17 @@
  * 這是 §3 指定的實作方式。**載具 transform 不經過這裡**——它吃物理插值，
  * 維持 60fps。
  *
- * 目前遊戲端還沒驅動這支 API（臉尚未接進 `renderer.ts`），所以
- * `BAR-PERF §4.1 character_anim_hz` 仍誠實回報 not_applicable。機制先
- * 建好，接上去時就不必回頭補。
+ * R20 起 `renderer.ts` 每幀都在呼叫這支 API，`BAR-PERF §4.1` 因此是真的可量的。
+ * **量測點就在這裡**：量化格真的改變時遞增 `renderTelemetry.characterAnimationFrames`
+ * （`src/contract/render-telemetry.ts`）。
+ *
+ * R25 之前探針是用「全域替換 `Math.floor` 再比對堆疊字串裡有沒有
+ * `setExpressionTime`」量的——那讓 ck-physics 的 `§4.1` 隱形依賴這個檔案的
+ * 方法名，改名就會壞掉而兩邊都不知道。改成顯式計數之後，依賴是雙方都看得到的
+ * 契約。
  */
 import { Group, Mesh, TorusGeometry } from 'three';
+import { renderTelemetry } from '@contract/render-telemetry';
 import { clayBlob, claySlab } from '../render/clay/geometry.js';
 import { createClayMaterial } from '../render/clay/material.js';
 import { FACE } from '../render/clay/palette.js';
@@ -163,13 +169,23 @@ export function createDriverFace(): DriverFace {
   // 元件審查圖不因為這次拆分而改變。
   mouth.position.y = -0.2;
 
+  /** 上一次的量化格號。只在它改變時才計入 `BAR-PERF §4.1`。 */
+  let lastAnimationBin: number | null = null;
+
   return {
     group,
     eyes,
     mouth,
     setExpressionTime(seconds: number): void {
       // §3 指定的抽格實作：角色動畫時間軸取 floor(t * 12) / 12。
-      const quantized = Math.floor(seconds * CHARACTER_ANIM_HZ) / CHARACTER_ANIM_HZ;
+      const bin = Math.floor(seconds * CHARACTER_ANIM_HZ);
+      // `BAR-PERF §4.1` 判的是抽格有沒有生效，所以只在**格號真的改變**時計數。
+      // 每次呼叫都加會量到算繪率，那就退回 `4.2`/`4.3` 現在的毛病。
+      if (bin !== lastAnimationBin) {
+        lastAnimationBin = bin;
+        renderTelemetry.characterAnimationFrames += 1;
+      }
+      const quantized = bin / CHARACTER_ANIM_HZ;
       const phase = quantized % BLINK_PERIOD_S;
       const blinking = phase >= 0 && phase < BLINK_DURATION_S;
       for (const lid of eyelids) lid.visible = blinking;
