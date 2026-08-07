@@ -9,6 +9,7 @@ import type { Group } from 'three';
 import { createDriverFace } from '../../characters/driver-face.js';
 import { createKartBody } from './kart-body.js';
 import { createKartWheel } from './kart-wheels.js';
+import { createTrackBarrier } from './track-barriers.js';
 import { createTrackSurface } from './track-surface.js';
 
 /** 元件 id 直接沿用 `BAR-VISUAL §4` 的命名，不要另創。 */
@@ -49,7 +50,7 @@ export const COMPONENTS: readonly ComponentEntry[] = [
     create: () => createDriverFace().group,
   },
   { id: 'track-surface', scope: '賽道路面材質與接縫', create: createTrackSurface },
-  { id: 'track-barriers', scope: '護欄、路緣石', create: null },
+  { id: 'track-barriers', scope: '護欄、路緣石', create: createTrackBarrier },
   { id: 'foliage', scope: '樹木、草叢', create: null },
   { id: 'skybox-lighting', scope: '天空與全域柔和均勻光', create: null },
   { id: 'drift-sparks', scope: '漂移特效（黏土屑，非火花）', create: null },

@@ -25,6 +25,7 @@ import { TRACK_GEOMETRY } from '@physics/constants';
 import { exposeRenderTelemetry, renderTelemetry } from '@contract/render-telemetry';
 import { createKart, type KartVisual } from './components/kart.js';
 import { applyClayRenderSettings, createClayLighting, enableClayShadows } from './clay/lighting.js';
+import { createTrackBarrierRings } from './components/track-barriers.js';
 import { createTrackSurfaceRing } from './components/track-surface.js';
 import { createClayMaterial } from './clay/material.js';
 import { CAR_PARK, TERRAIN, XIAOHONG } from './clay/palette.js';
@@ -162,30 +163,24 @@ class ClayRenderer implements Renderer {
   }
 
   /**
-   * 視覺上的牆，畫在賽道邊界（radius ± halfWidth），不是往內縮車體半徑
+   * 視覺上的邊界，畫在賽道邊界（radius ± halfWidth），不是往內縮車體半徑
    * 後的碰撞面——否則看起來會像「還沒碰到就彈開」。
    *
-   * **不是元件 #5 `track-barriers`**——那個元件要的是護欄與路緣石造型，
-   * 這裡只有一圈圓管。顏色換成 car-park 主題的品牌橘（`CHARACTERS.md §6`）。
+   * **這裡就是元件 #5 `track-barriers`（R28）。** 在此之前是兩圈
+   * `TorusGeometry` 圓管——那正是 `§5.5` 點名要排除的東西：「護欄是一段一段
+   * 捏出來再接起來，**不是一根無限長的擠出管**」。現在是離散段體，段間留縫、
+   * 長度取三個變體輪流、橘白交替。
+   *
+   * 用 `InstancedMesh`：兩圈約 280 段，每個 `Mesh` 一次 draw call 會直接撞穿
+   * `BAR-PERF §5.3` 的 150 預算。合成之後是 3 個長度 × 2 個顏色 = 6 次。
    */
   #buildBoundaryWalls(): void {
-    const wallHeight = 0.5;
-    const wallThickness = 0.3;
-    const material = createClayMaterial({ color: CAR_PARK.brandOrange, textureScale: 30 });
-
-    for (const radius of [
-      TRACK_GEOMETRY.radius - TRACK_GEOMETRY.halfWidth,
-      TRACK_GEOMETRY.radius + TRACK_GEOMETRY.halfWidth,
-    ]) {
-      const wall = new THREE.Mesh(
-        new THREE.TorusGeometry(radius, wallThickness / 2, 8, 96),
-        material,
-      );
-      wall.rotation.x = Math.PI / 2;
-      wall.position.set(TRACK_GEOMETRY.centerX, wallHeight, TRACK_GEOMETRY.centerZ);
-      wall.receiveShadow = true;
-      this.#scene.add(wall);
-    }
+    const barriers = createTrackBarrierRings(
+      TRACK_GEOMETRY.radius,
+      TRACK_GEOMETRY.halfWidth,
+    );
+    barriers.position.set(TRACK_GEOMETRY.centerX, 0, TRACK_GEOMETRY.centerZ);
+    this.#scene.add(barriers);
   }
 
   /** 索引 i 的車若不存在就先建立——渲染層不預先假設車數。 */
