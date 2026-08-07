@@ -318,12 +318,7 @@ function browserProbeScript() {
     inputTimers: [],
     textureBytes: 0,
     textureContexts: new Map(),
-    characterAnimation: {
-      active: true,
-      calls: 0,
-      changes: [],
-      lastBin: null,
-    },
+    renderTelemetryStart: null,
   };
   state.reset = () => {
     for (const timer of state.inputTimers) clearTimeout(timer);
@@ -337,31 +332,16 @@ function browserProbeScript() {
     state.triangles = 0;
     state.heapSamples = [];
     state.measurementStart = performance.now();
-    state.characterAnimation = {
-      active: true,
-      calls: 0,
-      changes: [],
-      lastBin: null,
-    };
-  };
-  const originalFloor = Math.floor;
-  Math.floor = function(value) {
-    const result = originalFloor(value);
-    const animation = state.characterAnimation;
-    if (animation?.active && Number.isFinite(value) && value >= 0 && value <= 120) {
-      // driver-face.ts is the only application call that uses this exact
-      // quantisation operation.  The stack filter keeps bootstrap's tick
-      // accumulator and Three.js geometry helpers out of the observation.
-      const stack = new Error().stack ?? '';
-      if (stack.includes('setExpressionTime')) {
-        animation.calls += 1;
-        if (animation.lastBin !== result) {
-          animation.changes.push({ bin: result, now: performance.now() });
-          animation.lastBin = result;
-        }
+    const telemetry = window.__CLAY_RENDER_TELEMETRY__;
+    state.renderTelemetryStart = telemetry && Number.isFinite(telemetry.vehicleTransformUpdates)
+      && Number.isFinite(telemetry.cameraUpdates)
+      && Number.isFinite(telemetry.characterAnimationFrames)
+      ? {
+        vehicleTransformUpdates: telemetry.vehicleTransformUpdates,
+        cameraUpdates: telemetry.cameraUpdates,
+        characterAnimationFrames: telemetry.characterAnimationFrames,
       }
-    }
-    return result;
+      : null;
   };
   state.scheduleInput = (segments, tickHz) => {
     const held = new Set();
@@ -690,19 +670,42 @@ async function measureBrowser() {
           const lower = Math.floor(index), upper = Math.ceil(index);
           return lower === upper ? sorted[lower] : sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
         };
-        const renderedHz = elapsed > 0 ? renderedFrames / elapsed : 0;
+        const renderTelemetry = window.__CLAY_RENDER_TELEMETRY__;
+        const telemetryStart = state?.renderTelemetryStart;
+        const telemetryEnd = renderTelemetry && Number.isFinite(renderTelemetry.vehicleTransformUpdates)
+          && Number.isFinite(renderTelemetry.cameraUpdates)
+          && Number.isFinite(renderTelemetry.characterAnimationFrames)
+          ? {
+            vehicleTransformUpdates: renderTelemetry.vehicleTransformUpdates,
+            cameraUpdates: renderTelemetry.cameraUpdates,
+            characterAnimationFrames: renderTelemetry.characterAnimationFrames,
+          }
+          : null;
+        const telemetryDeltas = telemetryStart && telemetryEnd
+          ? {
+            vehicleTransformUpdates: telemetryEnd.vehicleTransformUpdates - telemetryStart.vehicleTransformUpdates,
+            cameraUpdates: telemetryEnd.cameraUpdates - telemetryStart.cameraUpdates,
+            characterAnimationFrames: telemetryEnd.characterAnimationFrames - telemetryStart.characterAnimationFrames,
+          }
+          : null;
+        const telemetryDeltaValid = telemetryDeltas
+          && Object.values(telemetryDeltas).every((value) => Number.isFinite(value) && value >= 0);
+        const renderTelemetryStatus = !telemetryStart || !telemetryEnd
+          ? 'missing_render_telemetry'
+          : !telemetryDeltaValid
+            ? 'invalid_counter_delta'
+            : 'measured';
+        const telemetryHz = telemetryDeltaValid && elapsed > 0
+          ? {
+            vehicleTransformUpdates: telemetryDeltas.vehicleTransformUpdates / elapsed,
+            cameraUpdates: telemetryDeltas.cameraUpdates / elapsed,
+            characterAnimationFrames: telemetryDeltas.characterAnimationFrames / elapsed,
+          }
+          : null;
         const navigation = performance.getEntriesByType('navigation')[0];
         const heap = state?.heapSamples ?? [];
         const drawCallsPerFrame = state?.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
         const trianglesPerFrame = state?.frameTriangles ? [...state.frameTriangles.values()] : [];
-        const animation = state?.characterAnimation ?? {};
-        const animationChanges = Array.isArray(animation.changes) ? animation.changes : [];
-        const firstAnimationChange = animationChanges[0];
-        const lastAnimationChange = animationChanges.at(-1);
-        const animationElapsed = firstAnimationChange && lastAnimationChange
-          ? (lastAnimationChange.now - firstAnimationChange.now) / 1000
-          : 0;
-        const animationUpdates = Math.max(0, animationChanges.length - 1);
         const frameSamples = raf.slice(1).map((entry, index) => {
           const previous = raf[index];
           const frame = entry.frame ?? {};
@@ -735,17 +738,23 @@ async function measureBrowser() {
           fps_p05: percentile(fps, 5),
           frame_time_p99_ms: percentile(frameIntervals, 99),
           long_frame_count: frameIntervals.filter((ms) => ms > 33).length,
-          vehicle_transform_hz: renderedHz,
-          camera_hz: renderedHz,
-          character_anim_hz: animationElapsed > 0 ? animationUpdates / animationElapsed : null,
-          character_anim_status: animationUpdates > 0 ? 'measured_render_quantisation' : 'measurement_unavailable',
-          character_anim_calls: Number(animation.calls ?? 0),
-          character_anim_updates: animationUpdates,
+          vehicle_transform_hz: telemetryHz?.vehicleTransformUpdates ?? null,
+          camera_hz: telemetryHz?.cameraUpdates ?? null,
+          character_anim_hz: telemetryHz?.characterAnimationFrames ?? null,
+          character_anim_status: renderTelemetryStatus === 'measured'
+            ? 'measured_render_telemetry'
+            : renderTelemetryStatus,
+          character_anim_updates: telemetryDeltas?.characterAnimationFrames ?? null,
           character_anim_measurement: {
-            method: 'Math.floor stack probe for driver-face setExpressionTime',
-            sample_count: animationChanges.length,
-            elapsed_s: animationElapsed,
+            method: 'window.__CLAY_RENDER_TELEMETRY__ counter deltas / measurement elapsed',
+            status: renderTelemetryStatus,
+            elapsed_s: elapsed,
+            counters_start: telemetryStart,
+            counters_end: telemetryEnd,
+            counter_deltas: telemetryDeltas,
           },
+          render_telemetry_status: renderTelemetryStatus,
+          render_telemetry_counters: telemetryDeltas,
           first_interactive_s: navigation?.domContentLoadedEventEnd ? navigation.domContentLoadedEventEnd / 1000 : null,
           time_to_first_render_s: state?.firstRenderAt === null ? null : (state.firstRenderAt - state.documentStart) / 1000,
           heap_peak_mb: heap.length ? Math.max(...heap) : null,
@@ -849,7 +858,10 @@ const report = {
     device,
     device_note: 'Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement',
     measurement_method: 'External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
-    character_animation: 'measured_render_quantisation',
+    render_telemetry: {
+      global: '__CLAY_RENDER_TELEMETRY__',
+      counters: ['vehicleTransformUpdates', 'cameraUpdates', 'characterAnimationFrames'],
+    },
   },
   metrics: {
     ...measurementMetrics,
