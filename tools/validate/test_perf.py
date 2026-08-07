@@ -33,6 +33,20 @@ def test_missing_character_status_does_not_turn_into_a_pass():
     assert check["status"] == "FAIL"
 
 
+def test_missing_render_telemetry_fails_all_three_section_four_checks():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "vehicle_transform_hz": None,
+            "camera_hz": None,
+            "character_anim_hz": None,
+        },
+    }))
+
+    for metric_id in ("4.1", "4.2", "4.3"):
+        check = next(check for check in verdict["checks"] if check["id"] == metric_id)
+        assert check["status"] == "FAIL"
+
+
 def test_measured_character_animation_is_validated_when_present():
     metrics = calculate_metrics({"metrics": {"character_anim_hz": 12}})
 
@@ -41,6 +55,22 @@ def test_measured_character_animation_is_validated_when_present():
     check = next(check for check in verdict["checks"] if check["id"] == "4.1")
     assert check["actual"] == 12.0
     assert check["status"] == "PASS"
+
+
+def test_measured_render_telemetry_rates_pass_section_four():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "character_anim_hz": 12,
+            "vehicle_transform_hz": 60,
+            "camera_hz": 60,
+        },
+    }))
+
+    assert all(
+        check["status"] == "PASS"
+        for check in verdict["checks"]
+        if check["id"] in {"4.1", "4.2", "4.3"}
+    )
 
 
 def test_missing_gc_and_texture_measurements_are_explicit_failures():

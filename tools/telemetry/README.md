@@ -1,8 +1,8 @@
 # Real-device telemetry prototype
 
-`device-probe` is the first real-device path for BAR-PERF. It keeps the
-page-side rAF/WebGL and `driver-face` quantisation probe in one place, then
-changes only the transport:
+`device-probe` is the first real-device path for BAR-PERF. It reads the shared
+`window.__CLAY_RENDER_TELEMETRY__` counters for vehicle transforms, camera
+updates, and character animation frames, then changes only the transport:
 
 | target | transport | device-side prerequisite |
 |---|---|---|
