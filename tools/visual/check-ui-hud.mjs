@@ -4,12 +4,15 @@
  *
  * 可程式判定：底板 `#f0e4cd`、數字 `#3a5f96`、告警 `#ff8c2b`；
  * 禁純白底；opacity 必須為 1、無 backdrop-filter；
- * 底板短邊 / 畫面短邊 ≤ 1/8。
+ * 底板短邊 / 畫面短邊 ≤ 1/8（§1.3）；R28 實作目標收緊為 ≤ 0.11。
  *
  * Usage:
  *   npm run build && node tools/visual/check-ui-hud.mjs
  *   npm run test:ui-hud
  */
+
+/** R28：加名次列前先拉開餘裕；比 §1.3 的 1/8 更緊。 */
+const MAX_SHORT_RATIO = 0.11;
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -303,8 +306,12 @@ async function main() {
     if (data.rootBackdrop && data.rootBackdrop !== 'none') {
       failures.push(`root backdrop-filter banned, got ${data.rootBackdrop}`);
     }
-    if (!Array.isArray(data.values) || data.values.length < 1) {
-      failures.push('no clay-hud-value nodes');
+    if (!Array.isArray(data.values) || data.values.length < 4) {
+      failures.push(
+        `expected ≥4 clay-hud-value nodes (LAP/TIME/POS/BEST), got ${
+          Array.isArray(data.values) ? data.values.length : 0
+        }`,
+      );
     } else {
       for (const [i, v] of data.values.entries()) {
         if (!near(parseRgb(v.color), EXPECT.number)) {
@@ -321,10 +328,10 @@ async function main() {
     if (!near(parseRgb(data.alertColor), EXPECT.alert)) {
       failures.push(`alert color want #ff8c2b, got ${data.alertColor}`);
     }
-    if (data.ratio == null || !(data.ratio <= 1 / 8 + 1e-6)) {
+    if (data.ratio == null || !(data.ratio <= MAX_SHORT_RATIO + 1e-6)) {
       failures.push(
-        `board short/view short must be ≤ 1/8, got ${data.ratio} ` +
-          `(visualShort=${data.visualShort}, viewShort=${data.viewShort})`,
+        `board short/view short must be ≤ ${MAX_SHORT_RATIO}, got ${data.ratio} ` +
+          `(visualShort=${data.visualShort}, viewShort=${data.viewShort}; §1.3 ceiling is 1/8)`,
       );
     }
 
