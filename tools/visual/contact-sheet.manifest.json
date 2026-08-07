@@ -10,9 +10,9 @@
     },
     {
       "id": "kart-wheels",
-      "ref": "build/visual/refs/kart-wheels.png",
+      "ref": null,
       "ours": "build/visual/kart-wheels.png",
-      "note": "右側疊起來的胎堆：胎面、胎壁、奶油色內圈都看得清楚，且與車輪同一套材質"
+      "note": "deferred（R24 稽核）—— 見 BAR-VISUAL.md §7.2"
     },
     {
       "id": "driver-face",
@@ -40,15 +40,15 @@
     },
     {
       "id": "skybox-lighting",
-      "ref": "build/visual/refs/skybox-lighting.png",
+      "ref": null,
       "ours": "build/visual/skybox-lighting.png",
-      "note": "唯一一張單獨的黏土雲，且原本就是 512² 中性背景，符合 §3 拍攝規範；有 alpha，需壓平到中性灰"
+      "note": "deferred（R24 稽核）—— 見 BAR-VISUAL.md §7.2"
     },
     {
       "id": "drift-sparks",
-      "ref": "build/visual/refs/drift-sparks.png",
+      "ref": null,
       "ours": "build/visual/drift-sparks.png",
-      "note": "車尾那幾團奶油白黏土排氣團塊，是 refs 裡唯一「被捏出來的屑/團」而不是火花的素材"
+      "note": "deferred（R24 稽核）—— 見 BAR-VISUAL.md §7.2"
     },
     {
       "id": "item-boxes",

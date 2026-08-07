@@ -1,5 +1,5 @@
 {
-  "$comment": "BAR-VISUAL §1 盲測 A/B 的參考半邊裁決（R20，Lead）。判準與逐項理由寫在 BAR-VISUAL.md §7.1，這裡只放機器要用的座標。crop 省略＝整張圖。單位為來源圖的像素，原點左上。deferred 的組不配參考半邊——寧可少一組分數，也不要拿一張撐不起 512² 或本身不合 §5.0 的圖去湊，那種分數比沒有分數更糟。",
+  "$comment": "BAR-VISUAL §1 盲測 A/B 的參考半邊裁決（R20，Lead）。判準與逐項理由寫在 BAR-VISUAL.md §7.1，這裡只放機器要用的座標。crop 省略＝整張圖。單位為來源圖的像素，原點左上。deferred 的組不配參考半邊——寧可少一組分數，也不要拿一張撐不起 512² 或本身不合 §5.0 的圖去湊，那種分數比沒有分數更糟。 R24 稽核後更新：track-surface 換來源（原柏油灰違反 §5.4），kart-wheels／skybox-lighting／drift-sparks 改列暫緩。逐項理由見 BAR-VISUAL.md §7.2。",
   "tile_size": 512,
   "background": "#8a8a8a",
   "max_upscale": 1.4,
@@ -11,13 +11,8 @@
     },
     {
       "id": "kart-wheels",
-      "source": "refs/clay/characters/小紅賽車.jpg",
-      "crop": {
-        "x": 960,
-        "y": 620,
-        "size": 440
-      },
-      "why": "右側疊起來的胎堆：胎面、胎壁、奶油色內圈都看得清楚，且與車輪同一套材質"
+      "deferred": true,
+      "why": "deferred（R24 稽核）—— 原配 小紅賽車.jpg 的疊胎堆是賽道邊的胎牆不是車輪，沒有輪轂與輪框，§5.2 要的「胎面/胎壁/輪轂三塊分開的黏土」不在圖上。五張角色照裡最大的車輪約 190px（安安救護車前輪），要撐起 512² 得放大 2.7 倍，遠超 max_upscale 1.4；即使裁到 366px 下限，輪子也只佔畫面約四分之一，撐不起判準 2"
     },
     {
       "id": "driver-face",
@@ -31,13 +26,13 @@
     },
     {
       "id": "track-surface",
-      "source": "refs/clay/characters/鈴鈴清潔車.jpg",
+      "source": "refs/clay/characters/安安救護車.jpg",
       "crop": {
-        "x": 1000,
-        "y": 1030,
-        "size": 370
+        "x": 0,
+        "y": 900,
+        "size": 500
       },
-      "why": "路面加車道虛線，是 refs 裡唯一一塊夠大的純路面"
+      "why": "奶油沙色黏土地面，左上與左下都有沙地與草地的交界（§5.4「路面與草地的交界必須看得到接縫」），石子壓在地裡。右上角有一點車身是刻意保留——§5.4 的比例條款要的就是「壓痕的世界尺度必須與車身一致」，車在框內才比得了。R24 換掉原本 鈴鈴清潔車.jpg 的柏油灰路面，那張違反 §5.4 明文「不用柏油灰」"
     },
     {
       "id": "track-barriers",
@@ -61,18 +56,13 @@
     },
     {
       "id": "skybox-lighting",
-      "source": "refs/clay/cloud-a.png",
-      "why": "唯一一張單獨的黏土雲，且原本就是 512² 中性背景，符合 §3 拍攝規範；有 alpha，需壓平到中性灰"
+      "deferred": true,
+      "why": "deferred（R24 稽核）—— 原配 cloud-a.png 是一朵去背的雲貼在中性灰上，代表不了 §5.7 的「天空與全域柔和均勻光」。角色照裡的天空是飽和中藍，與 §5.7 的淺水藍 #cfe8f3 一階不合；而黃金樣本 car-park.png 根本沒有天空（孤島浮在白底）。這一組需要另外產一張參考，不是重裁能解決的"
     },
     {
       "id": "drift-sparks",
-      "source": "refs/clay/characters/嘟嘟小紅車.jpg",
-      "crop": {
-        "x": 1120,
-        "y": 560,
-        "size": 415
-      },
-      "why": "車尾那幾團奶油白黏土排氣團塊，是 refs 裡唯一「被捏出來的屑/團」而不是火花的素材"
+      "deferred": true,
+      "why": "deferred（R24 稽核）—— 原配 嘟嘟小紅車.jpg 是扁平剪紙風（平塗綠底、單顆大眼、車身無厚度），與黃金樣本的立體場景不是同一套美術。那張圖平均彩度 0.702，是六張來源裡最高，黃金樣本是 0.444。refs 裡沒有立體風格的「捏出來的屑/團」素材"
     },
     {
       "id": "item-boxes",
