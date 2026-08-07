@@ -1,0 +1,99 @@
+{
+  "generated_by": "tools/visual/ref-tiles.mjs",
+  "bar_ref": "BAR-VISUAL.md §7.1",
+  "tile_size": 512,
+  "background": "#8a8a8a",
+  "paired": [
+    {
+      "id": "kart-body",
+      "source": "refs/clay/characters/小紅賽車.jpg",
+      "crop": null,
+      "sourceEdge": 1400,
+      "scale": 0.366
+    },
+    {
+      "id": "driver-face",
+      "source": "refs/clay/characters/小紅賽車.jpg",
+      "crop": {
+        "x": 430,
+        "y": 620,
+        "size": 620
+      },
+      "sourceEdge": 620,
+      "scale": 0.826
+    },
+    {
+      "id": "track-surface",
+      "source": "refs/clay/characters/安安救護車.jpg",
+      "crop": {
+        "x": 0,
+        "y": 900,
+        "size": 500
+      },
+      "sourceEdge": 500,
+      "scale": 1.024
+    },
+    {
+      "id": "track-barriers",
+      "source": "refs/clay/characters/小紅賽車.jpg",
+      "crop": {
+        "x": 0,
+        "y": 1020,
+        "size": 380
+      },
+      "sourceEdge": 380,
+      "scale": 1.347
+    },
+    {
+      "id": "foliage",
+      "source": "refs/clay/characters/安安救護車.jpg",
+      "crop": {
+        "x": 0,
+        "y": 60,
+        "size": 540
+      },
+      "sourceEdge": 540,
+      "scale": 0.948
+    },
+    {
+      "id": "shadows-contact",
+      "source": "refs/clay/characters/安安救護車.jpg",
+      "crop": {
+        "x": 250,
+        "y": 700,
+        "size": 700
+      },
+      "sourceEdge": 700,
+      "scale": 0.731
+    },
+    {
+      "id": "water-sea",
+      "source": "refs/clay/sea.png",
+      "crop": null,
+      "sourceEdge": 1024,
+      "scale": 0.5
+    }
+  ],
+  "deferred": [
+    {
+      "id": "kart-wheels",
+      "reason": true
+    },
+    {
+      "id": "skybox-lighting",
+      "reason": true
+    },
+    {
+      "id": "drift-sparks",
+      "reason": true
+    },
+    {
+      "id": "item-boxes",
+      "reason": "refs/clay 裡沒有任何箱體素材。恐龍車多多.jpg 的糖果是候選，但那些糖果有明顯的透亮/鏡面反光，違反 §6 全域禁令——拿違反禁令的圖當標準會讓這一組的分數失去意義"
+    },
+    {
+      "id": "ui-hud",
+      "reason": "refs/clay 完全沒有 HUD 素材，且 HUD 是 2D 疊層，跟其餘 11 個 3D 元件不在同一個比較基礎上。要評分需要先另外產一張黏土風 HUD 參考——那是獨立工作，不在 R20 範圍"
+    }
+  ]
+}

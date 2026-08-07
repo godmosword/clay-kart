@@ -1,0 +1,141 @@
+{
+  "round": 29,
+  "wave": "W3",
+  "element": "visual-contact-sheet",
+  "verdict": "FAIL",
+  "bar_ref": "BAR-VISUAL.md §1, §5",
+  "checks": [
+    {
+      "id": "kart-body",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [
+        4,
+        5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "driver-face",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [
+        4,
+        5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "track-surface",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [
+        4,
+        5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "kart-wheels",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [
+        4,
+        5
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "track-barriers",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [
+        4,
+        5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "foliage",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [
+        4,
+        5
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "shadows-contact",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [
+        4,
+        5
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "water-sea",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [
+        4,
+        5
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "skybox-lighting",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [
+        4,
+        5
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "drift-sparks",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [
+        4,
+        5
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "item-boxes",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [
+        4,
+        5
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "ui-hud",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [
+        4,
+        5
+      ],
+      "status": "FAIL"
+    }
+  ],
+  "largest_gap": {
+    "id": "foliage",
+    "delta": "四個已實作且有有效參考的元件全部達門檻（中位數 4），且三輪零分歧——12 格逐格相同，是至今第一次。track-barriers 第一次評分就是 4。最大落差是覆蓋率：12 個元件仍有 7 個未實作，其中 foliage 的參考半邊在 §7.2 判為「保留」（樹主體有效但框裡是遊具不是草叢小花），做起來分數要打折讀。",
+    "priority_rank": 1
+  },
+  "artifacts": [
+    "loop/round-29/artifacts/contact-sheet.png",
+    "loop/round-29/CRITIC-NOTES.md"
+  ],
+  "next_owner": "claude-code",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 0
+}
