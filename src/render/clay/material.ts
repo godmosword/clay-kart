@@ -32,6 +32,9 @@ const DEFAULT_NORMAL_SCALE = 0.9;
 /** `§6` 禁止純黑 `#000000` 與純白 `#ffffff`，這是推離端點的餘裕。 */
 const PURE_LIMIT = 0.04;
 
+/** `§6` 禁止純螢光/高飽和。與 `violatesGlobalBans()` 的判準同一個數字。 */
+const MAX_SATURATION = 0.92;
+
 /**
  * 貼圖重複密度。壓痕大小要跨元件一致，否則尺度會亂掉。
  *
@@ -87,7 +90,12 @@ function clampAwayFromPure(color: number): Color {
   const hsl = { h: 0, s: 0, l: 0 };
   result.getHSL(hsl);
   const clampedL = Math.min(1 - PURE_LIMIT, Math.max(PURE_LIMIT, hsl.l));
-  if (clampedL !== hsl.l) result.setHSL(hsl.h, hsl.s, clampedL);
+  // `§6` 也禁「純螢光/高飽和」，但這裡原本只夾明度不夾飽和度——R28 做
+  // `track-barriers` 時，`CAR_PARK.brandOrange`（s=1.000）一路穿過工廠直到
+  // `§6` 稽核才被擋下。既然這個檔案的宗旨是「用程式強制而不是靠註解提醒」，
+  // 兩條就該一起夾。token 本身也已依 `§5.0` 退階，這是第二道。
+  const clampedS = Math.min(MAX_SATURATION, hsl.s);
+  if (clampedL !== hsl.l || clampedS !== hsl.s) result.setHSL(hsl.h, clampedS, clampedL);
   return result;
 }
 
@@ -138,6 +146,10 @@ export function selfTestGlobalBanAuditor(): number {
     ['roughness', new MeshStandardMaterial({ metalness: 0, roughness: 0.1, color: 0x888888 })],
     ['pure black', new MeshStandardMaterial({ metalness: 0, roughness: 0.9, color: 0x000000 })],
     ['pure white', new MeshStandardMaterial({ metalness: 0, roughness: 0.9, color: 0xffffff })],
+    // R28 補上。工廠開始夾飽和度之後，正常路徑再也造不出高飽和材質——
+    // 那也代表稽核的那一條從此不會被觸發，等於沒有被證明過。
+    // 這個案例用的正是上游 `CHARACTERS.md §6` 的 brandOrange 原值（s=1.000）。
+    ['fluorescent', new MeshStandardMaterial({ metalness: 0, roughness: 0.9, color: 0xff8c2b })],
   ];
   const missed = cases
     .filter(([, material]) => violatesGlobalBans(material).length === 0)

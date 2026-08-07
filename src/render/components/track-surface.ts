@@ -24,8 +24,12 @@ import {
   BufferAttribute,
   BufferGeometry,
   Group,
+  InstancedMesh,
+  Matrix4,
   Mesh,
   PlaneGeometry,
+  Quaternion,
+  Vector3,
 } from 'three';
 import { applyHandPressedRelief, clayBlob, claySlab } from '../clay/geometry.js';
 import { createClayMaterial, pressRepeatFor } from '../clay/material.js';
@@ -324,22 +328,40 @@ export function createTrackSurfaceRing(
     color: TERRAIN.islandSand,
     textureScale: pressRepeatFor(LANE_DASH.length),
   });
+  // **一次 draw call，不是 90 次。**
+  //
+  // 第一版每條虛線一個 `Mesh`——`2π×30 / 2.1 ≈ 90` 條，每個 `Mesh` 一次
+  // draw call。R28 量到接護欄之前 `draw_calls` 就已經是 **213**，而
+  // `BAR-PERF §5.3` 的預算是 **150**——這 90 條是主因，是 R25 合併
+  // `track-surface` 時沒有量 perf 就進 main 的後果。
+  //
+  // `InstancedMesh` 讓它們共用一次提交。做法與 `track-barriers` 相同，
+  // 那邊的註解有完整理由。
+  const dashMesh = new InstancedMesh(
+    claySlab(LANE_DASH.width, LANE_DASH.height, LANE_DASH.length),
+    dashMaterial,
+    dashCount,
+  );
+  const dashMatrix = new Matrix4();
+  const dashQuat = new Quaternion();
+  const dashScale = new Vector3(1, 1, 1);
+  const dashAxis = new Vector3(0, 1, 0);
+  const dashPos = new Vector3();
   for (let i = 0; i < dashCount; i++) {
     const angle = (i / dashCount) * Math.PI * 2;
-    const dash = new Mesh(
-      claySlab(LANE_DASH.width, LANE_DASH.height, LANE_DASH.length),
-      dashMaterial,
-    );
-    dash.position.set(
+    dashPos.set(
       Math.cos(angle) * centre,
       SLAB_HEIGHT + LANE_DASH.height * 0.5,
       Math.sin(angle) * centre,
     );
     // 讓長邊沿著行進方向（切線），不是指向圓心。
-    dash.rotation.y = -angle;
-    dash.receiveShadow = true;
-    group.add(dash);
+    dashQuat.setFromAxisAngle(dashAxis, -angle);
+    dashMatrix.compose(dashPos, dashQuat, dashScale);
+    dashMesh.setMatrixAt(i, dashMatrix);
   }
+  dashMesh.instanceMatrix.needsUpdate = true;
+  dashMesh.receiveShadow = true;
+  group.add(dashMesh);
 
   scatterEdgeDetail(group, REVIEW.roadWidth * 0.5, length, SLAB_HEIGHT);
 

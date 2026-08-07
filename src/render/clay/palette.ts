@@ -26,11 +26,30 @@ export const TERRAIN = {
   contactShadow: 0x6b5a48,
 } as const;
 
-/** car-park 車車樂園主題色，`CHARACTERS.md §6` 第二張表。 */
+/**
+ * car-park 車車樂園主題色，`CHARACTERS.md §6` 第二張表。
+ *
+ * **`brandOrange` 與 `accentYellow` 依 `§5.0` 退了一階（R28）。**
+ * 上游那兩個值（`#ff8c2b`、`#ffd866`）各有一個通道是 `255`，HSL 飽和度因此
+ * 恰好是 `1.000`——直接違反 `§6` 的「禁止純螢光/高飽和」（上限 0.92），
+ * 也違反 `§5.0` 的「略帶粉彩、比純色去飽和約 10–20%」。
+ *
+ * 這是 R28 做 `track-barriers` 時被 `§6` 稽核擋下來才發現的：`§5.5` 明文要求
+ * 護欄用 `brandOrange`，而那個值本身違反 `§6`——**標準自相矛盾**。
+ * 其餘 31 個 token 的飽和度最高 0.816，這兩個是唯一的離群值。
+ *
+ * 退到 0.80 與其餘 token 同一個區間。`XIAOHONG` 那組本來就是「吸色後再依
+ * `§5.0` 退一階」，這裡只是把同一個處理補到當初漏掉的兩個上。
+ *
+ * **色相與明度都沒動**，只降飽和度——`§5.0` 說的是「顏色是材質本身」，
+ * 換色相會變成另一個顏色，退飽和才是那條要的。
+ */
 export const CAR_PARK = {
-  brandOrange: 0xff8c2b,
+  /** 上游 `#ff8c2b`（s=1.000），依 `§5.0`／`§6` 退到 s=0.80。 */
+  brandOrange: 0xf49862,
   accentPink: 0xf7a8c4,
-  accentYellow: 0xffd866,
+  /** 上游 `#ffd866`（s=1.000），依 `§5.0`／`§6` 退到 s=0.80。 */
+  accentYellow: 0xf5d581,
   accentGreen: 0xb7df9b,
   accentBlue: 0x8fcde8,
   accentLavender: 0xc5b3e6,
