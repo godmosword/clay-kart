@@ -211,7 +211,12 @@
 - **連帶**：`BAR-VISUAL §5.12` 要求 HUD 有「圈數/計時/**名次**」，而
   `clay-hud.ts` 只有 LAP/TIME/BEST。名次在只有一台車時做不了，順序不能反
 - **已開 TASK**：`loop/round-28/TASK-cursor.md`（含 `ui-hud` 餘裕拉開）
-- **狀態**：待裁決——TASK 已開，等 Cursor 執行
+- **狀態**：**已處理（Cursor）**。`createWorld({ aiOpponents: [3] })` 接進
+  `bootstrap.ts`；HUD 加 `POS`（`src/ui/race-standing.ts` 由 laps＋位置推算）；
+  底板先縮到 `ratio≈0.107`（≤0.11）再加列。截圖
+  `loop/round-28/artifacts/ai-opponents-game.png`（藍／綠／紫 AI_LIVERY 可見）。
+  `test:ui-hud`／`test:steer-screen`／`npm test`／`typecheck` 全 PASS。
+  未改 `world.ts`／`controller.ts`／`src/render/`／`src/contract/`。
 
 
 ### ui-hud 的底板短邊比只差上限 0.7%，且「數字不是黏土」這條沒被涵蓋
@@ -231,7 +236,22 @@
   真的黏土幾何（那要進 3D 場景，跨出 `ck-plumb` 範圍）／為「不是字型」找一個
   可機械判定的代理（例如禁止 `font-family` 出現在 HUD 的數字元素上，改用
   預先算好的黏土數字圖）
-- **狀態**：待裁決——不阻擋任何事，但別把這個 PASS 讀成 `ui-hud` 做完了
+- **狀態**：**餘裕已拉開（Cursor R28）**——`ratio≈0.107`／上限改驗 `≤0.11`；
+  「數字不是黏土」那條仍未涵蓋，維持已知限制，不阻擋。
+
+
+### bootstrap 接上多車後，steer-screen 橫向速率餘裕變薄（仍 PASS）
+
+- **輪次**：R28（Cursor 接 `aiOpponents` 後重跑）
+- **現況**：`test:steer-screen` 仍 PASS，但右鍵 `rate` 從先前約 `5.27`
+  掉到約 `0.80`（門檻 `0.5`）。多半是場上 AI 車佔據附近軌道、碰撞／擁擠
+  影響持鍵期間的側向位移量測——不是轉向符號又反了
+- **目標**：任務原文「多車不該影響玩家的轉向」——功能上轉向仍對，但回歸
+  餘裕從很厚變成貼門檻
+- **已嘗試**：未改物理／未改 steer 腳本；只記錄
+- **來源**：Cursor R28；對照先前 plumb 進度筆記
+- **狀態**：待裁決——要不要把 steer-screen 改成單車 fixture（不經 bootstrap
+  的多車預設），或接受「多車真實場景下門檻更緊」
 
 
 ### 探針沒讀 renderedFrames，§4.2/§4.3 仍分不開「抽格」與「慢」
