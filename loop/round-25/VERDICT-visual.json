@@ -1,0 +1,105 @@
+{
+  "round": 25,
+  "wave": "W3",
+  "element": "visual-contact-sheet",
+  "verdict": "FAIL",
+  "bar_ref": "BAR-VISUAL.md §1, §5",
+  "checks": [
+    {
+      "id": "kart-body",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    },
+    {
+      "id": "driver-face",
+      "metric": "clay_score_1to5",
+      "actual": 4,
+      "window": [4, 5],
+      "status": "PASS"
+    },
+    {
+      "id": "track-surface",
+      "metric": "clay_score_1to5",
+      "actual": 3,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "kart-wheels",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "track-barriers",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "foliage",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "shadows-contact",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "water-sea",
+      "metric": "clay_score_1to5",
+      "actual": 1,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "skybox-lighting",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "drift-sparks",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "item-boxes",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    },
+    {
+      "id": "ui-hud",
+      "metric": "clay_score_1to5",
+      "actual": 0,
+      "window": [4, 5],
+      "status": "FAIL"
+    }
+  ],
+  "largest_gap": {
+    "id": "track-surface",
+    "delta": "三輪中位數 3，參考 5——換成有效的參考半邊之後，R24 那個「我們 3 對參考 2」的結果反轉成「我們 3 對參考 5」。三輪理由一致指向同一件事：ours「過於幾何簡化」「較平整」「較像平整幾何片」，也就是 §5.4 一眼判斷的反面。這與 R24 實作時量到的數字吻合：路面區域的明暗變化 sd/mean 約 1.8%，kart-body 是 27.7%。手壓起伏做了但幅度不足。",
+    "priority_rank": 1
+  },
+  "artifacts": [
+    "loop/round-25/artifacts/contact-sheet.png",
+    "loop/round-25/CRITIC-NOTES.md"
+  ],
+  "next_owner": "claude-code",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 0
+}

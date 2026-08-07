@@ -1,0 +1,96 @@
+{
+  "generated_by": "tools/visual/render-components.mjs",
+  "bar_ref": "BAR-VISUAL.md §3",
+  "view_size": 512,
+  "sheet_cell_note": "512×512 composed of the four §3 views at 256×256 each (R18 decision)",
+  "global_bans_audited": {
+    "ref": "BAR-VISUAL.md §6",
+    "materials_checked": 22,
+    "auditor_self_test_cases": 4,
+    "violations": []
+  },
+  "rendered": [
+    {
+      "id": "kart-body",
+      "sheetCell": "kart-body.png",
+      "views": [
+        "kart-body.front.png",
+        "kart-body.three-quarter-front-left.png",
+        "kart-body.side.png",
+        "kart-body.top.png"
+      ]
+    },
+    {
+      "id": "kart-wheels",
+      "sheetCell": "kart-wheels.png",
+      "views": [
+        "kart-wheels.front.png",
+        "kart-wheels.three-quarter-front-left.png",
+        "kart-wheels.side.png",
+        "kart-wheels.top.png"
+      ]
+    },
+    {
+      "id": "driver-face",
+      "sheetCell": "driver-face.png",
+      "views": [
+        "driver-face.front.png",
+        "driver-face.three-quarter-front-left.png",
+        "driver-face.side.png",
+        "driver-face.top.png"
+      ]
+    },
+    {
+      "id": "track-surface",
+      "sheetCell": "track-surface.png",
+      "views": [
+        "track-surface.front.png",
+        "track-surface.three-quarter-front-left.png",
+        "track-surface.side.png",
+        "track-surface.top.png"
+      ]
+    }
+  ],
+  "not_implemented": [
+    {
+      "id": "track-barriers",
+      "scope": "護欄、路緣石",
+      "reason": "not_implemented"
+    },
+    {
+      "id": "foliage",
+      "scope": "樹木、草叢",
+      "reason": "not_implemented"
+    },
+    {
+      "id": "skybox-lighting",
+      "scope": "天空與全域柔和均勻光",
+      "reason": "not_implemented"
+    },
+    {
+      "id": "drift-sparks",
+      "scope": "漂移特效（黏土屑，非火花）",
+      "reason": "not_implemented"
+    },
+    {
+      "id": "item-boxes",
+      "scope": "道具箱與拾取特效",
+      "reason": "not_implemented"
+    },
+    {
+      "id": "shadows-contact",
+      "scope": "短柔接地陰影與 AO",
+      "reason": "not_implemented"
+    },
+    {
+      "id": "water-sea",
+      "scope": "海面/水面，對齊 map/sea.png",
+      "reason": "not_implemented"
+    },
+    {
+      "id": "ui-hud",
+      "scope": "HUD 的黏土化處理（ck-plumb 範圍）",
+      "reason": "not_implemented"
+    }
+  ]
+}
