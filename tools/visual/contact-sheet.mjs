@@ -10,10 +10,13 @@
  *
  * Usage:
  *   node tools/visual/contact-sheet.mjs \
+ *     --out-dir loop/round-25/artifacts \
  *     [--manifest tools/visual/contact-sheet.manifest.json] \
- *     [--out-dir loop/round-17/artifacts] \
  *     [--seed 42] \
  *     [--repo-root .]
+ *
+ * `--out-dir` 必填（R25）：舊預設 `loop/round-17/artifacts` 曾靜默覆寫
+ * 已提交的歷史 artifact。
  */
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import { resolve, dirname, relative, isAbsolute } from 'node:path';
@@ -34,7 +37,7 @@ const DEFAULT_MANIFEST = resolve(HERE, 'contact-sheet.manifest.json');
 function parseArgs(argv) {
   const out = {
     manifest: DEFAULT_MANIFEST,
-    outDir: resolve('loop/round-17/artifacts'),
+    outDir: null,
     seed: null,
     repoRoot: resolve('.'),
   };
@@ -54,15 +57,20 @@ function parseArgs(argv) {
       out.repoRoot = resolve(next);
       i++;
     } else if (a === '--help' || a === '-h') {
-      console.log(`Usage: node tools/visual/contact-sheet.mjs [options]
+      console.log(`Usage: node tools/visual/contact-sheet.mjs --out-dir <path> [options]
+  --out-dir <path>    REQUIRED. write contact-sheet.png + contact-sheet.key.json
   --manifest <path>   pairing manifest (default: tools/visual/contact-sheet.manifest.json)
-  --out-dir <path>    write contact-sheet.png + contact-sheet.key.json
   --seed <int>        override manifest.seed
   --repo-root <path>  resolve relative image paths (default: cwd)`);
       process.exit(0);
     } else {
       throw new Error(`unknown arg: ${a}`);
     }
+  }
+  if (!out.outDir) {
+    throw new Error(
+      'missing required --out-dir <path> (refusing to default to a historical round artifacts dir)',
+    );
   }
   return out;
 }

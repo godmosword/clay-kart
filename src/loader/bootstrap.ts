@@ -14,6 +14,7 @@ import {
   type SimWorld,
   type WorldInput,
 } from '@contract/sim';
+import { createClayHud } from '@ui/clay-hud';
 import {
   createSteerProbeSample,
   writeFollowCam,
@@ -102,8 +103,13 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
 
   const world: SimWorld = createWorld();
   const renderer: Renderer = createRenderer(mount);
+  // ui-hud（§5.12）在 Cursor 範圍；render 裡的 W1 monospace HUD 會被 clay-hud 藏掉。
+  const hud = createClayHud(mount);
 
-  const onResize = () => renderer.resize(mount.clientWidth, mount.clientHeight);
+  const onResize = () => {
+    renderer.resize(mount.clientWidth, mount.clientHeight);
+    hud.resize();
+  };
   window.addEventListener('resize', onResize);
   onResize();
 
@@ -181,6 +187,7 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
     // alpha > 1 會讓 renderer 外插，長幀時車被畫超前再彈回——正好破壞這次修正。
     const alpha = Math.min(1, accumulator / TICK_DT);
     renderer.draw(snap, alpha);
+    hud.update(snap);
 
     // 其餘每幀配置：
     // - world.snapshot()：物理層契約，不在本檔可改範圍
