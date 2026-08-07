@@ -37,10 +37,22 @@ Mario Kart **只當手感與關卡節奏的品質標竿**,不是素材來源。
 |---|---|---|---|---|
 | 1 | 小紅賽車 | race car | **主角/預設** 均衡 | `refs/clay/characters/小紅賽車.jpg` |
 | 2 | 恐龍車多多 | dinosaur car | 重量級,高極速低加速 | `refs/clay/characters/恐龍車多多.jpg` |
-| 3 | 阿酷鑽地車 | drill excavator | 履帶,高抓地低極速 | `refs/clay/characters/阿酷鑽地車.jpg` |
+| 3 | 阿酷鑽地車 | drill excavator | 履帶,高抓地低極速 | `refs/clay/characters/阿酷鑽地車.jpg` ⚠️ **只看造型** |
 | 4 | 嘟嘟小紅車 | car | 輕量,高加速低極速 | `refs/clay/characters/嘟嘟小紅車.jpg` |
 | 5 | 安安救護車 | ambulance | 均衡偏穩 | `refs/clay/characters/安安救護車.jpg` |
 | 6 | 鈴鈴清潔車 | street sweeper | 均衡偏靈活 | `refs/clay/characters/鈴鈴清潔車.jpg` |
+
+> ⚠️ **`阿酷鑽地車.jpg` 只能當造型參考,材質一律不看(R25 裁決)。**
+>
+> 那張圖是**實體壓鑄/塑膠玩具挖土機的照片**,不是黏土:金屬油壓桿、光澤表面、
+> 印刷上去的臉。`BAR-VISUAL §6` 的三條全域禁令——`metallic`、`roughness`、
+> 「顏色是材質本身」——它一條都不符合。
+>
+> **照著它捏材質,會做出全場唯一一台塑膠車。** 造型(履帶、鑽頭、車體比例)
+> 可以參考;材質、光澤、顏色一律回 `BAR-VISUAL §5.0` 與本文 `§6` 的配色表。
+>
+> 已在 `BAR-VISUAL §7.1` 明文排除於盲測參考半邊之外——那是給 critic 的規則,
+> 這一條是給**捏阿酷的人**的,兩邊都要有才擋得住。
 
 **W1 只實作 #1。** 車手差異化的數值是 W2 尾聲的事,在 `BAR-FEEL` 全部 PASS 之後才動 ——
 六台車各有數值,等於六倍的手感驗收面積,先把一台調到位。

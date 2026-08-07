@@ -56,6 +56,26 @@ FAIL 所做的討論，**判的都是不構成驗收依據的數字**。這不�
 **這是目前 `BAR-PERF` 最大的缺口**，而且它比任何單項指標都前置：在 iPad
 或中階 Android 上跑得起來、量得到 frame log 之前，`§1` 的整張表都只是意向。
 
+### §1.2 代理基準機：一台中階 Android（R25 裁決）
+
+`§1` 的基準檔位是「iPad（第 9 代）/ 中階 Android」。兩者之中**先指定一台中階
+Android 當代理基準**，理由是路徑最短：`adb forward` + Chrome CDP 與現行
+`perf-probe.mjs` 走的是同一套協定，`tools/telemetry/device-probe.mjs` 的原型
+已經寫好（R25），缺的只是一台實體裝置。iOS 那條要 `ios_webkit_debug_proxy`
+＋ Safari Web Inspector，設定步驟多得多。
+
+**代理基準機量到的數字是採計的**，`§2`／`§5` 可以據此判 PASS/FAIL。這跟開發機
+不同——開發機是 M 系列 Mac，效能高出目標裝置一個數量級以上，量到 60fps 不代表
+iPad 上跑得動；中階 Android 與 iPad 第 9 代是同一個效能檔位，差異在數十個
+百分點而不是數倍。
+
+**但要標明它是代理**：artifact 的 `meta.environment` 要記下實際機種，verdict
+引用時寫「代理基準機」而不是「基準機」。等 iPad 那條路也通了，兩者的數字要
+並排比一次——**若差距大到會改變 PASS/FAIL，代理這件事就不成立**，那時再回來
+重新裁決。
+
+> 在那台 Android 到位之前，`§2` 仍然維持未判決。**指定檔位不等於已經量到。**
+
 ---
 
 ## §2 幀率
@@ -161,9 +181,19 @@ camera 的**實際更新事件**計數，而不是數算繪幀。那落在 `src/
 - `tools/validate/perf.py` 讀該 JSON 對本文件窗口判 PASS/FAIL,輸出 `VERDICT.json`
 - **這支腳本不得呼叫任何 LLM API**
 
-**基準機量測需要真實裝置。** 在 CI 沒有 iPad 之前,可暫用 Chrome DevTools 的
-4x CPU throttling 當代理指標,但 `verdict` 必須標註 `"device": "proxy"`,
-且 proxy 的 PASS 不得寫進 `FROZEN.md`。
+**基準機量測需要真實裝置。** 這裡有兩種「代理」,性質完全不同,不要混用同一個詞:
+
+| 名稱 | 是什麼 | 數字採計? |
+|---|---|---|
+| `device: "proxy"` | 開發機 + Chrome DevTools 4x CPU throttling。**模擬**出來的慢 | **否**。PASS 不得寫進 `FROZEN.md` |
+| **代理基準機**(`§1.2`) | 一台實體中階 Android。真實硬體,與 iPad 第 9 代同檔位 | **是**。可據此判 `§2`／`§5` |
+
+CPU throttling 只縮 CPU,不動 GPU、記憶體頻寬與熱節流——而 W3 的成本主要在
+GPU(R20 量到 VSM 陰影佔 12 倍)。用它當基準會系統性低估真實裝置的痛點。
+它的用途只有一個:在沒有任何裝置時給一個「至少不會更好」的下界。
+
+代理基準機的 artifact 要在 `meta.environment` 記下實際機種,verdict 引用時
+寫「代理基準機」而不是「基準機」——理由見 `§1.2`。
 
 ---
 
