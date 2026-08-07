@@ -212,8 +212,14 @@
   `render_telemetry_counters` 已經存了三個原始 delta，加上 `renderedFrames`
   與比值即可，讓「抽格」這個問題在數字上答得出來。**這不改變任何 PASS/FAIL**，
   只是讓 FAIL 的理由分得出來是哪一個
-- **狀態**：待裁決——不阻擋任何事，但 `§4` 是 `§6` 優先序第一的條款，
-  它的 FAIL 現在指錯方向
+- **狀態**：**已解決（R26）**。`perf-probe.mjs` 改讀四個 counter，artifact 新增
+  `render_telemetry_counters.renderedFrames` 與三個 `render_telemetry_ratios`。
+  Lead 端到端重跑：`renderedFrames = 106`、`vehicleTransformPerFrame = 1.000`、
+  `cameraPerFrame = 1.000`、`characterAnimationPerFrame = 0.566`，而該機器
+  `fps_p50` 只有 22.222——**「有沒有抽格」與「快不快」第一次分開了**。
+  status 逐項與 R26 之前相同（4.1 PASS / 4.2 FAIL / 4.3 FAIL），符合
+  「只增加資訊量」的要求。無 fallback：`renderedFrames` 進了有效性檢查，
+  grep 確認沒有 `|| 1` 或 `glFrames` 頂替的路徑。22 個 pytest 通過
 
 
 ### 五個元件沒有參考半邊，§1 的盲測只能判 12 個裡的 7 個
