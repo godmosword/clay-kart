@@ -175,6 +175,27 @@
 
 ## 待裁決
 
+### 探針沒讀 renderedFrames，§4.2/§4.3 仍分不開「抽格」與「慢」
+
+- **輪次**：R26（Lead 驗證探針接線時發現）
+- **現況**：`src/contract/render-telemetry.ts` 有四個欄位，`perf-probe.mjs`
+  只讀了三個——**`renderedFrames` 沒有被讀**
+- **後果**：`vehicleTransformUpdates` 每幀寫一次，除以經過時間必然等於算繪率。
+  Lead 端到端實測：`vehicle_transform_hz = camera_hz = 20.796`，而
+  `fps_p50 = 21.739`——兩者貼著跑。窗口 `[58, 62]` 在任何跑不到 60fps 的機器上
+  必然 FAIL，而 `BAR-PERF §4.4` 明文說那個 FAIL 該讀成「算繪慢」不是
+  「抽格套錯對象」
+- **`renderedFrames` 就是為此補的**：R25 接線時發現這個問題才加的分母。
+  「有沒有抽格」的正確算法是 `updates / renderedFrames`，**該是 1.0 且與機器
+  快慢無關**——ck-visual 端實測過就是 275/275 = 1.000
+- **窗口不改**（R25 已裁決「修儀器不調窗口」）。要補的是 artifact：
+  `render_telemetry_counters` 已經存了三個原始 delta，加上 `renderedFrames`
+  與比值即可，讓「抽格」這個問題在數字上答得出來。**這不改變任何 PASS/FAIL**，
+  只是讓 FAIL 的理由分得出來是哪一個
+- **狀態**：待裁決——不阻擋任何事，但 `§4` 是 `§6` 優先序第一的條款，
+  它的 FAIL 現在指錯方向
+
+
 ### 五個元件沒有參考半邊，§1 的盲測只能判 12 個裡的 7 個
 
 - **輪次**：R25（`§7.2` 稽核落地之後的直接後果）
@@ -195,8 +216,9 @@
   的逐條機械條款表。這 5 組的 VERDICT 不記 `clay_score_1to5`，改記
   `mechanical_checks_passed`（布林）。**選這條而不是自己做參考**，是因為自己產
   參考半邊等於自己定標準，盲測就失去意義。**明文記下它比盲測弱**：機械檢查只能
-  抓違反，抓不到「做得不像手捏的」，通過不等於 §2 的 4 分，等於「沒有可驗證的
-  違規」。只要那 5 組拿到有效參考半邊就回到盲測。**實作尚未開始**
+  抓違反，  抓不到「做得不像手捏的」，通過不等於 §2 的 4 分，等於「沒有可驗證的
+  違規」。只要那 5 組拿到有效參考半邊就回到盲測。
+  **ui-hud 實作已由 Cursor 落地**（見下方 ui-hud 條）；其餘 4 組尚未派工
 
 ### contact-sheet.mjs 的預設輸出路徑會覆寫已提交的歷史 artifact
 
@@ -212,10 +234,8 @@
 - **建議**：預設值改成必填，或改成 `build/visual/`（可重生的工作目錄）。
   `tools/visual/` 是 W3 共用目錄，`contact-sheet.mjs` 由 Cursor 在 R17 寫的，
   依 R20 的慣例「共用目錄不代表可以互改」，這裡只記錄不代改
-- **狀態**：**已裁決（R25）：改必填**。跟 R22 修 `feel.py` 的 `--round`／`--output`
-  同一個做法——拿掉預設值，讓「忘記帶」變成明確錯誤而不是靜默寫錯地方。
-  `tools/visual/` 是共用目錄、`contact-sheet.mjs` 由 Cursor 在 R17 寫的，
-  依 R20 慣例不代改。**待派工給 Cursor**
+- **狀態**：**已處理（Cursor）**。`--out-dir` 改必填，缺省直接 throw；
+  不再預設任何 `loop/round-*/artifacts`。與 R22 `feel.py` 必填旗標同一做法。
 
 
 ### §4.1 的量測靠比對 ck-visual 的函式名，跨 worktree 耦合沒有機械防護
@@ -239,14 +259,12 @@
 - **可能的處置（都是裁決）**：在 `driver-face.ts` 留一個明確的註解說明它被
   perf-probe 依賴／改由 `src/contract/` 定義一個具名的抽格點讓兩邊都指向它／
   接受現況但把依賴寫進 `FROZEN.md` 或 `loop/README.md` 的收尾檢查
-- **狀態**：**已裁決（R25）：併進 4.2/4.3 的顯式計數點**。契約已建立於
-  `src/contract/render-telemetry.ts`（Lead 專屬目錄，兩邊都看得到）：
-  `vehicleTransformUpdates`／`cameraUpdates`／`characterAnimationFrames`
-  三個計數器，render 端遞增、探針讀取。只累加次數不算 Hz，頻率由探針用差值
-  除以經過時間算——算繪端不需要知道量測窗口。欄位就地遞增不 new，符合 `§2.5`。
-  **契約已定，接線尚未開始**：ck-visual 要在 `renderer.ts` 與 `driver-face.ts`
-  遞增，ck-physics 要把 `perf-probe.mjs` 從 `renderedHz` 別名與 `Math.floor`
-  堆疊比對改成讀這三個計數器
+- **狀態**：**已解決（R26）**。`perf-probe.mjs` 改讀 `window.__CLAY_RENDER_TELEMETRY__`，
+  `setExpressionTime`、`Math.floor` 替換、`renderedHz` 別名三個字串在探針裡
+  各出現 **0 次**。Lead 端到端重跑：`render_telemetry_status = "measured"`、
+  `character_anim_hz = 11.771`（窗口 `[11.5, 12.5]` PASS）。依賴現在是
+  `src/contract/render-telemetry.ts`，雙方都看得到。21 個 pytest 通過，
+  新增兩條涵蓋「缺 telemetry」與「counter 倒退」，缺值走明確 FAIL 無 fallback
 
 
 ### 視覺 critic 的單輪變異大於 PASS/FAIL 的間距
@@ -422,11 +440,11 @@
   3. 正式移出 W3 12 元件／改 cap／改 owner
 - **已嘗試**：無實作。Cursor 依 `LOOP-OPS.md §4.4` 停手，不自決驗收方式。
 - **來源**：`BAR-VISUAL.md §1`/§4；R20 `refs/report.json`；`loop/budget.json` `ui-hud`
-- **狀態**：**已裁決（R25）**。併入「五個元件沒有參考半邊」那條的處置——改走
-  `BAR-VISUAL §1.3` 的機械驗收。`§5.12` 可機械判定的部分：底板／數字／告警三個
-  色、禁純白底、禁半透明（`opacity` 必須為 1、無 `backdrop-filter`）、底板短邊
-  ≤ 畫面短邊 1/8。判不到的是「數字是壓上去的獨立黏土不是描邊字型」。
-  **驗收路徑有了，可以派工給 Cursor**
+- **狀態**：**已處理（Cursor）**。`src/ui/clay-hud.ts` + bootstrap 接線；
+  `npm run test:ui-hud`（`tools/visual/check-ui-hud.mjs`）機械條款 PASS
+  （底板／數字／告警色、opacity=1、無 backdrop-filter、短邊比 ≤ 1/8）。
+  render 裡 W1 monospace HUD 由 clay-hud 以 `display:none` 藏起（Cursor
+  不能改 `src/render/`）——若要正式刪除那支 stub，另派 Claude Code。
 
 ### kart-wheels 的參考半邊比我們的輸出還差，這一組的 PASS 沒有意義
 
