@@ -305,10 +305,12 @@ function remoteProbeScript(durationMs, inputSegments) {
     state.triangles = 0;
     const snapshotRenderTelemetry = () => {
       const telemetry = window.__CLAY_RENDER_TELEMETRY__;
-      return telemetry && Number.isFinite(telemetry.vehicleTransformUpdates)
+      return telemetry && Number.isFinite(telemetry.renderedFrames)
+        && Number.isFinite(telemetry.vehicleTransformUpdates)
         && Number.isFinite(telemetry.cameraUpdates)
         && Number.isFinite(telemetry.characterAnimationFrames)
         ? {
+          renderedFrames: telemetry.renderedFrames,
           vehicleTransformUpdates: telemetry.vehicleTransformUpdates,
           cameraUpdates: telemetry.cameraUpdates,
           characterAnimationFrames: telemetry.characterAnimationFrames,
@@ -380,6 +382,7 @@ function summarizeRemote(measurement, kind, transport, url, fixtureName) {
   const telemetryEnd = measurement.renderTelemetryEnd;
   const telemetryDeltas = telemetryStart && telemetryEnd
     ? {
+      renderedFrames: telemetryEnd.renderedFrames - telemetryStart.renderedFrames,
       vehicleTransformUpdates: telemetryEnd.vehicleTransformUpdates - telemetryStart.vehicleTransformUpdates,
       cameraUpdates: telemetryEnd.cameraUpdates - telemetryStart.cameraUpdates,
       characterAnimationFrames: telemetryEnd.characterAnimationFrames - telemetryStart.characterAnimationFrames,
@@ -399,6 +402,14 @@ function summarizeRemote(measurement, kind, transport, url, fixtureName) {
       characterAnimationFrames: telemetryDeltas.characterAnimationFrames / elapsed,
     }
     : null;
+  const telemetryRenderedFrames = telemetryDeltaValid ? telemetryDeltas.renderedFrames : null;
+  const telemetryRatios = telemetryRenderedFrames > 0
+    ? {
+      vehicleTransformPerFrame: telemetryDeltas.vehicleTransformUpdates / telemetryRenderedFrames,
+      cameraPerFrame: telemetryDeltas.cameraUpdates / telemetryRenderedFrames,
+      characterAnimationPerFrame: telemetryDeltas.characterAnimationFrames / telemetryRenderedFrames,
+    }
+    : null;
   return {
     meta: {
       fixture: fixtureName,
@@ -411,7 +422,7 @@ function summarizeRemote(measurement, kind, transport, url, fixtureName) {
       measurement_method: 'remote requestAnimationFrame/WebGL instrumentation over device inspector protocol',
       render_telemetry: {
         global: '__CLAY_RENDER_TELEMETRY__',
-        counters: ['vehicleTransformUpdates', 'cameraUpdates', 'characterAnimationFrames'],
+        counters: ['renderedFrames', 'vehicleTransformUpdates', 'cameraUpdates', 'characterAnimationFrames'],
       },
     },
     metrics: {
@@ -427,6 +438,9 @@ function summarizeRemote(measurement, kind, transport, url, fixtureName) {
       character_anim_updates: telemetryDeltas?.characterAnimationFrames ?? null,
       vehicle_transform_hz: telemetryHz?.vehicleTransformUpdates ?? null,
       camera_hz: telemetryHz?.cameraUpdates ?? null,
+      render_telemetry_status: renderTelemetryStatus,
+      render_telemetry_counters: telemetryDeltas,
+      render_telemetry_ratios: telemetryRatios,
       heap_peak_mb: null,
       heap_growth_per_lap_mb: null,
       draw_calls: Number(measurement.drawCalls ?? 0),
