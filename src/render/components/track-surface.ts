@@ -27,7 +27,7 @@ import {
   Mesh,
   PlaneGeometry,
 } from 'three';
-import { applyHandPressedRelief, claySlab } from '../clay/geometry.js';
+import { applyHandPressedRelief, clayBlob, claySlab } from '../clay/geometry.js';
 import { createClayMaterial, pressRepeatFor } from '../clay/material.js';
 import { TERRAIN } from '../clay/palette.js';
 
@@ -84,6 +84,104 @@ const LANE_DASH = { length: 1.1, width: 0.16, gap: 1.0, height: 0.035 } as const
  * 壓痕的世界尺度兩者完全相同，切片只是取景範圍不同。
  */
 const REVIEW = { roadWidth: 5, roadLength: 7, grassMargin: 1.8 } as const;
+
+
+/**
+ * 確定性擺放用的哈希。與 `applyHandPressedRelief` 的 value noise 同一個原則：
+ * **元件審查圖必須可以重複產生**，所以不得用 `Math.random()`。
+ */
+function placementHash(i: number, salt: number): number {
+  let h = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/**
+ * 沙地與草地交界的草叢，以及壓進路面的石子。
+ *
+ * ## 為什麼要這兩樣
+ *
+ * R25 的 critic 三輪一致指 ours「過於幾何簡化」「較平整」「較像平整幾何片」。
+ * R26 加大了手壓起伏（sd/mean 1.8% → 2.83%），但那只處理了**表面**。
+ * 對照參考半邊（`安安救護車.jpg` 的沙地）還差兩件事，兩件都不是表面問題：
+ *
+ * 1. **交界是不規則的。** 參考圖上草叢往沙地裡長，邊界是一條起伏的線；
+ *    我們是一條數學直線。`§5.4` 說「路面與草地的交界必須看得到接縫 ——
+ *    那是『拼出來的模型』感的主要來源」，而一條完美直線讀起來是「切出來的」
+ *    不是「拼出來的」
+ * 2. **地上有東西。** 參考圖有壓進沙裡的石子。`§5.0` 的「零星小坑與棉絮感」
+ *    講的就是這種離散細節——沒有它，再好的表面起伏也只是一塊乾淨的板
+ *
+ * 兩者都是**離散幾何**，不是貼圖也不是表面位移，所以 `applyHandPressedRelief`
+ * 再怎麼調都補不上。
+ */
+function scatterEdgeDetail(
+  group: Group,
+  roadHalfWidth: number,
+  length: number,
+  slabTop: number,
+): void {
+  const grassMaterial = createClayMaterial({
+    color: TERRAIN.grassMid,
+    textureScale: pressRepeatFor(0.4),
+  });
+  const darkGrass = createClayMaterial({
+    color: TERRAIN.grassDark,
+    textureScale: pressRepeatFor(0.4),
+  });
+  const pebbleMaterial = createClayMaterial({
+    color: TERRAIN.islandSand,
+    textureScale: pressRepeatFor(0.25),
+    // 石子比路面暗一階靠的是自身陰影，不是換色——§5.0 的「顏色是材質本身」
+    roughness: 0.95,
+  });
+
+  // 交界草叢：沿兩側邊界擺，往沙地裡探進去一點。數量由長度決定，間距不等長
+  // ——完全等距會讀成塑膠射出件（§5.5 對護欄講的是同一件事）。
+  const tuftCount = Math.max(8, Math.round(length * 3.2));
+  for (let i = 0; i < tuftCount; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const t = (i + placementHash(i, 1) * 0.8) / tuftCount;
+    const z = (t - 0.5) * length;
+    // 跨過交界：−0.3 在路面上、+0.45 在草地上。草叢因此橫跨那條直線，
+    // 從上方看邊界就不再是一刀切的。
+    const across = placementHash(i, 2) * 0.75 - 0.3;
+    const x = side * (roadHalfWidth + across);
+    const onRoad = Math.abs(x) < roadHalfWidth;
+    // 路面比草地高一整個 overlay 高度，草叢得各自坐在自己那一側的表面上，
+    // 否則會浮在半空或沉進去。
+    const y = onRoad ? slabTop + OVERLAY_LIFT + 0.01 : 0.02;
+    const scale = 0.7 + placementHash(i, 3) * 0.8;
+    const tuft = new Mesh(clayBlob(0.16 * scale, 9), placementHash(i, 4) > 0.6 ? darkGrass : grassMaterial);
+    tuft.position.set(x, y, z);
+    // 三軸各自不等 —— 從上方看是完美圓形的話，一排下來仍然讀得出是程式擺的。
+    tuft.scale.set(
+      0.75 + placementHash(i, 6) * 0.6,
+      0.5 + placementHash(i, 5) * 0.45,
+      0.75 + placementHash(i, 7) * 0.6,
+    );
+    tuft.rotation.y = placementHash(i, 8) * Math.PI;
+    tuft.castShadow = true;
+    tuft.receiveShadow = true;
+    group.add(tuft);
+  }
+
+  // 壓進路面的石子。少而明確——§5.4 的「不得細密到變成雜訊」對離散物件
+  // 一樣適用，鋪滿一地小石頭會變成雜訊貼圖的立體版。
+  const pebbleCount = Math.max(3, Math.round(length * 0.8));
+  for (let i = 0; i < pebbleCount; i++) {
+    const z = (placementHash(i, 11) - 0.5) * length * 0.9;
+    const x = (placementHash(i, 12) - 0.5) * (roadHalfWidth * 1.5);
+    const r = 0.045 + placementHash(i, 13) * 0.035;
+    const pebble = new Mesh(clayBlob(r, 9), pebbleMaterial);
+    // 只露出上半 —— 「壓進去」不是「放上去」
+    pebble.position.set(x, slabTop + OVERLAY_LIFT + r * 0.3, z);
+    pebble.scale.set(1, 0.5, 0.85 + placementHash(i, 14) * 0.3);
+    pebble.castShadow = true;
+    pebble.receiveShadow = true;
+    group.add(pebble);
+  }
+}
 
 /**
  * 環形路面，UV 直接用世界尺度算。
@@ -243,6 +341,8 @@ export function createTrackSurfaceRing(
     group.add(dash);
   }
 
+  scatterEdgeDetail(group, REVIEW.roadWidth * 0.5, length, SLAB_HEIGHT);
+
   return group;
 }
 
@@ -370,6 +470,8 @@ export function createTrackSurface(): Group {
     dash.receiveShadow = true;
     group.add(dash);
   }
+
+  scatterEdgeDetail(group, REVIEW.roadWidth * 0.5, length, SLAB_HEIGHT);
 
   return group;
 }
