@@ -166,3 +166,22 @@ artifacts：`perf-baseline-boxcar.json`／`perf-clay-noshadow.json`／`perf-prox
 - [x] `§6` 稽核仍 0 違規
 - [x] perf 重跑並拆解成因，FAIL 如實記錄
 - [x] 接線後發現的缺陷全數寫進 `loop/BACKLOG.md`
+
+---
+
+## 補記（R25）：本輪的 `VERDICT-feel.json` 有兩個 provenance 缺陷
+
+`loop/round-20/VERDICT-feel.json` **內容是真的重跑出來的**（與 R15 逐項比對只有
+ULP 級浮點差異，不是複製檔），但它有兩個問題：
+
+1. `"round": 3` —— `tools/validate/feel.py` 當時的 `--round` 預設值就是 3，
+   本輪重跑沒帶參數。一份放在 `round-20/`、記錄 R20 結果的檔案，對外宣稱自己是 R3
+2. `artifacts` 指向 `/tmp/.../scratchpad/feel.json` —— 那個容器已消失，
+   **倉庫裡沒有這一輪的 telemetry**，這份 VERDICT 無法從 repo 內獨立重新驗證
+
+**已被 R22 完全取代。** `loop/round-22/VERDICT-feel.json` 是 46/46 全 PASS，
+telemetry 有 commit（`loop/round-22/artifacts/lap-a.json`），Lead 用 main 自己的
+程式碼重跑驗證過逐項零差異。要引用 BAR-FEEL 的結果請用 R22 那份。
+
+**原檔不動**（R25 裁決）：它是當時真的跑出來的紀錄，刪掉等於毀證。
+根因（`--round` 預設值）已在 R22 修掉，改為必填。

@@ -1,37 +1,109 @@
 {
-  "$comment": "Builder 每輪結束後更新 spent。撞到 cap 見 LOOP-OPS.md §6。單位為 token。W2 前兩個完成的元件皆大幅超支（drift-miniturbo +56%、steering-grip +150%），cap 估算系統性偏低，見 loop/BACKLOG.md 的整體重估項目，未逐項調高剩餘 cap 前不要求 builder 硬控在 cap 內。",
+  "$comment": "R25 裁決：**廢除 cap，只記實際花費。** cap 從來沒有擋下任何一輪——W2 超支 1.5x–10x，而 R7 起的 policy 明文「不要求 builder 控制在 cap 內、如實記錄」。W3 四個元件做完，spent 全是 0，沒人在記。一個沒人執行但可能被相信的數字，比沒有數字更壞——跟 §2.5 的假 PASS、§4.1 的 not_applicable 是同一類問題：看起來有防線，實際上沒有。spent 仍然記錄（之後估工作量用得到），cap 欄位移除。單位為 token。",
   "W1": {
     "$comment": "W1 不跑 loop，不設 cap。達成即進 W2。",
-    "physics-loop": { "cap": null, "spent": 0 },
-    "project-skeleton": { "cap": null, "spent": 0 },
-    "minimal-render": { "cap": null, "spent": 0 }
+    "physics-loop": {
+      "spent": 0
+    },
+    "project-skeleton": {
+      "spent": 0
+    },
+    "minimal-render": {
+      "spent": 0
+    }
   },
   "W2": {
-    "sim-determinism": { "cap": 150000, "spent": 0, "bar": "BAR-FEEL §2" },
-    "acceleration-curve": { "cap": 200000, "spent": 0, "bar": "BAR-FEEL §3" },
-    "drift-miniturbo": { "cap": 400000, "spent": 626134, "bar": "BAR-FEEL §4", "$comment": "R5 收尾：4.5 硬門檻達標，超支 56%，轉 steering-grip。4.4/4.6/4.7/4.10 記在 BACKLOG，未強制解決" },
-    "steering-grip": { "cap": 250000, "spent": 785905, "bar": "BAR-FEEL §5", "$comment": "R6 完成，超支150%。R13 surface 工作拆分實際花費 160629（約本輪 80%，依 surface world/probe/validator/test diff scope），累加後 785905。5.5=0.6435420429、5.6=0.8794263055 PASS，5.2/5.7/5.8/5.9 零回歸。" },
-    "collision-response": { "cap": 200000, "spent": 189261, "bar": "BAR-FEEL §6", "$comment": "R7 完成 telemetry 與 6.1-6.3 校準；6.4 已於 R11 完成。R13 6.5 工作拆分實際花費 40157（約本輪 20%，依 stuck threshold/telemetry/test diff scope），累加後 189261；6.5=2 PASS。" },
-    "airborne-landing": { "cap": 150000, "spent": 1553403, "bar": "BAR-FEEL §7", "$comment": "R9 原記錄 1135659 已核對存在於 VERDICT/budget 歷史，但無可獨立重建的 token 拆分證據，保留不改；R12 最終實際 417744 累加。R12 7.3=1.0、7.4=0.7645012039 PASS，落地角度耦合水平減速與同 tick 引擎增速量測修正完成。" },
-    "input-feedback": { "cap": 100000, "spent": 600671, "bar": "BAR-FEEL §8", "$comment": "R10 原 spent=182927；R12 最終實際 417744 累加。R12 實作 100ms drift press buffer 與 0.08 steer deadzone；8.2=91.6666667ms、8.4=0.08 PASS，並確認 §4.5 無回歸。" },
-    "ai-opponents": { "cap": 300000, "spent": 972995, "bar": "BAR-FEEL §6 + §12", "$comment": "R11 第一階段完成：多車架構與 kart-kart collision；6.4=1.0 PASS。R14 本輪實際花費 420990，累加後 719943，超支如實記錄。真正 AI 決策走 Kart.setInput() 與共用 #stepDrive/#stepYaw；12.1=true、12.2=3.6333333333s、12.3=3.4833333333s PASS。12.4 R14 第一版曾用配置值頂替實測被 Lead 退回，修正版（326283f）誠實回報 observed_max_speed_ratio=0.9626708488607413 FAIL，已合併。R15（bddf6ce）實際花費 253052，累加後 972995：用實際 trace 確認 gap 目標衰減根因，改為次線性 target response；observed_max_speed_ratio=1.0032181019、12.3=3.0166666667s 均 PASS。" },
-    "perf-validator": { "cap": 150000, "spent": 0, "bar": "BAR-PERF §4", "$comment": "R16 完成並由 Lead 獨立驗證合併（c540b0f→7046b34）：perf-probe.mjs 的 §4 防抽格檢查（character_anim_hz/vehicle_transform_hz/camera_hz）從 R3 起寫死常數，已改為真實 Chrome headless 測量 build/out/；character 動畫尚不存在，artifact 誠實記為 null/not_applicable，未憑空回報 12。spent 未回報，跟 sim-determinism/acceleration-curve 一樣是記帳缺口，非阻斷。" }
+    "sim-determinism": {
+      "spent": 0,
+      "bar": "BAR-FEEL §2"
+    },
+    "acceleration-curve": {
+      "spent": 0,
+      "bar": "BAR-FEEL §3"
+    },
+    "drift-miniturbo": {
+      "spent": 626134,
+      "bar": "BAR-FEEL §4",
+      "$comment": "R5 收尾：4.5 硬門檻達標，超支 56%，轉 steering-grip。4.4/4.6/4.7/4.10 記在 BACKLOG，未強制解決"
+    },
+    "steering-grip": {
+      "spent": 785905,
+      "bar": "BAR-FEEL §5",
+      "$comment": "R6 完成，超支150%。R13 surface 工作拆分實際花費 160629（約本輪 80%，依 surface world/probe/validator/test diff scope），累加後 785905。5.5=0.6435420429、5.6=0.8794263055 PASS，5.2/5.7/5.8/5.9 零回歸。"
+    },
+    "collision-response": {
+      "spent": 189261,
+      "bar": "BAR-FEEL §6",
+      "$comment": "R7 完成 telemetry 與 6.1-6.3 校準；6.4 已於 R11 完成。R13 6.5 工作拆分實際花費 40157（約本輪 20%，依 stuck threshold/telemetry/test diff scope），累加後 189261；6.5=2 PASS。"
+    },
+    "airborne-landing": {
+      "spent": 1553403,
+      "bar": "BAR-FEEL §7",
+      "$comment": "R25：**這個數字不可考，日後估算一律不採用。** R9 記 1135659，但那輪只改了 tools/telemetry 與 tools/validate，world.ts 完全沒動，跟工作量不成比例（R7 collision-response 改動範圍相近，花 149104）。BACKLOG 已記「無可獨立重建的拆分證據」。R12 的 417744 是實際值、可信。此欄總和保留不改寫——刪掉等於毀證，標記不可信才是誠實的做法。budget.json 的 W3 註解原本就已排除它於中位數之外，這裡把它變成正式標記。",
+      "spent_reliability": "unreliable"
+    },
+    "input-feedback": {
+      "spent": 600671,
+      "bar": "BAR-FEEL §8",
+      "$comment": "R10 原 spent=182927；R12 最終實際 417744 累加。R12 實作 100ms drift press buffer 與 0.08 steer deadzone；8.2=91.6666667ms、8.4=0.08 PASS，並確認 §4.5 無回歸。"
+    },
+    "ai-opponents": {
+      "spent": 972995,
+      "bar": "BAR-FEEL §6 + §12",
+      "$comment": "R11 第一階段完成：多車架構與 kart-kart collision；6.4=1.0 PASS。R14 本輪實際花費 420990，累加後 719943，超支如實記錄。真正 AI 決策走 Kart.setInput() 與共用 #stepDrive/#stepYaw；12.1=true、12.2=3.6333333333s、12.3=3.4833333333s PASS。12.4 R14 第一版曾用配置值頂替實測被 Lead 退回，修正版（326283f）誠實回報 observed_max_speed_ratio=0.9626708488607413 FAIL，已合併。R15（bddf6ce）實際花費 253052，累加後 972995：用實際 trace 確認 gap 目標衰減根因，改為次線性 target response；observed_max_speed_ratio=1.0032181019、12.3=3.0166666667s 均 PASS。"
+    },
+    "perf-validator": {
+      "spent": 0,
+      "bar": "BAR-PERF §4",
+      "$comment": "R16 完成並由 Lead 獨立驗證合併（c540b0f→7046b34）：perf-probe.mjs 的 §4 防抽格檢查（character_anim_hz/vehicle_transform_hz/camera_hz）從 R3 起寫死常數，已改為真實 Chrome headless 測量 build/out/；character 動畫尚不存在，artifact 誠實記為 null/not_applicable，未憑空回報 12。spent 未回報，跟 sim-determinism/acceleration-curve 一樣是記帳缺口，非阻斷。"
+    }
   },
   "W3": {
     "$comment": "2026-08-02 W2 收尾後重估。W2 六個已花費元件的實際/cap 比值：drift-miniturbo 1.57x、steering-grip 3.14x、collision-response 0.95x、airborne-landing 10.36x（數字可疑，見 BACKLOG，未採計）、input-feedback 6.01x、ai-opponents 3.24x——排除 airborne-landing 後，剩餘五個比值的中位數為 3.14x，僅視為約 2-3x 的粗略訊號。這裡對 10 個 Opus+ultracode 視覺元件粗略乘 2 當第一版調整，ui-hud（Cursor 便宜檔位）與 audio（沿用既有資產）調整幅度較保守。Opus+ultracode 每單位工作實際耗費多少 token 目前完全沒有實測數據，這組數字仍是猜測，不是精算——跟 W2 一樣，policy 是撞 cap 不硬停、如實記錄、記入 BACKLOG，cap 數字本身的準確度不是防線，那道防線是『不強迫 builder 為了守 cap 而讓品質打折』。W3 第一個元件跑完後應該回頭用真實數據校正剩餘元件的 cap。",
-    "kart-body": { "cap": 500000, "spent": 0 },
-    "kart-wheels": { "cap": 300000, "spent": 0 },
-    "driver-character": { "cap": 500000, "spent": 0 },
-    "track-surface": { "cap": 400000, "spent": 0 },
-    "track-barriers": { "cap": 300000, "spent": 0 },
-    "foliage": { "cap": 300000, "spent": 0 },
-    "skybox-lighting": { "cap": 400000, "spent": 0 },
-    "drift-sparks": { "cap": 300000, "spent": 0 },
-    "item-boxes": { "cap": 240000, "spent": 0 },
-    "shadows-contact": { "cap": 360000, "spent": 0 },
-    "water-sea": { "cap": 240000, "spent": 0 },
-    "ui-hud": { "cap": 180000, "spent": 0, "$comment": "ck-plumb/Cursor 便宜檔位，不是 Opus+ultracode，調整幅度較保守（1.5x）" },
-    "audio": { "cap": 130000, "spent": 0, "$comment": "沿用 podcast 既有資產，成本低，調整幅度較保守（1.3x）" },
-    "game-integration": { "cap": null, "spent": null, "$comment": "R20：把 R18/R19 的黏土地基接進遊戲 renderer，外加 12 組參考半邊裁決與 BAR-VISUAL §5.1–§5.12。不是 BAR-VISUAL §4 的 12 個元件之一，所以不設 cap——這是接線與裁決，不是可以反覆 loop 的美術元件。spent 記 null 而不是編一個數字：本輪在單一 session 內跑完，沒有可獨立重建的 token 拆分證據，跟 sim-determinism／acceleration-curve／perf-validator 一樣是記帳缺口，非阻斷。R20 量到的效能資料（同機器上黏土車比方塊車慢 44×，其中 VSM 陰影佔 12×）應該用來重估其餘 9 個元件的 cap——目前那組數字仍是 W2 中位數乘 2 的猜測。" }
+    "kart-body": {
+      "spent": 0
+    },
+    "kart-wheels": {
+      "spent": 0
+    },
+    "driver-character": {
+      "spent": 0
+    },
+    "track-surface": {
+      "spent": 0
+    },
+    "track-barriers": {
+      "spent": 0
+    },
+    "foliage": {
+      "spent": 0
+    },
+    "skybox-lighting": {
+      "spent": 0
+    },
+    "drift-sparks": {
+      "spent": 0
+    },
+    "item-boxes": {
+      "spent": 0
+    },
+    "shadows-contact": {
+      "spent": 0
+    },
+    "water-sea": {
+      "spent": 0
+    },
+    "ui-hud": {
+      "spent": 0,
+      "$comment": "ck-plumb/Cursor 便宜檔位，不是 Opus+ultracode，調整幅度較保守（1.5x）"
+    },
+    "audio": {
+      "spent": 0,
+      "$comment": "沿用 podcast 既有資產，成本低，調整幅度較保守（1.3x）"
+    },
+    "game-integration": {
+      "spent": null,
+      "$comment": "R20：把 R18/R19 的黏土地基接進遊戲 renderer，外加 12 組參考半邊裁決與 BAR-VISUAL §5.1–§5.12。不是 BAR-VISUAL §4 的 12 個元件之一，所以不設 cap——這是接線與裁決，不是可以反覆 loop 的美術元件。spent 記 null 而不是編一個數字：本輪在單一 session 內跑完，沒有可獨立重建的 token 拆分證據，跟 sim-determinism／acceleration-curve／perf-validator 一樣是記帳缺口，非阻斷。R20 量到的效能資料（同機器上黏土車比方塊車慢 44×，其中 VSM 陰影佔 12×）應該用來重估其餘 9 個元件的 cap——目前那組數字仍是 W2 中位數乘 2 的猜測。"
+    }
   }
 }
