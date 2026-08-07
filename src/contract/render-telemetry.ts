@@ -38,6 +38,19 @@
 /** 算繪端每輪更新時遞增的計數器。欄位語意見各自註解。 */
 export interface RenderTelemetry {
   /**
+   * 算繪幀數。**分母。**
+   *
+   * 沒有它的話，`vehicleTransformUpdates / 經過時間` 算出來仍然等於算繪率——
+   * 因為 transform 本來就是每幀寫一次。那會退回 `§4.2`/`§4.3` 原本的毛病：
+   * 一台跑 22fps 的機器會回報 22，FAIL 的理由是「慢」而不是「抽格」，
+   * 而 `§4` 要防的是後者。
+   *
+   * 有了分母，「有沒有抽格」變成 `updates / renderedFrames`，**該是 1.0**，
+   * 且與機器快慢無關。`§4.1` 的角色動畫則該是 `12 / renderedFrames` 附近。
+   */
+  renderedFrames: number;
+
+  /**
    * 載具 transform 實際被寫入的次數。**每台車每幀算一次**，不是每台車各算一次
    * ——`§4.2` 判的是「載具有沒有被抽格」，不是場上有幾台車。
    */
@@ -60,6 +73,7 @@ export interface RenderTelemetry {
  * 不用 class、不用 getter：任何一層間接都是每幀數千次的呼叫。
  */
 export const renderTelemetry: RenderTelemetry = {
+  renderedFrames: 0,
   vehicleTransformUpdates: 0,
   cameraUpdates: 0,
   characterAnimationFrames: 0,

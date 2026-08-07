@@ -42,7 +42,7 @@ const SAND_EDGE_WIDTH = 0.55;
  * `positiveOnly` 的起伏只往上長，第一版把邊帶放在 `SLAB_HEIGHT + 0.012`，
  * 振幅 0.085 的路面直接把它們吞掉——成品圖上邊帶與虛線整組消失。
  */
-const OVERLAY_LIFT = 0.058;
+const OVERLAY_LIFT = 0.155;
 
 /**
  * 手壓起伏。**振幅與波長要一起看**——決定表面能不能讀出來的是斜率
@@ -58,7 +58,7 @@ const OVERLAY_LIFT = 0.058;
  * 不是數學平面。
  */
 const RELIEF = {
-  road: { amplitude: 0.05, wavelength: 0.45, positiveOnly: true },
+  road: { amplitude: 0.14, wavelength: 0.40, positiveOnly: true },
   grass: { amplitude: 0.075, wavelength: 0.55 },
 } as const;
 
@@ -319,8 +319,8 @@ export function createTrackSurface(): Group {
       new PlaneGeometry(
         REVIEW.roadWidth,
         length,
-        Math.round(REVIEW.roadWidth * 16),
-        Math.round(length * 16),
+        Math.round(REVIEW.roadWidth * 32),
+        Math.round(length * 32),
       ).rotateX(-Math.PI / 2),
       RELIEF.road,
     ),
