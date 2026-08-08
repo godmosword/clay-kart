@@ -33,6 +33,7 @@ import {
 } from 'three';
 import { applyHandPressedRelief, clayBlob, claySlab } from '../clay/geometry.js';
 import { createClayMaterial, pressRepeatFor } from '../clay/material.js';
+import { placementHash } from '../clay/placement.js';
 import { TERRAIN } from '../clay/palette.js';
 
 /** 路面高出草地多少。夠深才有影子，太深會變成月台。 */
@@ -94,12 +95,6 @@ const REVIEW = { roadWidth: 5, roadLength: 7, grassMargin: 1.8 } as const;
  * 確定性擺放用的哈希。與 `applyHandPressedRelief` 的 value noise 同一個原則：
  * **元件審查圖必須可以重複產生**，所以不得用 `Math.random()`。
  */
-function placementHash(i: number, salt: number): number {
-  let h = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
 /**
  * 沙地與草地交界的草叢，以及壓進路面的石子。
  *
