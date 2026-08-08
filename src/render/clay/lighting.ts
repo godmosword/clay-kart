@@ -99,9 +99,15 @@ const SHADOW_BLUR_SAMPLES = 4;
  *
  * 刻意不提供任何 per-element 調光參數——見檔頭說明。
  */
-export function createClayLighting(): Group {
+export interface ClayLightingOptions {
+  /** Runtime gameplay can use a contact patch instead of a shadow-map pass. */
+  shadows?: boolean;
+}
+
+export function createClayLighting(options: ClayLightingOptions = {}): Group {
   const group = new Group();
   group.name = 'clay-global-lighting';
+  const shadowsEnabled = options.shadows ?? true;
 
   // 高、均勻、暖白的環境光：黏土世界的亮度主力。
   const hemisphere = new HemisphereLight(SKY_COLOUR, GROUND_BOUNCE_COLOUR, HEMISPHERE_INTENSITY);
@@ -114,7 +120,7 @@ export function createClayLighting(): Group {
   // 弱方向性主光，略偏上方且略偏前——投影因此落在物件正下方略偏前。
   const key = new DirectionalLight(KEY_COLOUR, KEY_INTENSITY);
   key.position.set(2.6, 6.4, 4.2);
-  key.castShadow = true;
+  key.castShadow = shadowsEnabled;
   key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   key.shadow.radius = SHADOW_BLUR_RADIUS;
   key.shadow.blurSamples = SHADOW_BLUR_SAMPLES;
@@ -143,8 +149,11 @@ export function createClayLighting(): Group {
  * 特別不開 ACESFilmic tone mapping：那會把粉彩色壓向對比更強的電影感，
  * 跟「顏色是材質本身」與低對比的要求相反。
  */
-export function applyClayRenderSettings(renderer: WebGLRenderer): void {
-  renderer.shadowMap.enabled = true;
+export function applyClayRenderSettings(
+  renderer: WebGLRenderer,
+  options: ClayLightingOptions = {},
+): void {
+  renderer.shadowMap.enabled = options.shadows ?? true;
   renderer.shadowMap.type = VSMShadowMap;
   renderer.toneMappingExposure = 1;
 }

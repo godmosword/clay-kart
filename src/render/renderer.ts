@@ -23,8 +23,12 @@ import * as THREE from 'three';
 import type { Renderer, SimSnapshot } from '@loader/bootstrap';
 import { TRACK_GEOMETRY } from '@physics/constants';
 import { exposeRenderTelemetry, renderTelemetry } from '@contract/render-telemetry';
-import { createKart, type KartVisual } from './components/kart.js';
-import { applyClayRenderSettings, createClayLighting, enableClayShadows } from './clay/lighting.js';
+import {
+  createKart,
+  createKartProxy,
+  type KartVisual,
+} from './components/kart.js';
+import { applyClayRenderSettings, createClayLighting } from './clay/lighting.js';
 import { createTrackBarrierRings } from './components/track-barriers.js';
 import { createTrackSurfaceRing } from './components/track-surface.js';
 import { createFoliageScatter } from './components/foliage.js';
@@ -75,11 +79,12 @@ class ClayRenderer implements Renderer {
 
   /**
    * 全域光照鑽機。每幀跟著玩家車移動——**這不是逐元件調光**（`§3` 禁的是
-   * 那個），燈的參數一個都沒變，只是把整組平移過去。不跟著移動的話
-   * `clay/lighting.ts` 的陰影 frustum（±9 單位）在車開離原點之後就框不到車，
-   * 接地陰影會整個消失。
+   * 那個），燈的參數一個都沒變，只是把整組平移過去。遊戲路徑關閉即時
+   * shadow-map pass，接地陰影由下方的單一 contact patch 提供；拍攝台仍走
+   * `clay/lighting.ts` 的完整陰影設定。
    */
-  readonly #lighting = createClayLighting();
+  readonly #lighting = createClayLighting({ shadows: false });
+  readonly #playerContactShadow: THREE.Mesh;
 
   /**
    * 每台車一組整車視覺，索引對齊 `snap.karts`。長度隨快照動態調整——
@@ -97,7 +102,10 @@ class ClayRenderer implements Renderer {
   constructor(mount: HTMLElement) {
     this.#renderer = new THREE.WebGLRenderer({ antialias: true });
     this.#renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    applyClayRenderSettings(this.#renderer);
+    // The game uses a cheap contact patch. The full VSM shadow pass remains the
+    // default for the component capture stage, but it blocks the gameplay rAF
+    // loop on low-end / SwiftShader paths even after the AI LOD reduction.
+    applyClayRenderSettings(this.#renderer, { shadows: false });
     mount.appendChild(this.#renderer.domElement);
 
     // 天空是元件 #7 `skybox-lighting` 的一部分，還沒實作——但 `§3` 的
@@ -115,6 +123,21 @@ class ClayRenderer implements Renderer {
     this.#buildTrack();
     this.#buildBoundaryWalls();
     this.#buildFoliage();
+
+    this.#playerContactShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 24),
+      new THREE.MeshBasicMaterial({
+        color: TERRAIN.contactShadow,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+      }),
+    );
+    this.#playerContactShadow.name = 'player-contact-shadow';
+    this.#playerContactShadow.rotation.x = -Math.PI / 2;
+    this.#playerContactShadow.scale.set(1.0, 1.55, 1);
+    this.#playerContactShadow.position.y = 0.012;
+    this.#scene.add(this.#playerContactShadow);
 
     this.#hud = document.createElement('div');
     this.#hud.style.cssText = [
@@ -207,15 +230,20 @@ class ClayRenderer implements Renderer {
     this.#scene.add(barriers);
   }
 
-  /** 索引 i 的車若不存在就先建立——渲染層不預先假設車數。 */
+  /**
+   * 索引 i 的車若不存在就先建立——渲染層不預先假設車數。
+   *
+   * 玩家車使用完整黏土元件；AI 車目前只有識別色，使用單 mesh proxy，
+   * 避免把尚未有專屬造型的暫時車輛成本放大到每一台。這是 gameplay LOD，
+   * 不影響 `components/kart.ts` 的元件拍攝路徑。
+   */
   #ensureKart(i: number, isPlayer: boolean): KartVisual {
     let kart = this.#karts[i];
     if (kart) return kart;
     const bodyColor = isPlayer
       ? XIAOHONG.body
       : (AI_LIVERY[(i - 1 + AI_LIVERY.length) % AI_LIVERY.length] ?? CAR_PARK.accentBlue);
-    kart = createKart({ bodyColor });
-    enableClayShadows(kart.group);
+    kart = isPlayer ? createKart({ bodyColor }) : createKartProxy(bodyColor);
     this.#scene.add(kart.group);
     this.#karts[i] = kart;
     this.#rolled[i] = 0;
@@ -274,6 +302,7 @@ class ClayRenderer implements Renderer {
 
     // 光照鑽機跟著玩家走，陰影 frustum 才框得到車。燈的參數不變。
     this.#lighting.position.set(playerIx, playerIy, playerIz);
+    this.#playerContactShadow.position.set(playerIx, 0.012, playerIz);
 
     const [fx, fz] = forwardVector(playerIyaw);
     // `BAR-PERF §4.3`：相機 transform 實際被寫入的次數。**不得抽格**。
