@@ -197,6 +197,53 @@ async function assertNotPalettised(pngPath) {
   }
 }
 
+/**
+ * 拒絕出貨「容器是全彩、內容早就被量化」的對比表。
+ *
+ * `assertNotPalettised()` 只讀 IHDR 的 colour type——**它檢查的是容器**。
+ * R32 就從那個縫隙漏過去了:我修掉 `contact-sheet.mjs` 的兩處量化，卻漏了
+ * `ref-tiles.mjs`,於是參考半邊在被合成之前就各自壓成 256 色。最終合成圖是
+ * RGBA,守衛照樣放行。
+ *
+ * 而且那比 R31 更糟。R31 是**兩邊同等**受害;單邊量化等於專門對其中一組製造
+ * `§6`「程序化雜訊」的偽陽性——這次剛好偏向我們，下次可能反過來。
+ *
+ * 所以改成數實際的相異色。門檻取 300:算繪半邊實測 814–2697、參考半邊
+ * 30k–50k,而任何一次 256 色量化都會落在 256 以下。純色佔位圖(2 色)排除。
+ */
+function assertHalvesNotQuantised(pixels, width, slots, cell) {
+  const MIN_DISTINCT = 300;
+  const problems = [];
+  const countHalf = (x0, y0) => {
+    const seen = new Set();
+    for (let y = y0; y < y0 + cell; y += 2) {
+      for (let x = x0; x < x0 + cell; x += 2) {
+        const i = (y * width + x) * 3;
+        seen.add((pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2]);
+      }
+    }
+    return seen.size;
+  };
+  for (const slot of slots) {
+    for (const [index, kind] of [slot.left, slot.right].entries()) {
+      const placeholder = kind === 'ref' ? slot.refPlaceholder : slot.oursPlaceholder;
+      if (placeholder) continue;
+      const n = countHalf(slot.col * cell * 2 + index * cell, slot.row * cell);
+      if (n < MIN_DISTINCT) {
+        problems.push(`${slot.component} 的 ${kind} 半邊只有 ${n} 種顏色`);
+      }
+    }
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      `對比表有半邊在合成前就被量化(門檻 ${MIN_DISTINCT} 色):\n  `
+      + problems.join('\n  ')
+      + '\n量化會逼出抖動,而抖動看起來就是 §6 禁止的程序化雜訊——'
+      + '評分因此評的是編碼器不是材質。檢查產生那半邊的工具有沒有 palette 量化。',
+    );
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const raw = JSON.parse(await readFile(args.manifest, 'utf8'));
@@ -314,6 +361,12 @@ async function main() {
   await writeFile(sheetPath, cleaned);
   await assertNoLeakedKeyMetadata(sheetPath, 'contact-sheet.key.json');
   await assertNotPalettised(sheetPath);
+  // 容器檢查完再檢查內容——R32 證明前者攔不住後者。
+  const { data: sheetPixels, info: sheetInfo } = await sharp(cleaned)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  assertHalvesNotQuantised(sheetPixels, sheetInfo.width, slots, CELL);
 
   const sheetHash = createHash('sha256').update(cleaned).digest('hex');
   const key = {
