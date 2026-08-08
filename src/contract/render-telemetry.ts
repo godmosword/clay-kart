@@ -51,6 +51,32 @@ export interface RenderTelemetry {
   renderedFrames: number;
 
   /**
+   * 場上**實際帶有角色臉部動畫**的車輛數。`§4.1` 的 instance 分母。
+   *
+   * ## 為什麼不能用場上車輛數
+   *
+   * R32 之後 AI 對手走 gameplay LOD——有輪子但**沒有臉**（理由見
+   * `src/render/components/kart.ts` 的 `createKartProxy`）。所以「場上有幾台車」
+   * 與「有幾張臉在抽格」不再相等：四台車、一張臉。
+   *
+   * 用 HUD 的參賽車數當分母，會把 1 張臉算成 4 張，`§4.1` 因此 FAIL——
+   * 而 **FAIL 的理由會指向動畫，實際問題在分母**。那正是 `§4.2`／`§4.3`
+   * 在 R26 之前的毛病，只是換一個欄位重演。
+   *
+   * ## 為什麼放這裡而不是 canvas 的 data attribute
+   *
+   * 這個檔案存在的理由就是「render 端與 probe 端要有**一個**雙方都看得到的
+   * 計數點」（見檔頭）。另外開一條 DOM 屬性通道，等於讓同一類數字有兩個來源，
+   * 而兩個來源遲早會分岔——那正是檔頭第一段在講的問題。
+   *
+   * ## 缺值怎麼辦
+   *
+   * 探針讀不到這個欄位時應該**明確 FAIL**，不得退回用車輛數猜。猜出來的分母
+   * 會讓 `§4.1` 變成一個看起來有在跑、實際上量錯對象的檢查。
+   */
+  characterAnimationInstances: number;
+
+  /**
    * 載具 transform 實際被寫入的次數。**每台車每幀算一次**，不是每台車各算一次
    * ——`§4.2` 判的是「載具有沒有被抽格」，不是場上有幾台車。
    */
@@ -74,6 +100,7 @@ export interface RenderTelemetry {
  */
 export const renderTelemetry: RenderTelemetry = {
   renderedFrames: 0,
+  characterAnimationInstances: 0,
   vehicleTransformUpdates: 0,
   cameraUpdates: 0,
   characterAnimationFrames: 0,
