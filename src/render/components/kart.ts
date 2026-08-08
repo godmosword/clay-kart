@@ -72,6 +72,8 @@ export interface KartVisualOptions {
 export interface KartVisual {
   /** 整台車。原點在車體正下方的地面，forward = `+Z`。 */
   group: Group;
+  /** 是否包含需要 12fps 抽格的角色臉部動畫。 */
+  readonly hasCharacterAnimation: boolean;
   /**
    * 輪子累積滾動角。呼叫端傳**距離**，換算成角度在這裡做——
    * 滾動半徑屬於輪子元件的細節，不該外流到 `renderer.ts`。
@@ -121,7 +123,7 @@ export function createKartProxy(bodyColor: number): KartVisual {
   );
   // 車體抬高到輪子上方，讓輪子露出來——與完整組裝的離地關係一致。
   body.position.y = WHEEL_ROLLING_RADIUS + 0.31;
-  body.castShadow = true;
+  // AI 車用接地色塊，不進即時 shadow-map pass；仍可接收靜態場景陰影。
   body.receiveShadow = true;
   group.add(body);
 
@@ -133,6 +135,7 @@ export function createKartProxy(bodyColor: number): KartVisual {
 
   return {
     group,
+    hasCharacterAnimation: false,
     setRolledDistance(metres: number): void {
       wheels.setSpin(metres / WHEEL_ROLLING_RADIUS);
     },
@@ -180,6 +183,7 @@ export function createKart(options: KartVisualOptions = {}): KartVisual {
 
   return {
     group,
+    hasCharacterAnimation: true,
     setRolledDistance(metres: number): void {
       wheels.setSpin(metres / WHEEL_ROLLING_RADIUS);
     },

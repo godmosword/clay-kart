@@ -84,8 +84,8 @@ class ClayRenderer implements Renderer {
 
   /**
    * 全域光照鑽機。每幀跟著玩家車移動——**這不是逐元件調光**（`§3` 禁的是
-   * 那個），燈的參數一個都沒變，只是把整組平移過去。遊戲路徑關閉即時
-   * shadow-map pass，接地陰影由下方的單一 contact patch 提供；拍攝台仍走
+   * 那個），燈的參數一個都沒變，只是把整組平移過去。遊戲路徑保留靜態場景的
+   * 即時 shadow-map，車輛本身則用 contact patch 補接地感；拍攝台仍走
    * `clay/lighting.ts` 的完整陰影設定。
    */
   // **遊戲端保留即時陰影。** R32 有一版為了降 draw call 把它整個關掉，
@@ -125,6 +125,7 @@ class ClayRenderer implements Renderer {
     // 是加強不是替代。
     applyClayRenderSettings(this.#renderer, { shadows: true });
     mount.appendChild(this.#renderer.domElement);
+    this.#renderer.domElement.dataset.characterAnimationInstances = '0';
 
     // 天空是元件 #7 `skybox-lighting` 的一部分，還沒實作——但 `§3` 的
     // `#8a8a8a` 中性灰是**拍攝台背景**，那是為了讓元件圖可比，不是遊戲場景
@@ -296,6 +297,7 @@ class ClayRenderer implements Renderer {
     renderTelemetry.renderedFrames += 1;
 
     let playerIx = 0, playerIy = 0, playerIz = 0, playerIyaw = 0;
+    let characterAnimationInstances = 0;
 
     // 本幀推進的模擬時間。輪子自轉吃距離、表情吃時間，兩者都要它。
     const simDt = this.#prevSimTime === null ? 0 : Math.max(0, snap.t - this.#prevSimTime);
@@ -303,6 +305,7 @@ class ClayRenderer implements Renderer {
 
     for (const [i, kart] of snap.karts.entries()) {
       const visual = this.#ensureKart(i, i === snap.playerIndex);
+      if (visual.hasCharacterAnimation) characterAnimationInstances += 1;
       const [x, y, z] = kart.pos;
       const prev = this.#prevPos[i] ?? null;
 
@@ -339,6 +342,11 @@ class ClayRenderer implements Renderer {
         playerIyaw = iyaw;
       }
     }
+
+    // R30 §4.1 需要分母是實際有角色動畫的車，而不是 HUD 的參賽車總數；
+    // AI gameplay LOD 刻意沒有臉，透過 canvas data attribute 把真實 instance
+    // 數交給 perf-probe/device-probe。缺值時探針應誠實 FAIL，不可猜測。
+    this.#renderer.domElement.dataset.characterAnimationInstances = String(characterAnimationInstances);
 
     // `BAR-PERF §4.2`：載具 transform 實際被寫入的次數。**每幀算一次**，
     // 不是每台車各算一次——§4.2 判的是「載具有沒有被抽格」，不是場上有幾台車。
