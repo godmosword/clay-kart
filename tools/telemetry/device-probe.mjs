@@ -304,9 +304,12 @@ function remoteProbeScript(durationMs, inputSegments) {
     state.frames = [];
     state.drawCalls = 0;
     state.triangles = 0;
-    const hudValues = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
-    const standingMatch = (hudValues[2]?.textContent ?? '').match(/^\\d+\\/(\\d+)$/);
-    state.characterAnimationInstances = standingMatch ? Number(standingMatch[1]) : null;
+    const animationCanvas = document.querySelector('canvas[data-character-animation-instances]');
+    const animationInstanceCount = Number(animationCanvas?.dataset.characterAnimationInstances);
+    state.characterAnimationInstances = Number.isInteger(animationInstanceCount)
+      && animationInstanceCount > 0
+      ? animationInstanceCount
+      : null;
     const snapshotRenderTelemetry = () => {
       const telemetry = window.__CLAY_RENDER_TELEMETRY__;
       return telemetry && Number.isFinite(telemetry.renderedFrames)

@@ -1024,9 +1024,12 @@ async function measureBrowser() {
           }
           : null;
         const telemetryRenderedFrames = telemetryDeltaValid ? telemetryDeltas.renderedFrames : null;
-        const hudValues = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
-        const standingMatch = (hudValues[2]?.textContent ?? '').match(/^\\d+\\/(\\d+)$/);
-        const characterAnimationInstances = standingMatch ? Number(standingMatch[1]) : null;
+        const animationCanvas = document.querySelector('canvas[data-character-animation-instances]');
+        const animationInstanceCount = Number(animationCanvas?.dataset.characterAnimationInstances);
+        const characterAnimationInstances = Number.isInteger(animationInstanceCount)
+          && animationInstanceCount > 0
+          ? animationInstanceCount
+          : null;
         const rawCharacterAnimationHz = telemetryHz?.characterAnimationFrames ?? null;
         const rawCharacterAnimationPerFrame = telemetryRenderedFrames > 0
           ? telemetryDeltas.characterAnimationFrames / telemetryRenderedFrames
