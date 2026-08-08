@@ -115,17 +115,27 @@ async function loadTile(path, label, kind) {
     const buf = await sharp(path)
       .resize(CELL, CELL, { fit: 'cover', position: 'centre' })
       .removeAlpha()
-      .png({ effort: 4 })
+      // `palette: false` 見下方合成處的長註解。**這裡也要**——每張 tile 在
+      // 合成前就各自被量化過一次，所以只修合成那一段不夠：改完之後每個半邊
+      // 仍然恰好卡在 256 色，就是被這一行壓的。
+      .png({ palette: false, compressionLevel: 9 })
       .toBuffer();
     return { buf, source: 'file', path, placeholder: false };
   }
+  // **佔位圖不得帶任何來源資訊。** R31 之前這裡印著 `${kind}`（`REF`／`OURS`）
+  // 與元件名，等於把對照表直接畫進圖裡——`§1` 說「標籤對照表絕對不得進入
+  // critic 的可讀範圍」，而 key 檔被 gitignore 的同時，同一份資訊從像素洩出來。
+  //
+  // R31 三個獨立 critic 全部讀到了它，其中一個把七格的 `ref`／`ours` 逐格
+  // 列出來，**與 key 檔 7/7 完全相符**。單邊佔位的格子更糟：佔位那半邊的標籤
+  // 用排除法直接指認另一半邊的來源。
+  //
+  // 現在佔位圖是一塊不帶字的灰底，`ref` 與 `ours` 的佔位圖**逐位元相同**。
+  // 缺圖這件事 critic 本來就看得見，不需要也不應該告訴他是哪一邊缺。
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${CELL}" height="${CELL}">
   <rect width="100%" height="100%" fill="#8a8a8a"/>
   <rect x="16" y="16" width="${CELL - 32}" height="${CELL - 32}" fill="none" stroke="#444" stroke-width="4" stroke-dasharray="12 8"/>
-  <text x="50%" y="42%" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#222">${escapeXml(kind)}</text>
-  <text x="50%" y="54%" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#222">${escapeXml(label)}</text>
-  <text x="50%" y="66%" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#555">placeholder</text>
 </svg>`;
   const buf = await sharp(Buffer.from(svg)).png().toBuffer();
   return { buf, source: 'placeholder', path: path ?? null, placeholder: true };
@@ -148,6 +158,42 @@ async function assertNoLeakedKeyMetadata(pngPath, keyBasename) {
   // sharp strips most text by default; still refuse if any text chunks mention paths we care about
   if (meta.exif || meta.iptc || meta.xmp) {
     throw new Error('contact sheet unexpectedly retained exif/iptc/xmp; refusing to ship');
+  }
+}
+
+/**
+ * 拒絕出貨被量化成調色盤的對比表。
+ *
+ * R17–R29 每一張表都是 colour type 3（256 色調色盤），沒有人發現，因為
+ * 「有產出一張 2048×3072 的 PNG」這件事本身看起來完全正常。肇因是
+ * `.png({ effort: 4 })`——sharp 的 `effort` 會順手把 `palette` 設成 true。
+ *
+ * 註解擋不住這種事：下一個人只要為了壓檔案大小再加一個選項，同樣的事就會
+ * 再發生一次。所以直接讀回 IHDR 檢查 colour type。
+ *
+ * colour type 2 = truecolour RGB。3 = palette。
+ */
+async function assertNotPalettised(pngPath) {
+  const buf = await readFile(pngPath);
+  if (buf.length < 26 || buf.readUInt32BE(0) !== 0x89504e47) {
+    throw new Error(`not a PNG: ${pngPath}`);
+  }
+  // 2 = truecolour RGB、6 = truecolour + alpha。兩者都是每通道 8 bit 的全彩，
+  // 都可以接受。要擋的是 3（調色盤）與 0/4（灰階）。
+  //
+  // 第一版寫成 `!== 2`，實測直接把合法的 RGBA 擋下來——`palette: false` 之後
+  // sharp 因為合成來源帶 alpha 而輸出 colour type 6。守衛太嚴會被下一個人
+  // 順手放寬，那比沒有守衛更糟，所以判準要對準真正要擋的東西。
+  const ACCEPTED = new Set([2, 6]);
+  const colourType = buf.readUInt8(25);
+  if (!ACCEPTED.has(colourType)) {
+    throw new Error(
+      `contact sheet must be truecolour (PNG colour type 2 or 6), got ${colourType}`
+      + (colourType === 3
+        ? '。調色盤量化會把算繪半邊壓到數十色，逼出抖動，而抖動看起來就是'
+          + ' §6 禁止的程序化雜訊——評分因此評的是編碼器不是材質。'
+        : ''),
+    );
   }
 }
 
@@ -242,14 +288,32 @@ async function main() {
 
   // Do not call keepMetadata / withMetadata — default encode strips EXIF/IPTC/XMP.
   // Never embed filenames or key paths into the PNG.
+  // **`palette: false` 是必要的，不是預設。**
+  //
+  // 這裡原本是 `.png({ effort: 4 })`。sharp 的文件寫明 `effort` 這個選項
+  // **會把 `palette` 設成 true**——一個看起來只調 CPU 用量的參數，把 R17 以來
+  // 每一張對比表都量化成 256 色。
+  //
+  // 24 個半邊共用那 256 色，實測我們的算繪半邊被壓成：
+  //
+  //     track-barriers  1475 個相異色 → 24
+  //     foliage         4025          → 62
+  //
+  // 而黏土渲染的全部重點就是壓痕的細微明暗。壓成二十幾色之後只能靠**抖動**
+  // 近似漸層，而那個抖動看起來就是 `§6` 禁止的「程序化雜訊當表面細節」。
+  // R31 有兩個 critic 因此把我們的半邊判到 2 分，理由寫的是「亂數點噪」。
+  //
+  // 不對稱在於：參考半邊是高對比高飽和的實拍照片，量化後幾乎無損。
+  // **這張表因此系統性地摧毀了它自己要評的那個性質，而且只摧毀一邊。**
   const cleaned = await sharp({
     create: { width: SHEET_W, height: SHEET_H, channels: 3, background: BG },
   })
     .composite(compositesForSheet)
-    .png({ effort: 4 })
+    .png({ palette: false, compressionLevel: 9 })
     .toBuffer();
   await writeFile(sheetPath, cleaned);
   await assertNoLeakedKeyMetadata(sheetPath, 'contact-sheet.key.json');
+  await assertNotPalettised(sheetPath);
 
   const sheetHash = createHash('sha256').update(cleaned).digest('hex');
   const key = {
