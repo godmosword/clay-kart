@@ -12,6 +12,7 @@
     "test:steer-screen": "npm run build && node tools/visual/steer-screen.mjs",
     "test:ui-hud": "npm run build && node tools/visual/check-ui-hud.mjs",
     "test:race-standing": "node --experimental-strip-types tools/visual/check-race-standing.mjs",
+    "scene-stats": "npm run build && node tools/visual/scene-stats.mjs",
     "contact-sheet": "node tools/visual/contact-sheet.mjs",
     "progress": "python3 -m http.server 8080",
     "render-components": "node tools/visual/render-components.mjs"
