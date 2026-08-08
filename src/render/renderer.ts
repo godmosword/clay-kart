@@ -22,6 +22,11 @@
 import * as THREE from 'three';
 import type { Renderer, SimSnapshot } from '@loader/bootstrap';
 import { TRACK_GEOMETRY } from '@physics/constants';
+
+/**
+ * 接地色塊擺在路面頂再往上一點點，避免與路面 z-fight。
+ */
+const CONTACT_SHADOW_LIFT = 0.012;
 import { exposeRenderTelemetry, renderTelemetry } from '@contract/render-telemetry';
 import {
   createKart,
@@ -30,7 +35,7 @@ import {
 } from './components/kart.js';
 import { applyClayRenderSettings, createClayLighting } from './clay/lighting.js';
 import { createTrackBarrierRings } from './components/track-barriers.js';
-import { createTrackSurfaceRing } from './components/track-surface.js';
+import { createTrackSurfaceRing, ROAD_SURFACE_Y } from './components/track-surface.js';
 import { createFoliageScatter } from './components/foliage.js';
 import { createClayMaterial } from './clay/material.js';
 import { CAR_PARK, TERRAIN, XIAOHONG } from './clay/palette.js';
@@ -83,8 +88,21 @@ class ClayRenderer implements Renderer {
    * shadow-map pass，接地陰影由下方的單一 contact patch 提供；拍攝台仍走
    * `clay/lighting.ts` 的完整陰影設定。
    */
-  readonly #lighting = createClayLighting({ shadows: false });
-  readonly #playerContactShadow: THREE.Mesh;
+  // **遊戲端保留即時陰影。** R32 有一版為了降 draw call 把它整個關掉，
+  // 只留玩家車底下一個圓形色塊——樹、護欄、對手全部沒有陰影。
+  //
+  // 那個取捨用量測否定了：開陰影是 `draw_calls 137`（窗口 [0,150]）、
+  // `triangles_k 58.7`（[0,400]），關陰影是 126 / 55.5。**陰影只花 11 個
+  // draw call**，而它換掉的是 `§5.10 shadows-contact` 這一整個元件在遊戲裡
+  // 的存在，以及 `§5.0` 燈光鐵律裡的接地陰影與 AO。
+  //
+  // 「元件圖有、遊戲裡沒有」正是 `§5.3` 明文要排除的那種通過方式。
+  readonly #lighting = createClayLighting({ shadows: true });
+  /**
+   * 每台車一塊接地色塊。**不只玩家車**——R32 有一版只給玩家，
+   * 對手因此完全沒有接地感，看起來像浮在路面上。
+   */
+  readonly #contactShadows: THREE.Mesh[] = [];
 
   /**
    * 每台車一組整車視覺，索引對齊 `snap.karts`。長度隨快照動態調整——
@@ -102,10 +120,10 @@ class ClayRenderer implements Renderer {
   constructor(mount: HTMLElement) {
     this.#renderer = new THREE.WebGLRenderer({ antialias: true });
     this.#renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    // The game uses a cheap contact patch. The full VSM shadow pass remains the
-    // default for the component capture stage, but it blocks the gameplay rAF
-    // loop on low-end / SwiftShader paths even after the AI LOD reduction.
-    applyClayRenderSettings(this.#renderer, { shadows: false });
+    // 陰影留著，理由與成本見上面 `#lighting` 的註解。玩家車底下那塊
+    // contact patch 仍然保留——它補的是即時陰影在極斜角度下會變淡的情況，
+    // 是加強不是替代。
+    applyClayRenderSettings(this.#renderer, { shadows: true });
     mount.appendChild(this.#renderer.domElement);
 
     // 天空是元件 #7 `skybox-lighting` 的一部分，還沒實作——但 `§3` 的
@@ -124,20 +142,6 @@ class ClayRenderer implements Renderer {
     this.#buildBoundaryWalls();
     this.#buildFoliage();
 
-    this.#playerContactShadow = new THREE.Mesh(
-      new THREE.CircleGeometry(1, 24),
-      new THREE.MeshBasicMaterial({
-        color: TERRAIN.contactShadow,
-        transparent: true,
-        opacity: 0.22,
-        depthWrite: false,
-      }),
-    );
-    this.#playerContactShadow.name = 'player-contact-shadow';
-    this.#playerContactShadow.rotation.x = -Math.PI / 2;
-    this.#playerContactShadow.scale.set(1.0, 1.55, 1);
-    this.#playerContactShadow.position.y = 0.012;
-    this.#scene.add(this.#playerContactShadow);
 
     this.#hud = document.createElement('div');
     this.#hud.style.cssText = [
@@ -186,6 +190,33 @@ class ClayRenderer implements Renderer {
     );
     foliage.position.set(TRACK_GEOMETRY.centerX, 0, TRACK_GEOMETRY.centerZ);
     this.#scene.add(foliage);
+  }
+
+  /**
+   * 一塊接地色塊。`§5.10` 的條文字面是「陰影**短、柔、低對比**，落在物件
+   * 正下方略偏前」——柔邊圓形色塊比 shadow map 的硬邊投影更接近那句話，
+   * 同時只花一個 draw call。
+   */
+  #addContactShadow(): THREE.Mesh {
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 24),
+      new THREE.MeshBasicMaterial({
+        color: TERRAIN.contactShadow,
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+      }),
+    );
+    shadow.name = 'kart-contact-shadow';
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.scale.set(1.0, 1.55, 1);
+    // **必須高過路面。** 原本是 0.012，而 `track-surface` 的路面頂在
+    // `SLAB_HEIGHT 0.13 + OVERLAY_LIFT 0.155 = 0.285`——色塊整個被埋在路面
+    // 底下，一次都沒有顯示過。R32 的截圖裡「車子沒有影子」就是這個原因，
+    // 不是陰影參數不對。
+    shadow.position.y = ROAD_SURFACE_Y + CONTACT_SHADOW_LIFT;
+    this.#scene.add(shadow);
+    return shadow;
   }
 
   /**
@@ -244,7 +275,16 @@ class ClayRenderer implements Renderer {
       ? XIAOHONG.body
       : (AI_LIVERY[(i - 1 + AI_LIVERY.length) % AI_LIVERY.length] ?? CAR_PARK.accentBlue);
     kart = isPlayer ? createKart({ bodyColor }) : createKartProxy(bodyColor);
+    // **車輛刻意不進 shadow-map pass。** 每個 castShadow 的 mesh 都會在陰影
+    // pass 再畫一次，而四台車就是 121 個 mesh——實測把 `enableClayShadows()`
+    // 套回車上，`draw_calls` 從 126 變 **252**，直接爆掉 `§5.3` 的 150。
+    //
+    // 改用接地色塊。**這不是為了省而妥協**：`§5.10` 的條文字面就是
+    // 「陰影短、柔、低對比，落在物件正下方略偏前」——一塊柔邊圓形色塊比
+    // shadow map 的硬邊投影更接近那句話。靜態場景（樹、護欄、路面）仍走
+    // 真實陰影，它們的 mesh 數少，成本可控。
     this.#scene.add(kart.group);
+    this.#contactShadows[i] = this.#addContactShadow();
     this.#karts[i] = kart;
     this.#rolled[i] = 0;
     return kart;
@@ -273,7 +313,11 @@ class ClayRenderer implements Renderer {
 
       // 整車原點就在車體正下方的地面（見 components/kart-body.ts），
       // 所以直接吃快照的 y，不再補半個車高。
-      visual.group.position.set(ix, iy, iz);
+      // **加上路面高度。** 模擬的 y 是 0（它的地面就是 y=0 的平面），而
+      // `track-surface` 的路面頂在 `ROAD_SURFACE_Y`。不加的話車會有
+      // 0.285 埋進路裡——約四分之一個輪徑，看起來像輪子做小了。
+      // 這是 R25 把路面墊高時漏掉的，R32 查接地色塊為什麼看不到才發現。
+      visual.group.position.set(ix, iy + ROAD_SURFACE_Y, iz);
       visual.group.rotation.y = iyaw;
 
       // `CHARACTERS.md §3`：輪子屬載具，60fps 不抽格。
@@ -302,7 +346,15 @@ class ClayRenderer implements Renderer {
 
     // 光照鑽機跟著玩家走，陰影 frustum 才框得到車。燈的參數不變。
     this.#lighting.position.set(playerIx, playerIy, playerIz);
-    this.#playerContactShadow.position.set(playerIx, 0.012, playerIz);
+    // 每台車的色塊跟著自己那台走。只更新玩家那塊的話，對手的色塊會留在
+    // 起跑線上——那比沒有色塊更糟。
+    for (let i = 0; i < this.#karts.length; i++) {
+      const patch = this.#contactShadows[i];
+      const kart = this.#karts[i];
+      if (!patch || !kart) continue;
+      patch.position.set(kart.group.position.x, ROAD_SURFACE_Y + CONTACT_SHADOW_LIFT, kart.group.position.z);
+      patch.rotation.z = -kart.group.rotation.y;
+    }
 
     const [fx, fz] = forwardVector(playerIyaw);
     // `BAR-PERF §4.3`：相機 transform 實際被寫入的次數。**不得抽格**。
