@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-07T23:31:15Z",
+  "updated": "2026-08-08T01:03:49Z",
   "wave": "W3",
-  "round": 28,
-  "element": "ai-opponents-wire + ui-hud-pos",
+  "round": 30,
+  "element": "ui-hud-alert + race-standing-guard",
   "status": "done",
   "last_verdict": null,
-  "note": "R28：bootstrap 接 3 台 AI；HUD 加 POS（先縮 ratio≤0.11）；截圖可見 AI_LIVERY。test:ui-hud／steer-screen／W1／typecheck PASS。steer-screen 餘裕變薄已記 BACKLOG。"
+  "note": "R30：告警色 #ff8c2b→#f49862（對齊 §5.12／§6）；race-standing 註記起點角=0 前提 + test:race-standing。palette-bans／ui-hud／steer-screen／typecheck PASS。"
 }
