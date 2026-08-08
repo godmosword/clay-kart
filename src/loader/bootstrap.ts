@@ -9,6 +9,7 @@
 import {
   advance,
   TICK_DT,
+  type AiOpponentConfig,
   type Renderer,
   type SimSnapshot,
   type SimWorld,
@@ -20,6 +21,17 @@ import {
   writeFollowCam,
   type SteerProbeSample,
 } from '@ui/steer-screen-math';
+
+/**
+ * 場上 AI 對手（契約建議上限 3 台，共 4 車）。
+ * 難度落在 [0,1]；角色只影響識別／日後造型，物理側目前共用調校。
+ * 數量與旋鈕形狀來自 `WorldOptions`／ghost-replay 既有用法——不改 FROZEN 檔。
+ */
+const DEFAULT_AI_OPPONENTS: readonly AiOpponentConfig[] = [
+  { characterId: 'duoduo', difficulty: 0.45 },
+  { characterId: 'dudu', difficulty: 0.6 },
+  { characterId: 'anan', difficulty: 0.75 },
+];
 
 export { TICK_HZ, TICK_DT, advance } from '@contract/sim';
 export type { KartState, LapState, Renderer, SimSnapshot, SimWorld, WorldInput } from '@contract/sim';
@@ -101,7 +113,7 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
     import('@render/renderer'),
   ]);
 
-  const world: SimWorld = createWorld();
+  const world: SimWorld = createWorld({ aiOpponents: DEFAULT_AI_OPPONENTS });
   const renderer: Renderer = createRenderer(mount);
   // ui-hud（§5.12）在 Cursor 範圍；render 裡的 W1 monospace HUD 會被 clay-hud 藏掉。
   const hud = createClayHud(mount);
