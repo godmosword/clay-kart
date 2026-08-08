@@ -32,8 +32,12 @@ const BUILD_ROOT = resolve(REPO_ROOT, 'build/out');
 
 /** 目標模擬持鍵時長（秒，讀 probe.t）。牆鐘只當上限，不斷言牆鐘位移。 */
 const TARGET_SIM_SECONDS = 0.45;
-/** 牆鐘等待上限——超過仍拿不到足夠 simDt 就失敗（模擬卡住）。 */
-const MAX_WALL_WAIT_MS = 8_000;
+/**
+ * 牆鐘等待上限——超過仍拿不到足夠 simDt 就失敗（模擬卡住）。
+ * R28 接上 3 台 AI 後 SwiftShader 負載變高；8s 偶發只推進 ~0.2s sim。
+ * 門檻仍看 simDt，加長只是給慢機器更多牆鐘，不放寬轉向斷言。
+ */
+const MAX_WALL_WAIT_MS = 20_000;
 /**
  * 每模擬秒的橫向位移門檻（世界單位 / 模擬秒）。
  * 正常轉向約 1–2；翻符號會變號；純抖動遠低於此。
@@ -232,6 +236,21 @@ function screenLateral(start, end) {
   return dx * rx + dy * ry + dz * rz;
 }
 
+/** 等到 probe.t 相對 baseline 至少前進 minDelta（確認 rAF／模擬在跑）。 */
+async function waitForSimTick(session, baselineT, minDelta = 0.05, wallMs = MAX_WALL_WAIT_MS) {
+  const deadline = Date.now() + wallMs;
+  while (Date.now() < deadline) {
+    const sample = await readProbe(session);
+    if (sample?.pos && typeof sample.t === 'number' && sample.t - baselineT >= minDelta) {
+      return sample;
+    }
+    await sleep(50);
+  }
+  throw new Error(
+    `sim clock stalled (baseline t=${baselineT}, need +${minDelta} within ${wallMs}ms)`,
+  );
+}
+
 async function runTrial(session, steerKey) {
   // 先加速一點，避免靜止時側向分量太小（這段用牆鐘喚醒即可）
   await keyDown(session, 'ArrowUp');
@@ -246,6 +265,8 @@ async function runTrial(session, steerKey) {
   if (!start?.pos || typeof start.t !== 'number') {
     throw new Error('steer probe never became ready');
   }
+  // 確認加速段期間模擬有在跑，避免在卡死的幀上開始轉向量測
+  start = await waitForSimTick(session, start.t, 0.05);
 
   await keyDown(session, steerKey);
 
@@ -335,15 +356,16 @@ async function main() {
     const trials = [];
     for (const steerKey of ['ArrowRight', 'ArrowLeft']) {
       await session.call('Page.navigate', { url: gameUrl });
+      let readyProbe = null;
       for (let attempt = 0; attempt < 150; attempt += 1) {
-        const probe = await session.call('Runtime.evaluate', {
-          expression:
-            'Boolean(document.querySelector("#app canvas") && window.__CLAY_STEER_PROBE__?.latest())',
-          returnByValue: true,
-        });
-        if (probe?.result?.value === true) break;
+        readyProbe = await readProbe(session);
+        if (readyProbe?.pos && typeof readyProbe.t === 'number') break;
         await sleep(100);
       }
+      if (!readyProbe?.pos || typeof readyProbe.t !== 'number') {
+        throw new Error(`probe not ready before ${steerKey} trial`);
+      }
+      await waitForSimTick(session, readyProbe.t, 0.05);
       trials.push(await runTrial(session, steerKey));
     }
 

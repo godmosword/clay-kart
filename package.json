@@ -12,7 +12,7 @@
     "test:steer-screen": "npm run build && node tools/visual/steer-screen.mjs",
     "test:ui-hud": "npm run build && node tools/visual/check-ui-hud.mjs",
     "test:race-standing": "node --experimental-strip-types tools/visual/check-race-standing.mjs",
-    "test:plumb": "npm run typecheck && npm run test:race-standing && npm run test:ui-hud && npm run test:steer-screen",
+    "test:plumb": "npm run build && npm run test:race-standing && node tools/visual/check-ui-hud.mjs && node tools/visual/steer-screen.mjs",
     "scene-stats": "npm run build && node tools/visual/scene-stats.mjs",
     "game-shot": "npm run build && node tools/visual/game-shot.mjs",
     "contact-sheet": "node tools/visual/contact-sheet.mjs",
