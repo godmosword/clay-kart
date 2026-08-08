@@ -23,7 +23,6 @@ const device = positionalArgs[2] ?? 'proxy';
 const environment = positionalArgs[3] ?? process.env.PERF_ENV ?? 'local';
 const MEASUREMENT_SECONDS = 5;
 const HEAP_REQUIRED_LAPS = 5;
-const HEAP_RACE_LAPS = [3, 2];
 const HEAP_DRIVER_INPUT = {
   throttle: 1,
   // The page driver is keyboard-only: ArrowRight maps to the simulation's
@@ -454,23 +453,32 @@ function browserProbeScript() {
     if (probe.lastCurrent !== null && snapshot.current > probe.lastCurrent) {
       state.heapMeasurement.completedLaps += snapshot.current - probe.lastCurrent;
     }
-    if (snapshot.current === snapshot.total
-      && state.heapMeasurement.completedLaps === snapshot.total - 1) {
+    if (snapshot.current === snapshot.total) {
       const timeStable = probe.lastTime !== null && Math.abs(snapshot.time - probe.lastTime) < 0.005;
       probe.stableFinalFrames = timeStable ? probe.stableFinalFrames + 1 : 0;
       // A finished SimSnapshot freezes currentTime. Require enough rendered
       // frames for that freeze, so a rounded two-decimal HUD value during a
       // live final lap is not mistaken for the finish line.
       if (probe.stableFinalFrames >= 45) {
-        state.heapMeasurement.completedLaps += 1;
+        state.heapMeasurement.completedLaps = Math.max(
+          state.heapMeasurement.completedLaps,
+          snapshot.total,
+        );
       }
     } else {
       probe.stableFinalFrames = 0;
     }
     probe.lastCurrent = snapshot.current;
     probe.lastTime = snapshot.time;
+    const finalSnapshot = snapshot.current === snapshot.total
+      && probe.stableFinalFrames >= 45;
     if (state.heapMeasurement.completedLaps >= state.heapMeasurement.targetLaps) {
       finishHeapMeasurement('complete', now);
+    } else if (finalSnapshot && snapshot.total < state.heapMeasurement.targetLaps) {
+      // A world with fewer total laps cannot satisfy the five-lap contract.
+      // End the one continuous session from the SimSnapshot state instead of
+      // navigating to a second page and disguising two short runs as five.
+      finishHeapMeasurement('incomplete_five_lap_run', now);
     }
   };
   state.finishLapHeapMeasurement = (status) => finishHeapMeasurement(status, performance.now());
@@ -772,17 +780,17 @@ async function measureHeapRace(session, serverPort, targetLaps) {
 }
 
 async function measureHeapLaps(session, serverPort) {
-  const runs = [];
-  for (const targetLaps of HEAP_RACE_LAPS) {
-    const run = await measureHeapRace(session, serverPort, targetLaps);
-    runs.push(run ?? {
-      status: 'missing_measurement',
-      targetLaps,
-      completedLaps: 0,
-      heapDeltaMb: null,
-    });
-    if (run?.status !== 'complete' || run.completedLaps < targetLaps) break;
-  }
+  // §5.2 is specifically a single continuous five-lap heap observation.
+  // Keep the one Page.navigate inside measureHeapRace; never sum independent
+  // sessions because navigation resets the heap under test.
+  const targetLaps = HEAP_REQUIRED_LAPS;
+  const run = await measureHeapRace(session, serverPort, targetLaps);
+  const runs = [run ?? {
+    status: 'missing_measurement',
+    targetLaps,
+    completedLaps: 0,
+    heapDeltaMb: null,
+  }];
   const lapsMeasured = runs.reduce(
     (total, run) => total + Math.max(0, Number(run?.completedLaps) || 0),
     0,
@@ -793,8 +801,9 @@ async function measureHeapLaps(session, serverPort) {
       && Number.isFinite(run.heapDeltaMb))
     .map((run) => run.heapDeltaMb / run.completedLaps);
   const fullRun = lapsMeasured >= HEAP_REQUIRED_LAPS
-    && runs.length === HEAP_RACE_LAPS.length
-    && runs.every((run, index) => run?.status === 'complete' && run.completedLaps >= HEAP_RACE_LAPS[index]);
+    && runs.length === 1
+    && runs[0]?.status === 'complete'
+    && runs[0].completedLaps >= HEAP_REQUIRED_LAPS;
   return {
     status: !fullRun
       ? 'incomplete_five_lap_run'
@@ -803,7 +812,7 @@ async function measureHeapLaps(session, serverPort) {
         : 'missing_heap_measurement',
     lapsMeasured,
     requiredLaps: HEAP_REQUIRED_LAPS,
-    method: 'mean of each completed race-session heap delta divided by that session\'s SimSnapshot lap count',
+    method: 'single continuous race-session heap delta divided by its SimSnapshot lap count',
     growthPerLapMb: fullRun && perRunGrowth.length === runs.length
       ? perRunGrowth.reduce((sum, value) => sum + value, 0) / perRunGrowth.length
       : null,

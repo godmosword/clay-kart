@@ -99,7 +99,7 @@ def test_missing_gc_and_texture_measurements_are_explicit_failures():
         "meta": {
             "laps_measured": 5,
             "heap_measurement_status": "measured",
-            "heap_growth_measurement": "mean of each completed race-session heap delta divided by that session's SimSnapshot lap count",
+            "heap_growth_measurement": "single continuous race-session heap delta divided by its SimSnapshot lap count",
             "network_profile": {
                 "name": "4g-4mbps-20ms",
                 "latency_ms": 20,
@@ -156,7 +156,7 @@ def test_heap_growth_is_missing_until_five_simulation_laps_are_recorded():
         "meta": {
             "laps_measured": 4,
             "heap_measurement_status": "incomplete_five_lap_run",
-            "heap_growth_measurement": "mean of each completed race-session heap delta divided by that session's SimSnapshot lap count",
+            "heap_growth_measurement": "single continuous race-session heap delta divided by its SimSnapshot lap count",
         },
         "metrics": {"heap_growth_per_lap_mb": 0.1},
     }))
