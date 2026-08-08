@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-08T08:24:22Z",
+  "updated": "2026-08-08T08:26:31Z",
   "wave": "W3",
   "round": 31,
-  "element": "contact-sheet-r31-port",
+  "element": "game-shot-clay-hud",
   "status": "done",
   "last_verdict": null,
-  "note": "接手 Claude 在 tools/visual 的 Cursor 份：contact-sheet.mjs R31 修復（無 REF/OURS 佔位字、palette:false、assertNotPalettised）接到 feat/plumb。未動 src/render／.ab.png／manifest ours 路徑——仍屬 Claude。"
+  "note": "game-shot 改讀 [data-role=clay-hud] 並斷言含 POS；npm run game-shot。實測 hud 含 POS 4/4。"
 }
