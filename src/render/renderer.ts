@@ -27,6 +27,7 @@ import { createKart, type KartVisual } from './components/kart.js';
 import { applyClayRenderSettings, createClayLighting, enableClayShadows } from './clay/lighting.js';
 import { createTrackBarrierRings } from './components/track-barriers.js';
 import { createTrackSurfaceRing } from './components/track-surface.js';
+import { createFoliageScatter } from './components/foliage.js';
 import { createClayMaterial } from './clay/material.js';
 import { CAR_PARK, TERRAIN, XIAOHONG } from './clay/palette.js';
 
@@ -113,6 +114,7 @@ class ClayRenderer implements Renderer {
     this.#buildGround();
     this.#buildTrack();
     this.#buildBoundaryWalls();
+    this.#buildFoliage();
 
     this.#hud = document.createElement('div');
     this.#hud.style.cssText = [
@@ -135,10 +137,32 @@ class ClayRenderer implements Renderer {
       // 大面積地面的壓痕要拉開，不然整片會變成細密雜訊（`§6` 禁止的那種）。
       createClayMaterial({ color: TERRAIN.grassMid, textureScale: 60 }),
     );
+    // `§5.6` 的色條款寫著「草地三階都要用上 —— 單一綠會讓整片地變成塑膠
+    // 地毯」。這塊地只有 `grassMid` 一階，**它自己不滿足那一條**。滿足它的是
+    // `#buildFoliage()` 撒在上面的草叢與樹冠，另外兩階在那裡用掉。
+    // 換句話說這塊地不得單獨存在——拿掉 foliage 就會違反 §5.6。
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01; // 避免與賽道面 z-fight
     ground.receiveShadow = true;
     this.#scene.add(ground);
+  }
+
+  /**
+   * **元件 #6 `foliage`（R30）。** 賽道內外的樹與草叢。
+   *
+   * 這也是讓 `#buildGround()` 那塊單一綠的地滿足 `§5.6` 色條款的東西——
+   * 草地三階裡的 `grassLight` 與 `grassDark` 都在這裡用掉。
+   *
+   * `createFoliageScatter` 全部走 `InstancedMesh`：六次 draw call
+   * （圓穹 1 + 樹幹 1 + 葉瓣 2 + 草叢 2），與樹的數量無關。
+   */
+  #buildFoliage(): void {
+    const foliage = createFoliageScatter(
+      TRACK_GEOMETRY.radius,
+      TRACK_GEOMETRY.halfWidth,
+    );
+    foliage.position.set(TRACK_GEOMETRY.centerX, 0, TRACK_GEOMETRY.centerZ);
+    this.#scene.add(foliage);
   }
 
   /**
