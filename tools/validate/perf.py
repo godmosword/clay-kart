@@ -44,6 +44,7 @@ ANIMATION_RATIO_MAX = 0.95
 ANIMATION_MODE_HZ = "hz_12_window"
 ANIMATION_MODE_RATIO = "quantization_ratio_proves_quantization_only"
 ANIMATION_MODE_MISSING = "missing_fps_or_render_ratio"
+SCENE_ONLY_METRICS = frozenset({"draw_calls", "triangles_k", "texture_memory_mb"})
 
 
 def _has_full_heap_lap_measurement(doc: dict[str, Any]) -> bool:
@@ -127,6 +128,8 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(values, dict):
         values = {}
     metrics: dict[str, Any] = {}
+    meta = doc.get("meta")
+    scene_only = isinstance(meta, dict) and meta.get("mode") == "scene-only"
     fps_p05 = _required_finite(values.get("fps_p05"))
     animation_ratio = _character_animation_ratio(values)
     if fps_p05 is None:
@@ -139,6 +142,9 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, Any]:
     metrics["character_anim_validation_mode"] = animation_mode
     for _, metric, _, _, _ in WINDOWS:
         raw = values.get(metric)
+        if scene_only:
+            metrics[metric] = _required_finite(raw) if metric in SCENE_ONLY_METRICS else None
+            continue
         measured = (
             metric not in {"heap_growth_per_lap_mb", "first_interactive_s", "time_to_first_render_s"}
             or (
