@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-08T08:55:43Z",
+  "updated": "2026-08-08T09:00:41Z",
   "wave": "W3",
   "round": 31,
   "element": "test-plumb + ui-hud-behavior",
   "status": "done",
   "last_verdict": null,
-  "note": "check-ui-hud 補 POS n/4／標籤／W1 hide；npm run test:plumb 聚合 PASS。"
+  "note": "check-ui-hud：POS n/4、標籤、W1 hide；test:plumb 單次 build 聚合；steer-screen 牆鐘 20s＋sim tick 守衛。連跑兩次 PASS。"
 }
