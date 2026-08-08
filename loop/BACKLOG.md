@@ -175,6 +175,92 @@
 
 ## 待裁決
 
+### 量測環境已經量不動這個場景——8 項檢查結構性地不可能通過
+
+- **輪次**：R33（Lead 獨立驗證 R32 兩條 perf 修正時撞到）
+- **現況**：在 `6259abb` 上重跑完整探針（M4 MacBook Air，非信任 artifact）：
+
+      fps_p50      6.325     窗口 [58, 62]
+      fps_p05      3.118     窗口 [55, 62]
+      draw_calls   148
+      meta.environment.device_note
+        "Chrome headless ANGLE/SwiftShader proxy"
+
+  **SwiftShader 是軟體算繪，沒走 GPU。** R16 在同一支探針量到
+  `fps_p50 = 59.88`——那時場上是 W1 方塊車、`draw_calls = 5`。現在是 148 次
+  draw call 的黏土場景。不是程式變慢，是軟體算繪撐不起這個場景
+- **影響**：17 項檢查有 **8 項**（`4.1`／`4.2`／`4.3`／`2.1`／`2.2`／`2.3`／
+  `2.4`，外加 `5.2` 跑不完五圈）**全部倒在同一個原因上**。這 8 個 FAIL 不攜帶
+  任何關於這個遊戲的資訊
+- **這是追了六次那個形狀的鏡像**：一個不可能失敗的檢查沒有資訊，
+  **一個不可能通過的檢查同樣沒有資訊**——而且更難發現，因為 FAIL 看起來像在工作
+- **另外**：`device_note` 是**寫死的字串**不是量到的。它剛好講對了，
+  但換成硬體 GL 它也不會變
+- **已開 TASK**：`loop/round-33/TASK-codex.md` 第二條（記 GL renderer 字串、
+  先試硬體 GL、失敗時 FAIL 的理由要指向後端而不是應用程式；明文禁止因為
+  偵測到軟體算繪就讓指標變 PASS）
+- **狀態**：待 Codex；若 headless 拿不到硬體 GL，回頭由 Lead 重新裁決
+  `BAR-PERF` 時間性指標要在哪裡量
+
+### `§4.1` 的 ratio 窗口在適用範圍外會誤判，而且兩個方向相反
+
+- **輪次**：R33（Lead 驗證 R32 的 Nyquist 修正時發現）
+- **先講已驗證通過的**：切換邏輯是對的。`fps_p05 = 3.118 < 24` 確實切到 ratio
+  模式，缺值走 `MISSING` → `actual=None` → FAIL。R28 擔心的「未判決變成永遠
+  不會失敗」**沒有發生**
+- **問題在窗口不在切換**：`perf.py:172-178` 的 ratio 窗口是 `[0.0, 0.95]`，
+  只有上界；hz 模式的 `[11.5, 12.5]` 是雙邊的
+- **數學**：`ratio = characterAnimationFrames / renderedFrames`，12Hz 動畫在
+  算繪率 `f` 下的正確值是 `min(1, 12/f)`
+
+  | 算繪率 | 正確 ratio | 現行窗口判成 |
+  |---|---|---|
+  | 12.63 < f ≤ 24 | 0.50–0.95 | PASS ✓ |
+  | f ≤ 12.63 | **1.0** | **FAIL ✗ 誤判** |
+  | 動畫凍住 | 0.0 | **PASS ✗ 誤判** |
+
+- **這是實測不是推導**：這一輪 `character_animation_per_frame = 1.0` 被判
+  `4.1 FAIL`，而 `driver-face.ts` 的量化實作**從 R20 起一行沒動**。
+  6.3fps 下 12Hz 動畫本來就必須每幀換格，`ratio = 1` 是正確答案
+- **Codex 自己在 artifact 裡的結論寫對了**
+  （`"only quantization is tested; 12Hz frequency is not resolvable"`），
+  **窗口沒有把它編碼進去**
+- **已開 TASK**：`loop/round-33/TASK-codex.md` 第一條（分三段，帶內改雙邊窗口、
+  帶外 FAIL 且理由指向環境；`test_perf.py` 必須補 `ratio = 0.0` 要 FAIL）
+- **狀態**：待 Codex
+
+### `draw_calls` 漂到 148，餘裕剩 1.3%
+
+- **輪次**：R33（同一次驗證）
+- **現況**：`draw_calls = 148`，窗口 `[0, 150]`。R32 收尾記的是
+  `scene-stats 142`／`完整 probe 140`，session summary 記 140
+- **落差**：沒人改 draw call 的情況下漂了 +6～+8，而且**沒有任何機制會注意到**
+- **同一個家族的第三例**：`§4.10` 餘裕 0.03%、`ui-hud` 底板比 0.7%、
+  這條 1.3%。三次都是「能過，但多加一個東西就靜靜推出去」
+- **狀態**：待裁決——要不要在 `scene-stats` 加一條「相對上一輪的漂移」報告，
+  而不是只報絕對值對窗口
+
+### Worktree 落後 main——同一個疏漏的鏡像（第六次同形狀）
+
+- **輪次**：R33（Lead 開工前檢查）
+- **現況**：`feat/physics` 與 `feat/visual` 各落後 main **七個 commit**，
+  `feat/plumb` 還帶著一份未提交的 `contact-sheet.mjs` 修改。
+  Codex 那四個 perf commit 與 visual 那個 commit，Lead 是**重新 commit 到
+  main** 而不是 merge 進去的，所以分支頭沒動
+- **為什麼這跟前五次是同一件事的反面**：前五次是「程式碼沒進 main」，
+  這次是「main 的程式碼沒回到 worktree」。後果一樣——builder 在一棵不是
+  真相的樹上工作。R33 一開工，`ck-visual` 裡就會在一棵**沒有 R32 守衛**的樹上改東西
+- **`merge-base --is-ancestor` 檢查抓不到這個方向**：它問的是「分支有沒有進
+  main」，不是「main 有沒有回到分支」
+- **已處置**：三個 worktree 全部 `reset --hard main` 到 `6259abb`，
+  舊頭打了 `pre-sync/feat-{physics,visual,plumb}-r32` 標籤（可完全回退）。
+  處置前逐一核對過：兩個分支獨有的行全是 main 已改寫掉的舊版
+  （`renderer.ts` 的舊燈光接線、`perf-probe.mjs` 被 RenderTelemetry 取代的
+  DOM dataset 版），`ck-plumb` 那份未提交修改與 main **逐位元相同**。
+  沒有任何一行是還沒進 main 的真工作
+- **狀態**：待裁決——收尾檢查要不要加上反方向那一半
+  （`git merge-base --is-ancestor main <branch>`）
+
 ### 我給 critic 的指示與 `§5.0` 的招牌判準直接衝突
 
 - **輪次**：R32（critic 自己指出）
@@ -231,10 +317,26 @@
 - **現況**：`leafPadGeometry()` 用 `clayBlob(LEAF_PAD_RADIUS, 6)`，6 段的球體
   在 256² 的格子裡看不出來，貼滿 512² 之後每一片都是明顯的多面體
 - **這條本身是新做法有效的證據**：舊的四視角合成把它藏了整整一輪
-- **限制**：段數直接乘上葉瓣總數進三角形預算（48 棵樹 × 30 片 = 1440 片）。
-  6→10 段大約是 96→200 三角形／片，總量會從 138k 變 288k。
-  可能要分 LOD——但那會讓 critic 評的圖與玩家看到的不同，需要先想清楚
-- **狀態**：待處理（ck-visual，我的範圍）
+- **原本以為的限制（已證偽）**：「6→10 段大約是 96→200 三角形／片，總量從
+  138k 變 288k，可能要分 LOD——但那會讓 critic 評的圖與玩家看到的不同」
+- **實測（R33，直接用 three.js 建幾何數 index）**：
+
+      leaf pad seg=6   （現況）  84 tri/片  × 1440 = 121k
+      leaf pad seg=8            112 tri/片  × 1440 = 161k
+      leaf pad seg=10           140 tri/片  × 1440 = 202k
+
+  **上面那個估計高估了 43%。** 原因是 `clay/geometry.ts:74` 的
+  `SphereGeometry(radius, segments, Math.max(8, Math.round(segments * 0.6)))`
+  ——**heightSegments 被夾在 8**，`6→10` 只抬 widthSegments，不是兩軸一起長
+- **而且分母也搞錯了**：`triangles_k = 58.754` 是 `renderer.info.render` 的
+  **每幀已算繪數（過完視錐裁切）**，不是整個 scene 的總量。整個 scene 光
+  foliage 就有 170k（葉瓣 121k + 樹冠 14k + 草叢 35k），而預算 `[0, 400]`
+  比對的是 58.8 那個數。最壞情況（假設 58.8k 全是葉瓣）`6→10` 也只到 98k
+- **所以 LOD 的問題不存在**：直接把 `clayBlob(LEAF_PAD_RADIUS, 6)` 改成 10，
+  不需要 LOD，「critic 評的圖與玩家看到的不同」這個難題**隨之消失**
+- **教訓**：那個估計是在 BACKLOG 上放了兩輪的紙上推算，沒有人去建一次幾何數
+  一下。它讓一個五分鐘的改動看起來像一個需要裁決的架構取捨
+- **狀態**：待實作（ck-visual，我的範圍），無阻礙
 
 
 ### 盲測 A/B 本來就不可能成立——構圖不對稱，一眼就分得出來
@@ -397,7 +499,13 @@
 - **不確定為什麼要拆**：TASK 寫的是「量測窗口要真的跑滿五圈」。單段五圈的
   timeout 會是 150s（`targetLaps × 30_000`），不算離譜。可能有我不知道的
   限制，值得先問而不是直接改
-- **狀態**：待裁決
+- **狀態**：**已解決並經 Lead 獨立驗證（R33）**。`HEAP_REQUIRED_LAPS` 改為單一
+  常數、`measureHeapRace()` 裡只有一個 `Page.navigate`、`perf-probe.mjs:786`
+  留了「never sum independent runs」註解。Lead 在 `6259abb` 重跑：本機只跑到
+  3 圈就撞 timeout，於是 `heap_measurement_status = incomplete_five_lap_run`、
+  `heap_growth_per_lap_mb = None` → **誠實 FAIL，沒有按比例外推**，正是 R28
+  要求的行為。**但也因此 `§5.2` 在這台機器上量不到**——根因是軟體算繪
+  6.3fps，見上方「量測環境已經量不動這個場景」那條
 
 ### §4.1 在算繪率低於 24fps 時測不準（Nyquist）
 
@@ -419,7 +527,10 @@
 - **注意這條的兩面性**：加了前提之後，在慢機器上 `§4.1` 會變成「未判決」
   而不是 FAIL——那**不能**變成一個永遠不會失敗的檢查。前提要跟
   `§1.1`／`§4.4` 一樣寫明「未判決不是 PASS」
-- **狀態**：待裁決
+- **狀態**：**切換邏輯已解決並經 Lead 驗證（R33），窗口另開新條**。
+  `fps_p05 > 24` 走 hz、否則走 ratio、缺值走 `MISSING` → FAIL，
+  上面擔心的兩面性沒有發生。**但 ratio 模式的窗口 `[0, 0.95]` 本身在適用
+  範圍外會誤判**，見上方「`§4.1` 的 ratio 窗口在適用範圍外會誤判」那條
 
 
 ### 兩條結構性不可能失敗的檢查：§5.2 沒數圈、§3.1 沒有 4G 節流
@@ -502,8 +613,21 @@
   餘裕從很厚變成貼門檻
 - **已嘗試**：未改物理／未改 steer 腳本；只記錄
 - **來源**：Cursor R28；對照先前 plumb 進度筆記
-- **狀態**：待裁決——要不要把 steer-screen 改成單車 fixture（不經 bootstrap
-  的多車預設），或接受「多車真實場景下門檻更緊」
+- **裁決（R33）：兩個都要，拆成兩條斷言。** 看了斷言才發現那是個假選擇——
+  這支腳本用**一組**斷言同時承擔兩個目的，而兩者對餘裕的要求相反：
+
+  | 目的 | 該有的餘裕 | 該用的場景 |
+  |---|---|---|
+  | 轉向方向沒接反（R20 缺陷的回歸） | 越厚越好，這是契約回歸 | 單車，決定性 |
+  | 多車下玩家仍轉得動（R28 任務原文） | 貼著門檻是誠實的 | 多車，玩家真的會遇到 |
+
+  改成單車，第二個目的消失——多車現在**是**真實場景，AI 對手已接進遊戲。
+  接受現況不改，第一個目的永遠躲在 `0.80` 後面，下次真的接反了分不出來是
+  「接反」還是「又被 AI 車擠到」
+- **已開 TASK**：`loop/round-33/TASK-cursor.md`（新增單車方向斷言、保留多車
+  斷言、兩條都把 `rate` 實測值寫進輸出、都掛進 `test:plumb`；明文禁止為了
+  讓餘裕變厚去動物理或改 `RATE_THRESHOLD`）
+- **狀態**：已裁決，待 Cursor
 
 
 ### 探針沒讀 renderedFrames，§4.2/§4.3 仍分不開「抽格」與「慢」

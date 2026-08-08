@@ -1,0 +1,224 @@
+{
+  "meta": {
+    "fixture": "lap-a",
+    "tick_hz": 120,
+    "total_ticks": 7200,
+    "measurement_seconds": 5,
+    "build_sha": "6259abb5a69aab23cd00a86a6142590ed1df4803",
+    "build": {
+      "sha": "6259abb5a69aab23cd00a86a6142590ed1df4803",
+      "assets": {
+        "initial_bundle_kb_gz": 153.7255859375,
+        "total_assets_mb": 3.4949073791503906
+      }
+    },
+    "environment": {
+      "name": "local",
+      "hostname": "MacBook-Air.local",
+      "platform": "darwin 25.6.0",
+      "arch": "arm64",
+      "node_version": "v25.8.0",
+      "cpu_model": "Apple M4",
+      "cpu_count": 10,
+      "memory_total_mb": 16384,
+      "chrome_path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "containerized": false
+    },
+    "seed": 20260730,
+    "device": "proxy",
+    "device_note": "Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement",
+    "mode": "full",
+    "measurement_method": "External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.",
+    "network_profile": {
+      "name": "4g-4mbps-20ms",
+      "offline": false,
+      "latency_ms": 20,
+      "download_throughput_bps": 524288,
+      "upload_throughput_bps": 131072,
+      "connection_type": "cellular4g",
+      "cdp_method": "Network.emulateNetworkConditions"
+    },
+    "render_measurement_network": "unthrottled_after_load",
+    "measurement_status": "full_runtime_measurement",
+    "laps_required": 5,
+    "laps_measured": 3,
+    "heap_measurement_status": "incomplete_five_lap_run",
+    "heap_growth_measurement": "single continuous race-session heap delta divided by its SimSnapshot lap count",
+    "heap_lap_runs": [
+      {
+        "status": "incomplete_five_lap_run",
+        "targetLaps": 5,
+        "completedLaps": 3,
+        "startedAt": 1539.1999999999534,
+        "endedAt": 60477.69999999995,
+        "initial_snapshot": {
+          "current": 1,
+          "total": 3,
+          "time": 0.32
+        },
+        "heapStartBytes": 31962823,
+        "heapEndBytes": 23648911,
+        "heapPeakBytes": 35882477,
+        "heapDeltaBytesRaw": -8313912,
+        "heapDeltaBytes": 0,
+        "heapStartMb": 30.482123374938965,
+        "heapEndMb": 22.553359031677246,
+        "heapDeltaMb": 0,
+        "heapSampleCount": 342
+      }
+    ],
+    "render_telemetry": {
+      "global": "__CLAY_RENDER_TELEMETRY__",
+      "counters": [
+        "renderedFrames",
+        "vehicleTransformUpdates",
+        "cameraUpdates",
+        "characterAnimationFrames"
+      ]
+    }
+  },
+  "metrics": {
+    "canvas_count": 1,
+    "raf_callbacks": 31,
+    "rendered_frames": 31,
+    "gl_draw_calls": 2799,
+    "triangles": 1340558,
+    "elapsed_s": 5.0935,
+    "fps_p50": 6.325151177515243,
+    "fps_p05": 3.118212996672142,
+    "frame_time_p99_ms": 329.13600000006613,
+    "long_frame_count": 25,
+    "vehicle_transform_hz": 6.086188279179346,
+    "camera_hz": 6.086188279179346,
+    "character_anim_hz": 6.086188279179346,
+    "character_anim_status": "measured_render_telemetry",
+    "character_anim_updates": 31,
+    "character_anim_validation_mode": "quantization_ratio_proves_quantization_only",
+    "character_anim_validation": {
+      "mode": "quantization_ratio_proves_quantization_only",
+      "conclusion": "only quantization is tested; 12Hz frequency is not resolvable at this sampling rate",
+      "fps_p05": 3.118212996672142,
+      "character_anim_hz": 6.086188279179346,
+      "character_animation_per_frame": 1,
+      "max_per_frame_ratio": 0.95
+    },
+    "character_anim_measurement": {
+      "method": "window.__CLAY_RENDER_TELEMETRY__ counter deltas / measurement elapsed",
+      "status": "measured",
+      "elapsed_s": 5.0935,
+      "character_instances": 1,
+      "character_animation_hz_per_instance": 6.086188279179346,
+      "character_animation_per_frame": 1,
+      "counters_start": {
+        "renderedFrames": 7,
+        "vehicleTransformUpdates": 7,
+        "cameraUpdates": 7,
+        "characterAnimationInstances": 1,
+        "characterAnimationFrames": 4
+      },
+      "counters_end": {
+        "renderedFrames": 38,
+        "vehicleTransformUpdates": 38,
+        "cameraUpdates": 38,
+        "characterAnimationInstances": 1,
+        "characterAnimationFrames": 35
+      },
+      "counter_deltas": {
+        "renderedFrames": 31,
+        "vehicleTransformUpdates": 31,
+        "cameraUpdates": 31,
+        "characterAnimationFrames": 31
+      }
+    },
+    "render_telemetry_status": "measured",
+    "render_telemetry_counters": {
+      "renderedFrames": 31,
+      "vehicleTransformUpdates": 31,
+      "cameraUpdates": 31,
+      "characterAnimationFrames": 31
+    },
+    "render_telemetry_ratios": {
+      "vehicleTransformPerFrame": 1,
+      "cameraPerFrame": 1,
+      "characterAnimationPerFrame": 1,
+      "characterAnimationPerFrameRaw": 1
+    },
+    "first_interactive_s": 0.08089999999990687,
+    "time_to_first_render_s": 1.3124000000000233,
+    "heap_peak_mb": 15.886364936828613,
+    "heap_growth_per_lap_mb": null,
+    "draw_calls": 148,
+    "triangles_k": 58.754,
+    "texture_memory_mb": 4.9169158935546875,
+    "frame_breakdown": {
+      "method": "nearest_rank_p99_frame_interval",
+      "sample_count": 30,
+      "p99_frame": {
+        "frame_ordinal": 2,
+        "interval_start_ms": 3018.899999999907,
+        "interval_end_ms": 3348.5,
+        "frame_time_ms": 329.60000000009313,
+        "callback_start_ms": 3348.5,
+        "callback_end_ms": 3349.5,
+        "draw_ms": 0,
+        "script_wall_ms": 1,
+        "script_ms": 1,
+        "gc_ms": 0,
+        "unattributed_ms": 328.60000000009313,
+        "shares_pct": {
+          "draw": 0,
+          "script": 0.30339805825234145,
+          "gc": 0,
+          "unattributed": 99.69660194174766
+        }
+      },
+      "trace_gc_events": 51,
+      "trace_anchor": {
+        "status": "aligned",
+        "page_now_ms": 2656.0999999999767,
+        "trace_ts_ms": 734081.418
+      },
+      "attribution_note": "draw_ms is JS-side WebGL submission time; script_ms excludes draw and trace-aligned GC; unattributed includes browser/vsync/GPU wait."
+    },
+    "heap_measurement_status": "incomplete_five_lap_run",
+    "heap_measurement": {
+      "status": "incomplete_five_lap_run",
+      "lapsMeasured": 3,
+      "requiredLaps": 5,
+      "method": "single continuous race-session heap delta divided by its SimSnapshot lap count",
+      "growthPerLapMb": null,
+      "runs": [
+        {
+          "status": "incomplete_five_lap_run",
+          "targetLaps": 5,
+          "completedLaps": 3,
+          "startedAt": 1539.1999999999534,
+          "endedAt": 60477.69999999995,
+          "initial_snapshot": {
+            "current": 1,
+            "total": 3,
+            "time": 0.32
+          },
+          "heapStartBytes": 31962823,
+          "heapEndBytes": 23648911,
+          "heapPeakBytes": 35882477,
+          "heapDeltaBytesRaw": -8313912,
+          "heapDeltaBytes": 0,
+          "heapStartMb": 30.482123374938965,
+          "heapEndMb": 22.553359031677246,
+          "heapDeltaMb": 0,
+          "heapSampleCount": 342
+        }
+      ]
+    },
+    "gc_pause_max_ms": 0.337,
+    "gc_pause_max_event": {
+      "name": "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED",
+      "startMs": 735106.676,
+      "durationMs": 0.337
+    },
+    "trace_gc_event_count": 51,
+    "initial_bundle_kb_gz": 153.7255859375,
+    "total_assets_mb": 3.4949073791503906
+  }
+}
