@@ -443,13 +443,23 @@ async function main() {
     const written = [];
     for (const capture of payload.captures) {
       await writeDataUrl(join(options.outDir, `${capture.id}.png`), capture.sheetCell);
+      // A/B 對比用的單視角微距。**跟上面那張是不同用途**：`<id>.png` 是
+      // `§3` 的四視角合成，給我們自己審；`<id>.ab.png` 才是進 contact sheet
+      // 跟參考半邊並排的那張。R31 之前兩者是同一張，構圖與參考差太多，
+      // 盲測與比較都不成立——見 `src/render/clay/stage.ts` 的 AB_FRAMING_MARGIN。
+      await writeDataUrl(join(options.outDir, `${capture.id}.ab.png`), capture.abCell);
       const views = [];
       for (const [view, dataUrl] of Object.entries(capture.views)) {
         const file = `${capture.id}.${view}.png`;
         await writeDataUrl(join(options.outDir, file), dataUrl);
         views.push(file);
       }
-      written.push({ id: capture.id, sheetCell: `${capture.id}.png`, views });
+      written.push({
+        id: capture.id,
+        sheetCell: `${capture.id}.png`,
+        abCell: `${capture.id}.ab.png`,
+        views,
+      });
     }
 
     const manifest = {

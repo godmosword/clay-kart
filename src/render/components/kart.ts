@@ -16,10 +16,12 @@
  * 抽格只實作在 `characters/driver-face.ts` 的 `setExpressionTime()` 裡面，
  * 這裡純轉發——量化寫兩份，遲早有一份會漏掉。
  */
-import { Box3, Group } from 'three';
+import { Box3, Group, Mesh } from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createDriverFace } from '../../characters/driver-face.js';
 import { createKartBody } from './kart-body.js';
 import { createKartWheelSet, WHEEL_ROLLING_RADIUS } from './kart-wheels.js';
+import { createClayMaterial } from '../clay/material.js';
 
 export { WHEEL_ROLLING_RADIUS };
 
@@ -79,6 +81,68 @@ export interface KartVisual {
   setSteerInput(steer: number): void;
   /** 表情時間軸（秒）。內部量化到 12fps，呼叫端傳原始時間即可。 */
   setExpressionTime(seconds: number): void;
+}
+
+/**
+ * 遠處／非玩家車的低成本 gameplay 視覺。
+ *
+ * 場上最多三台 AI 車目前只有識別色，還沒有各自的角色造型；讓它們各自
+ * 建立完整的小紅車會把 58 個 mesh 複製四次，並把每個零件送進即時陰影 pass。
+ * 玩家車仍走 `createKart()` 的完整元件組裝，拍攝台也不會使用這個 proxy。
+ *
+ * ## 為什麼有輪子但沒有臉（R32 裁決）
+ *
+ * 第一版 proxy 只有一個圓角量體。實機截圖是**三個沒有輪子的色塊**——
+ * `draw_calls` 過了，但代價是卡丁車遊戲裡的對手不像車，
+ * 而 `CHARACTERS.md §4` 的角色識別整個消失。**那是用預算換掉了預算要保護的東西。**
+ *
+ * 裁決是照可見性分配成本：
+ *
+ * - **輪子留著。** 玩家絕大多數時間從**後方**看對手，輪子從後面與側面都看得到；
+ *   而 `§5.2` 的一眼判斷（「是一圈捏厚的黏土還是貼上去的黑色圓片」）本來就是
+ *   側面判準。沒有輪子的車從後面看就是個盒子
+ * - **臉不留。** 臉在車頭，從後方看不到。真正需要臉的是玩家車，而玩家車走
+ *   完整組裝
+ *
+ * 成本從 1 mesh／台變成約 6 mesh／台（車體 + 四輪），三台 18，
+ * 相對完整組裝的 174 仍然省下大部分。
+ *
+ * **若日後有超車特寫或 replay 看得到對手正面，這個取捨要重新評估**——
+ * 那時「臉看不到」就不再是可接受的簡化，而是 `§5.3` 明文的「裝到車上之後
+ * 被擋住也算沒做到」。
+ */
+export function createKartProxy(bodyColor: number): KartVisual {
+  const group = new Group();
+  group.name = 'kart-proxy';
+
+  const body = new Mesh(
+    new RoundedBoxGeometry(1.28, 0.62, 2.15, 3, 0.13),
+    createClayMaterial({ color: bodyColor, textureScale: 1.2 }),
+  );
+  // 車體抬高到輪子上方，讓輪子露出來——與完整組裝的離地關係一致。
+  body.position.y = WHEEL_ROLLING_RADIUS + 0.31;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  // 輪子用與玩家車同一套 `kart-wheels`（元件 #2），不是另做一份簡化輪。
+  // 同一套幾何才保證 `§5.2` 的比例與配色在對手身上也成立；而且它會滾，
+  // 「對手的輪子不轉」在賽車遊戲裡一眼就看得出來。
+  const wheels = createKartWheelSet();
+  group.add(wheels.group);
+
+  return {
+    group,
+    setRolledDistance(metres: number): void {
+      wheels.setSpin(metres / WHEEL_ROLLING_RADIUS);
+    },
+    setSteerInput(steer: number): void {
+      wheels.setSteer(steer * MAX_VISUAL_STEER);
+    },
+    setExpressionTime(): void {
+      // Proxy 沒有角色臉部動畫——臉在車頭，玩家從後方看不到（見檔頭說明）。
+    },
+  };
 }
 
 export function createKart(options: KartVisualOptions = {}): KartVisual {

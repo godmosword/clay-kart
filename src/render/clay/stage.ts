@@ -65,6 +65,36 @@ const FOV_DEG = 34;
 /** 包圍球外的留白倍率。四個角度共用，構圖才可比。 */
 const FRAMING_MARGIN = 1.28;
 
+/**
+ * A/B 對比圖專用的構圖餘裕。**刻意比 `FRAMING_MARGIN` 緊。**
+ *
+ * R31 的三個 critic 各自指出同一件事:對比表的兩個半邊構圖完全不同——我們那半
+ * 是 `#8a8a8a` 灰底上的**四視角合成**(每個角度只佔 256×256,也就是整格的
+ * 四分之一),參考那半是**實拍微距照**,主體佔滿畫面。
+ *
+ * 後果有兩層:
+ *
+ * 1. **只看構圖就 100% 分得出哪邊是誰**,盲測根本不成立
+ * 2. 更糟的是比較本身失去意義——`§5.0` 的決定性判準(指紋、壓棒痕、接縫)
+ *    **只有在微距下才解析得出來**,而我們把四個物件塞進 1/8 畫面,
+ *    等於要求它在解析不出表面工藝的尺度上證明表面工藝
+ *
+ * `§3` 明文「所有元件圖必須在同一組條件下渲染,否則評分不可比」,R31 的
+ * 五個有內容的格子**沒有一格滿足**。
+ *
+ * 裁決(R31):**兩種圖拆開**。`§3` 的四視角規範圖留給我們自己審(元件從各角度
+ * 成不成立),A/B 對比另外產一張單視角微距,構圖對齊參考半邊。
+ */
+export const AB_FRAMING_MARGIN = 1.02;
+
+/**
+ * A/B 對比圖用哪個角度。
+ *
+ * 三四分之一視角同時看得到正面與側面,是六張參考照裡最常見的取角;
+ * 正面視角會讓側裙、接縫這類 `§5.1` 明文要求的東西完全看不到。
+ */
+export const AB_VIEW: ViewName = 'three-quarter-front-left';
+
 /** 接地陰影的不透明度。`§5.0` 要「低對比」，這個值刻意壓得很淡。 */
 const CONTACT_SHADOW_OPACITY = 0.26;
 
@@ -74,8 +104,13 @@ export interface ClayStage {
   renderer: WebGLRenderer;
   /** 元件掛載點。換元件時清空這個 group，不要動場景其他部分。 */
   subject: Group;
-  /** 把相機擺到指定角度並重新框定構圖。 */
-  setView(view: ViewName): void;
+  /**
+   * 把相機擺到指定角度並重新框定構圖。
+   *
+   * `marginOverride` 用來產 A/B 對比圖——那張要貼滿畫面才跟實拍微距照
+   * 可比（見 `AB_FRAMING_MARGIN`）。省略時用 `§3` 規範圖的餘裕。
+   */
+  setView(view: ViewName, marginOverride?: number): void;
   /** 算繪一張並回傳 PNG data URL（512×512）。 */
   capture(): string;
   dispose(): void;
@@ -125,7 +160,7 @@ export function createClayStage(canvas: HTMLCanvasElement): ClayStage {
   const boundingSphere = new Sphere();
   const target = new Vector3();
 
-  const setView = (view: ViewName): void => {
+  const setView = (view: ViewName, marginOverride?: number): void => {
     boundingBox.setFromObject(subject);
     if (boundingBox.isEmpty()) {
       camera.position.set(0, 1, 4);
@@ -138,7 +173,8 @@ export function createClayStage(canvas: HTMLCanvasElement): ClayStage {
 
     target.copy(boundingSphere.center);
     const distance =
-      (boundingSphere.radius / Math.sin(MathUtils.degToRad(FOV_DEG) * 0.5)) * FRAMING_MARGIN;
+      (boundingSphere.radius / Math.sin(MathUtils.degToRad(FOV_DEG) * 0.5))
+      * (marginOverride ?? FRAMING_MARGIN);
 
     const { azimuthDeg, elevationDeg } = VIEW_ANGLES[view];
     const azimuth = MathUtils.degToRad(azimuthDeg);

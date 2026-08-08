@@ -5,73 +5,73 @@
     {
       "id": "kart-body",
       "ref": "build/visual/refs/kart-body.png",
-      "ours": "build/visual/kart-body.png",
+      "ours": "build/visual/kart-body.ab.png",
       "note": "整張圖就是小紅賽車的 3/4 視角，車佔滿畫面，不需要裁"
     },
     {
       "id": "kart-wheels",
       "ref": null,
-      "ours": "build/visual/kart-wheels.png",
+      "ours": "build/visual/kart-wheels.ab.png",
       "note": "deferred（R24 稽核）—— 見 BAR-VISUAL.md §7.2"
     },
     {
       "id": "driver-face",
       "ref": "build/visual/refs/driver-face.png",
-      "ours": "build/visual/driver-face.png",
+      "ours": "build/visual/driver-face.ab.png",
       "note": "臉盤大圓眼與保險桿上的笑口都在框內——正是 §5.3 要求同時看得到的兩件事"
     },
     {
       "id": "track-surface",
       "ref": "build/visual/refs/track-surface.png",
-      "ours": "build/visual/track-surface.png",
+      "ours": "build/visual/track-surface.ab.png",
       "note": "路面加車道虛線，是 refs 裡唯一一塊夠大的純路面"
     },
     {
       "id": "track-barriers",
       "ref": "build/visual/refs/track-barriers.png",
-      "ours": "build/visual/track-barriers.png",
+      "ours": "build/visual/track-barriers.ab.png",
       "note": "紅白相間的路緣石，§5.5 的「一段一段接起來」在這裡最清楚"
     },
     {
       "id": "foliage",
-      "ref": "build/visual/refs/foliage.png",
-      "ours": "build/visual/foliage.png",
-      "note": "團塊堆疊的樹冠、短粗樹幹、草叢與小花全在同一框，正是 §5.6 的三項"
+      "ref": null,
+      "ours": "build/visual/foliage.ab.png",
+      "note": "R31 撤除配對：參考素材的樹冠形態與黃金樣本互相矛盾，且無替代品。改走 BAR-VISUAL §1.3 機械驗收。見 REF-PAIRING.md §7.2.2"
     },
     {
       "id": "skybox-lighting",
       "ref": null,
-      "ours": "build/visual/skybox-lighting.png",
+      "ours": "build/visual/skybox-lighting.ab.png",
       "note": "deferred（R24 稽核）—— 見 BAR-VISUAL.md §7.2"
     },
     {
       "id": "drift-sparks",
       "ref": null,
-      "ours": "build/visual/drift-sparks.png",
+      "ours": "build/visual/drift-sparks.ab.png",
       "note": "deferred（R24 稽核）—— 見 BAR-VISUAL.md §7.2"
     },
     {
       "id": "item-boxes",
       "ref": null,
-      "ours": "build/visual/item-boxes.png",
+      "ours": "build/visual/item-boxes.ab.png",
       "note": "deferred（R20 Lead 裁決）—— refs/clay 裡沒有任何箱體素材。恐龍車多多.jpg 的糖果是候選，但那些糖果有明顯的透亮/鏡面反光，違反 §6 全域禁令——拿違反禁令的圖當標準會讓這一組的分數失去意義"
     },
     {
       "id": "shadows-contact",
       "ref": "build/visual/refs/shadows-contact.png",
-      "ours": "build/visual/shadows-contact.png",
+      "ours": "build/visual/shadows-contact.ab.png",
       "note": "車體下緣與沙地的接地陰影完整落在框內，長度、柔度、對比都可直接比對 §5.10"
     },
     {
       "id": "water-sea",
       "ref": "build/visual/refs/water-sea.png",
-      "ours": "build/visual/water-sea.png",
+      "ours": "build/visual/water-sea.ab.png",
       "note": "1024² 可平鋪黏土海面，整張就是這個元件的標準"
     },
     {
       "id": "ui-hud",
       "ref": null,
-      "ours": "build/visual/ui-hud.png",
+      "ours": "build/visual/ui-hud.ab.png",
       "note": "deferred（R20 Lead 裁決）—— refs/clay 完全沒有 HUD 素材，且 HUD 是 2D 疊層，跟其餘 11 個 3D 元件不在同一個比較基礎上。要評分需要先另外產一張黏土風 HUD 參考——那是獨立工作，不在 R20 範圍"
     }
   ]
