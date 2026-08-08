@@ -119,7 +119,14 @@ async function main() {
       // 先壓平再縮放:縮放會把透明邊緣跟未定義底色混在一起。
       .flatten({ background })
       .resize(tileSize, tileSize, { fit: 'cover', position: 'centre' })
-      .png({ effort: 4 })
+      // `palette: false` 是必要的，不是預設——sharp 的 `effort` 選項會順手把
+      // `palette` 設成 true。R31 修掉了 `contact-sheet.mjs` 的兩處，**漏了這裡**，
+      // 結果 R32 的量化變成單邊的：算繪半邊全彩 814–2697 色，參考半邊每一個
+      // 都恰好 256 色。
+      //
+      // 那比 R31 更糟。R31 兩邊同等受害；單邊量化等於**專門對其中一組製造
+      // `§6`「程序化雜訊」的偽陽性**——這一輪只是剛好偏向我們。
+      .png({ palette: false, compressionLevel: 9 })
       .toBuffer();
 
     const file = join(options.outDir, `${entry.id}.png`);
