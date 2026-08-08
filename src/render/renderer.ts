@@ -125,7 +125,6 @@ class ClayRenderer implements Renderer {
     // 是加強不是替代。
     applyClayRenderSettings(this.#renderer, { shadows: true });
     mount.appendChild(this.#renderer.domElement);
-    this.#renderer.domElement.dataset.characterAnimationInstances = '0';
 
     // 天空是元件 #7 `skybox-lighting` 的一部分，還沒實作——但 `§3` 的
     // `#8a8a8a` 中性灰是**拍攝台背景**，那是為了讓元件圖可比，不是遊戲場景
@@ -344,9 +343,9 @@ class ClayRenderer implements Renderer {
     }
 
     // R30 §4.1 需要分母是實際有角色動畫的車，而不是 HUD 的參賽車總數；
-    // AI gameplay LOD 刻意沒有臉，透過 canvas data attribute 把真實 instance
-    // 數交給 perf-probe/device-probe。缺值時探針應誠實 FAIL，不可猜測。
-    this.#renderer.domElement.dataset.characterAnimationInstances = String(characterAnimationInstances);
+    // AI gameplay LOD 刻意沒有臉。這個值走 RenderTelemetry 正式契約，缺值時
+    // 探針應誠實 FAIL，不可猜測。
+    renderTelemetry.characterAnimationInstances = characterAnimationInstances;
 
     // `BAR-PERF §4.2`：載具 transform 實際被寫入的次數。**每幀算一次**，
     // 不是每台車各算一次——§4.2 判的是「載具有沒有被抽格」，不是場上有幾台車。

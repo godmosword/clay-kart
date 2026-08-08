@@ -270,7 +270,6 @@ function remoteProbeScript(durationMs, inputSegments) {
       renderTelemetryStart: null, renderTelemetryEnd: null,
       rafInstalled: false, glInstalled: false,
       inputTimers: [],
-      characterAnimationInstances: null,
     };
     if (!state.rafInstalled) {
       const originalRaf = window.requestAnimationFrame.bind(window);
@@ -304,22 +303,18 @@ function remoteProbeScript(durationMs, inputSegments) {
     state.frames = [];
     state.drawCalls = 0;
     state.triangles = 0;
-    const animationCanvas = document.querySelector('canvas[data-character-animation-instances]');
-    const animationInstanceCount = Number(animationCanvas?.dataset.characterAnimationInstances);
-    state.characterAnimationInstances = Number.isInteger(animationInstanceCount)
-      && animationInstanceCount > 0
-      ? animationInstanceCount
-      : null;
     const snapshotRenderTelemetry = () => {
       const telemetry = window.__CLAY_RENDER_TELEMETRY__;
       return telemetry && Number.isFinite(telemetry.renderedFrames)
         && Number.isFinite(telemetry.vehicleTransformUpdates)
         && Number.isFinite(telemetry.cameraUpdates)
+        && Number.isFinite(telemetry.characterAnimationInstances)
         && Number.isFinite(telemetry.characterAnimationFrames)
         ? {
           renderedFrames: telemetry.renderedFrames,
           vehicleTransformUpdates: telemetry.vehicleTransformUpdates,
           cameraUpdates: telemetry.cameraUpdates,
+          characterAnimationInstances: telemetry.characterAnimationInstances,
           characterAnimationFrames: telemetry.characterAnimationFrames,
         }
         : null;
@@ -412,9 +407,9 @@ function summarizeRemote(measurement, kind, transport, url, fixtureName) {
     }
     : null;
   const telemetryRenderedFrames = telemetryDeltaValid ? telemetryDeltas.renderedFrames : null;
-  const characterAnimationInstances = Number.isFinite(measurement.characterAnimationInstances)
-    && measurement.characterAnimationInstances > 0
-    ? measurement.characterAnimationInstances
+  const characterAnimationInstances = Number.isInteger(telemetryEnd?.characterAnimationInstances)
+    && telemetryEnd.characterAnimationInstances > 0
+    ? telemetryEnd.characterAnimationInstances
     : null;
   const characterAnimationHz = telemetryHz?.characterAnimationFrames !== null
     && telemetryHz?.characterAnimationFrames !== undefined
