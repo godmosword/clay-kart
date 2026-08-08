@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-08T01:03:49Z",
+  "updated": "2026-08-08T04:09:49Z",
   "wave": "W3",
   "round": 30,
-  "element": "ui-hud-alert + race-standing-guard",
+  "element": "ui-hud-alert + race-standing + scene-stats",
   "status": "done",
   "last_verdict": null,
-  "note": "R30：告警色 #ff8c2b→#f49862（對齊 §5.12／§6）；race-standing 註記起點角=0 前提 + test:race-standing。palette-bans／ui-hud／steer-screen／typecheck PASS。"
+  "note": "R30：alert #f49862；race-standing 起點角=0 註記 + test:race-standing PASS。流程：npm run scene-stats（scene-only）——本機測得 draw_calls=519（budget 150，超標只回報）triangles_k=365.7（budget 400）。R30 本輪色碼/名次不增場景物件；之後增減場景必附這兩數。"
 }
