@@ -2,7 +2,7 @@
 /**
  * ui-hud 機械驗收（BAR-VISUAL §1.3 / §5.12）。
  *
- * 可程式判定：底板 `#f0e4cd`、數字 `#3a5f96`、告警 `#ff8c2b`；
+ * 可程式判定：底板 `#f0e4cd`、數字 `#3a5f96`、告警 `#f49862`；
  * 禁純白底；opacity 必須為 1、無 backdrop-filter；
  * 底板短邊 / 畫面短邊 ≤ 1/8（§1.3）；R28 實作目標收緊為 ≤ 0.11。
  *
@@ -27,7 +27,7 @@ const BUILD_ROOT = resolve(REPO_ROOT, 'build/out');
 const EXPECT = {
   board: { r: 0xf0, g: 0xe4, b: 0xcd },
   number: { r: 0x3a, g: 0x5f, b: 0x96 },
-  alert: { r: 0xff, g: 0x8c, b: 0x2b },
+  alert: { r: 0xf4, g: 0x98, b: 0x62 },
 };
 const RGB_TOL = 2;
 
@@ -326,7 +326,7 @@ async function main() {
       }
     }
     if (!near(parseRgb(data.alertColor), EXPECT.alert)) {
-      failures.push(`alert color want #ff8c2b, got ${data.alertColor}`);
+      failures.push(`alert color want #f49862, got ${data.alertColor}`);
     }
     if (data.ratio == null || !(data.ratio <= MAX_SHORT_RATIO + 1e-6)) {
       failures.push(
