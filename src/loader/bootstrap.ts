@@ -107,13 +107,33 @@ function isSteerProbeEnabled(): boolean {
   }
 }
 
+/**
+ * R33：`?solo=1`（或 `?aiOpponents=0`）→ 空 AI，等同 `createWorld()` 單車。
+ * 給 steer-screen 的「方向沒接反」斷言用；正式遊玩路徑不帶這些旗標。
+ */
+function resolveAiOpponents(): readonly AiOpponentConfig[] {
+  if (typeof window === 'undefined') return DEFAULT_AI_OPPONENTS;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('solo') || params.get('aiOpponents') === '0') {
+      return [];
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_AI_OPPONENTS;
+}
+
 export async function bootstrap(mount: HTMLElement, inputSource: InputSource = NO_OP_INPUT): Promise<void> {
   const [{ createWorld }, { createRenderer }] = await Promise.all([
     import('@physics/world'),
     import('@render/renderer'),
   ]);
 
-  const world: SimWorld = createWorld({ aiOpponents: DEFAULT_AI_OPPONENTS });
+  const aiOpponents = resolveAiOpponents();
+  const world: SimWorld = createWorld(
+    aiOpponents.length > 0 ? { aiOpponents } : {},
+  );
   const renderer: Renderer = createRenderer(mount);
   // ui-hud（§5.12）在 Cursor 範圍；render 裡的 W1 monospace HUD 會被 clay-hud 藏掉。
   const hud = createClayHud(mount);

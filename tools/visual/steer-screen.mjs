@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 /**
- * 轉向螢幕空間回歸（R20 缺陷的自動化防護）。
+ * 轉向螢幕空間回歸（R20 缺陷）＋多車可轉（R28／R33）。
  *
- * W1 只驗「CDP 送鍵後 yaw 有變」——按 → 車往畫面左轉也會 PASS。
- * 這支腳本改驗：持鍵期間，車體位移在**起始相機 local +X**（畫面右邊）
- * 上的投影，以**模擬時間** `snap.t` 正規化成每秒速率：
+ * R33 裁決：這不是「單車 vs 多車」二選一——那是假選擇。一組斷言不該同時
+ * 扛兩個對餘裕要求相反的目的，所以拆成兩條：
  *
- *   ArrowRight + throttle → lateral / simDt > +RATE_THRESHOLD
- *   ArrowLeft  + throttle → lateral / simDt < -RATE_THRESHOLD
+ *   1. solo（`?solo=1`）：方向沒接反——契約回歸，預期 rate ~5、餘裕很厚
+ *   2. multi（預設 bootstrap AI）：多車下玩家仍轉得動——貼門檻是誠實的
  *
- * 用模擬時間而不是牆鐘：機器被壓住時分子分母一起縮，門檻不受負載影響，
- * 且仍保留量值檢查（不是退化成純符號比對）。
- *
- * 沿用 game-shot.mjs 的 raw CDP + headless Chrome，不新增 npm 依賴。
- * 正式 build 預設不裝 probe——本腳本以 `?steerProbe=1` 開啟。
+ * 兩邊都用同一門檻 RATE_THRESHOLD=0.5；不要為了讓 multi 餘裕變厚去動物理
+ * 或改門檻。把 rate 實測值印出來——薄餘裕看得見才不會靜靜漂。
  *
  * Usage:
  *   npm run build && node tools/visual/steer-screen.mjs
@@ -40,9 +36,27 @@ const TARGET_SIM_SECONDS = 0.45;
 const MAX_WALL_WAIT_MS = 20_000;
 /**
  * 每模擬秒的橫向位移門檻（世界單位 / 模擬秒）。
- * 正常轉向約 1–2；翻符號會變號；純抖動遠低於此。
+ * solo 預期 ~5；multi 貼門檻（~0.8）是誠實的——兩邊共用同一數字。
  */
 const RATE_THRESHOLD = 0.5;
+
+const SCENARIOS = [
+  {
+    id: 'solo',
+    query: 'solo=1',
+    purpose: 'direction-contract',
+    note: '單車：R20 轉向接反回歸；預期 rate ~5、餘裕很厚',
+    /** POS 分母——單車場上只有玩家 */
+    expectPosField: 1,
+  },
+  {
+    id: 'multi',
+    query: '',
+    purpose: 'multi-kart-still-steers',
+    note: '多車：玩家真實場景仍轉得動；貼門檻是誠實的',
+    expectPosField: 4,
+  },
+];
 
 const KEY_CODES = {
   ArrowUp: 38,
@@ -228,6 +242,18 @@ async function readProbe(session) {
   return result?.result?.value ?? null;
 }
 
+async function readPosText(session) {
+  const result = await session.call('Runtime.evaluate', {
+    expression: `(() => {
+      const values = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
+      // LAP TIME POS BEST —— POS 是第 3 個
+      return (values[2]?.textContent || '').trim();
+    })()`,
+    returnByValue: true,
+  });
+  return result?.result?.value ?? '';
+}
+
 function screenLateral(start, end) {
   const dx = end.pos[0] - start.pos[0];
   const dy = end.pos[1] - start.pos[1];
@@ -252,7 +278,6 @@ async function waitForSimTick(session, baselineT, minDelta = 0.05, wallMs = MAX_
 }
 
 async function runTrial(session, steerKey) {
-  // 先加速一點，避免靜止時側向分量太小（這段用牆鐘喚醒即可）
   await keyDown(session, 'ArrowUp');
   await sleep(400);
 
@@ -265,12 +290,10 @@ async function runTrial(session, steerKey) {
   if (!start?.pos || typeof start.t !== 'number') {
     throw new Error('steer probe never became ready');
   }
-  // 確認加速段期間模擬有在跑，避免在卡死的幀上開始轉向量測
   start = await waitForSimTick(session, start.t, 0.05);
 
   await keyDown(session, steerKey);
 
-  // 等到模擬時間前進夠多再取樣——負載高時牆鐘會拉長，但 simDt 目標不變。
   const deadline = Date.now() + MAX_WALL_WAIT_MS;
   let end = start;
   while (Date.now() < deadline) {
@@ -294,7 +317,88 @@ async function runTrial(session, steerKey) {
   const lateral = screenLateral(start, end);
   const rate = lateral / simDt;
   const yawDelta = end.yaw - start.yaw;
-  return { steerKey, lateral, rate, simDt, yawDelta, start, end };
+  return { steerKey, lateral, rate, simDt, yawDelta };
+}
+
+function gameUrl(port, scenarioQuery) {
+  const params = new URLSearchParams({ steerProbe: '1' });
+  if (scenarioQuery) {
+    for (const part of scenarioQuery.split('&')) {
+      if (!part) continue;
+      const [k, v] = part.split('=');
+      params.set(k, v ?? '');
+    }
+  }
+  return `http://127.0.0.1:${port}/index.html?${params.toString()}`;
+}
+
+async function waitReady(session, url) {
+  await session.call('Page.navigate', { url });
+  let readyProbe = null;
+  for (let attempt = 0; attempt < 150; attempt += 1) {
+    readyProbe = await readProbe(session);
+    if (readyProbe?.pos && typeof readyProbe.t === 'number') break;
+    await sleep(100);
+  }
+  if (!readyProbe?.pos || typeof readyProbe.t !== 'number') {
+    throw new Error(`probe not ready for ${url}`);
+  }
+  await waitForSimTick(session, readyProbe.t, 0.05);
+}
+
+async function runScenario(session, port, scenario) {
+  const url = gameUrl(port, scenario.query);
+  const trials = [];
+  for (const steerKey of ['ArrowRight', 'ArrowLeft']) {
+    await waitReady(session, url);
+    trials.push(await runTrial(session, steerKey));
+  }
+
+  const right = trials.find((t) => t.steerKey === 'ArrowRight');
+  const left = trials.find((t) => t.steerKey === 'ArrowLeft');
+  if (!right || !left) throw new Error(`${scenario.id}: missing trials`);
+
+  // 重載一次確認場上車數（POS 分母）對得上場景
+  await waitReady(session, url);
+  await sleep(200);
+  const posText = await readPosText(session);
+
+  const failures = [];
+  if (!(right.rate > RATE_THRESHOLD)) {
+    failures.push(
+      `${scenario.id}/ArrowRight: expected lateral/simDt > ${RATE_THRESHOLD}, got ${right.rate.toFixed(4)} ` +
+        `(lateral=${right.lateral.toFixed(4)}, simDt=${right.simDt.toFixed(4)}, yawΔ=${right.yawDelta.toFixed(4)})`,
+    );
+  }
+  if (!(left.rate < -RATE_THRESHOLD)) {
+    failures.push(
+      `${scenario.id}/ArrowLeft: expected lateral/simDt < ${-RATE_THRESHOLD}, got ${left.rate.toFixed(4)} ` +
+        `(lateral=${left.lateral.toFixed(4)}, simDt=${left.simDt.toFixed(4)}, yawΔ=${left.yawDelta.toFixed(4)})`,
+    );
+  }
+  if (!(Math.sign(right.rate) === 1 && Math.sign(left.rate) === -1)) {
+    failures.push(
+      `${scenario.id}: expected opposite screen rate signs, got right=${right.rate.toFixed(4)} left=${left.rate.toFixed(4)}`,
+    );
+  }
+  const fieldMatch = String(posText).match(/^\d+\/(\d+)$/);
+  const field = fieldMatch ? Number(fieldMatch[1]) : null;
+  if (field !== scenario.expectPosField) {
+    failures.push(
+      `${scenario.id}: POS field want ${scenario.expectPosField}, got ${JSON.stringify(posText)} ` +
+        `(solo 應 1/1、multi 應 n/4——確認 ?solo=1 有關掉 AI）`,
+    );
+  }
+
+  return {
+    id: scenario.id,
+    purpose: scenario.purpose,
+    note: scenario.note,
+    pos: posText,
+    right: { rate: right.rate, lateral: right.lateral, simDt: right.simDt, yawDelta: right.yawDelta },
+    left: { rate: left.rate, lateral: left.lateral, simDt: left.simDt, yawDelta: left.yawDelta },
+    failures,
+  };
 }
 
 async function main() {
@@ -334,77 +438,35 @@ async function main() {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    const gameUrl = `http://127.0.0.1:${port}/index.html?steerProbe=1`;
-    await session.call('Page.navigate', { url: gameUrl });
 
-    let ready = false;
-    for (let attempt = 0; attempt < 150; attempt += 1) {
-      const probe = await session.call('Runtime.evaluate', {
-        expression:
-          'Boolean(document.querySelector("#app canvas") && window.__CLAY_STEER_PROBE__?.latest())',
-        returnByValue: true,
-      });
-      if (probe?.result?.value === true) {
-        ready = true;
-        break;
-      }
-      await sleep(100);
-    }
-    if (!ready) throw new Error('game never mounted canvas + steer probe (need ?steerProbe=1)');
-
-    // 每次 trial 重新載入，避免前一次轉向殘留姿態
-    const trials = [];
-    for (const steerKey of ['ArrowRight', 'ArrowLeft']) {
-      await session.call('Page.navigate', { url: gameUrl });
-      let readyProbe = null;
-      for (let attempt = 0; attempt < 150; attempt += 1) {
-        readyProbe = await readProbe(session);
-        if (readyProbe?.pos && typeof readyProbe.t === 'number') break;
-        await sleep(100);
-      }
-      if (!readyProbe?.pos || typeof readyProbe.t !== 'number') {
-        throw new Error(`probe not ready before ${steerKey} trial`);
-      }
-      await waitForSimTick(session, readyProbe.t, 0.05);
-      trials.push(await runTrial(session, steerKey));
+    const scenarios = [];
+    for (const scenario of SCENARIOS) {
+      scenarios.push(await runScenario(session, port, scenario));
     }
 
     if (session.pageErrors.length > 0) {
       throw new Error(`page reported errors:\n  ${session.pageErrors.join('\n  ')}`);
     }
 
-    const right = trials.find((t) => t.steerKey === 'ArrowRight');
-    const left = trials.find((t) => t.steerKey === 'ArrowLeft');
-    if (!right || !left) throw new Error('missing trials');
-
-    const failures = [];
-    // 按 →：每模擬秒往畫面右邊
-    if (!(right.rate > RATE_THRESHOLD)) {
-      failures.push(
-        `ArrowRight: expected lateral/simDt > ${RATE_THRESHOLD}, got ${right.rate.toFixed(4)} ` +
-          `(lateral=${right.lateral.toFixed(4)}, simDt=${right.simDt.toFixed(4)}, yawΔ=${right.yawDelta.toFixed(4)})`,
-      );
-    }
-    // 按 ←：每模擬秒往畫面左邊
-    if (!(left.rate < -RATE_THRESHOLD)) {
-      failures.push(
-        `ArrowLeft: expected lateral/simDt < ${-RATE_THRESHOLD}, got ${left.rate.toFixed(4)} ` +
-          `(lateral=${left.lateral.toFixed(4)}, simDt=${left.simDt.toFixed(4)}, yawΔ=${left.yawDelta.toFixed(4)})`,
-      );
-    }
-    // 兩邊符號必須相反——防止「兩邊都幾乎不動卻碰巧過門檻」
-    if (!(Math.sign(right.rate) === 1 && Math.sign(left.rate) === -1)) {
-      failures.push(
-        `expected opposite screen rate signs, got right=${right.rate.toFixed(4)} left=${left.rate.toFixed(4)}`,
-      );
-    }
+    const failures = scenarios.flatMap((s) => s.failures);
+    const byId = Object.fromEntries(
+      scenarios.map((s) => [
+        s.id,
+        {
+          purpose: s.purpose,
+          note: s.note,
+          pos: s.pos,
+          right: s.right,
+          left: s.left,
+        },
+      ]),
+    );
 
     const report = {
       ok: failures.length === 0,
       rateThreshold: RATE_THRESHOLD,
       targetSimSeconds: TARGET_SIM_SECONDS,
-      right: { rate: right.rate, lateral: right.lateral, simDt: right.simDt, yawDelta: right.yawDelta },
-      left: { rate: left.rate, lateral: left.lateral, simDt: left.simDt, yawDelta: left.yawDelta },
+      ...byId,
       failures,
     };
     console.log(JSON.stringify(report, null, 2));
@@ -413,7 +475,7 @@ async function main() {
       for (const f of failures) console.error(' -', f);
       process.exitCode = 1;
     } else {
-      console.error('\nsteer-screen regression: PASS');
+      console.error('\nsteer-screen regression: PASS (solo direction + multi still-steers)');
     }
   } finally {
     session?.close();
