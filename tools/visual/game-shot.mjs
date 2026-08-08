@@ -299,13 +299,36 @@ async function main() {
     await mkdir(dirname(options.out), { recursive: true });
     await writeFile(options.out, Buffer.from(shot.data, 'base64'));
 
+    // 必須讀 clay-hud——`#app div` 會先命中 render 裡仍在 DOM、已被
+    // display:none 的 W1 monospace stub（沒有 POS，也不是 §5.12 那塊牌）。
     const state = await session.call('Runtime.evaluate', {
-      expression: 'document.querySelector("#app div")?.textContent ?? ""',
+      expression: `(() => {
+        const hud = document.querySelector('[data-role="clay-hud"]');
+        if (!hud) return { error: 'missing clay-hud', hud: '' };
+        const text = (hud.innerText || hud.textContent || '').trim();
+        return { hud: text, hasPos: /\\bPOS\\b/i.test(text) };
+      })()`,
       returnByValue: true,
     });
+    const hudState = state?.result?.value ?? { error: 'evaluate failed', hud: '', hasPos: false };
+    if (hudState.error) {
+      throw new Error(`game-shot HUD probe: ${hudState.error}`);
+    }
+    if (!hudState.hasPos) {
+      throw new Error(
+        `clay-hud text missing POS row (got ${JSON.stringify(hudState.hud)}); ` +
+          'likely still reading the hidden W1 monospace stub',
+      );
+    }
     console.log(
       JSON.stringify(
-        { ok: true, out: options.out, seconds: options.seconds, keys: options.keys, hud: state?.result?.value ?? '' },
+        {
+          ok: true,
+          out: options.out,
+          seconds: options.seconds,
+          keys: options.keys,
+          hud: hudState.hud,
+        },
         null,
         2,
       ),
