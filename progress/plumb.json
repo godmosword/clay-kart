@@ -2,11 +2,13 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-09T00:00:00Z",
+  "updated": "2026-08-08T23:55:00Z",
   "wave": "W3",
   "round": 33,
   "element": "steer-screen dual assert",
   "status": "done",
   "last_verdict": null,
-  "note": "R33：steer-screen 拆 solo（?solo=1 方向契約）＋ multi（預設 AI 仍可轉）。RATE_THRESHOLD=0.5 不動。test:plumb PASS。solo rate≈2.7/-3.5；multi≈3.8/-4.1（皆厚於門檻）。"
+  "commit": "099f549",
+  "note": "R33：steer-screen 拆 solo（?solo=1 方向契約）＋ multi（預設 AI 仍可轉）。RATE_THRESHOLD=0.5 不動。test:plumb PASS。solo rate≈2.7/-3.5；multi≈3.8/-4.1（皆厚於門檻）。未 merge main。"
 }
+
