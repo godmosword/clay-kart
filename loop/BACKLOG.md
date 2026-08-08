@@ -627,7 +627,11 @@
 - **已開 TASK**：`loop/round-33/TASK-cursor.md`（新增單車方向斷言、保留多車
   斷言、兩條都把 `rate` 實測值寫進輸出、都掛進 `test:plumb`；明文禁止為了
   讓餘裕變厚去動物理或改 `RATE_THRESHOLD`）
-- **狀態**：已裁決，待 Cursor
+- **狀態**：**已處理（Cursor R33）**。`?solo=1` → 空 AI／`createWorld({})`；
+  `steer-screen.mjs` 跑 solo＋multi 兩場景，各自印 `right.rate`／`left.rate`，
+  門檻仍 `0.5`。掛進 `test:plumb`。plumb tip 見 progress。實測（SwiftShader，
+  連跑兩次皆 PASS）：solo right≈2.71–2.91／left≈-3.49–-3.79；multi
+  right≈3.84–3.89／left≈-3.53–-4.14。POS 分別驗 `1/1` 與 `n/4`。
 
 
 ### 探針沒讀 renderedFrames，§4.2/§4.3 仍分不開「抽格」與「慢」

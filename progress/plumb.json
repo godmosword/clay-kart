@@ -2,11 +2,11 @@
   "tool": "cursor",
   "worktree": "../ck-plumb",
   "branch": "feat/plumb",
-  "updated": "2026-08-08T09:00:41Z",
+  "updated": "2026-08-09T00:00:00Z",
   "wave": "W3",
-  "round": 31,
-  "element": "test-plumb + ui-hud-behavior",
+  "round": 33,
+  "element": "steer-screen dual assert",
   "status": "done",
   "last_verdict": null,
-  "note": "check-ui-hud：POS n/4、標籤、W1 hide；test:plumb 單次 build 聚合；steer-screen 牆鐘 20s＋sim tick 守衛。連跑兩次 PASS。"
+  "note": "R33：steer-screen 拆 solo（?solo=1 方向契約）＋ multi（預設 AI 仍可轉）。RATE_THRESHOLD=0.5 不動。test:plumb PASS。solo rate≈2.7/-3.5；multi≈3.8/-4.1（皆厚於門檻）。"
 }
