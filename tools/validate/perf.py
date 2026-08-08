@@ -39,6 +39,12 @@ REQUIRED_MEASUREMENTS = frozenset({
     "time_to_first_render_s",
 })
 
+ANIMATION_SAMPLE_FPS_THRESHOLD = 24.0
+ANIMATION_RATIO_MAX = 0.95
+ANIMATION_MODE_HZ = "hz_12_window"
+ANIMATION_MODE_RATIO = "quantization_ratio_proves_quantization_only"
+ANIMATION_MODE_MISSING = "missing_fps_or_render_ratio"
+
 
 def _has_full_heap_lap_measurement(doc: dict[str, Any]) -> bool:
     meta = doc.get("meta")
@@ -107,11 +113,30 @@ def _required_finite(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | None]:
+def _character_animation_ratio(values: dict[str, Any]) -> float | None:
+    direct = values.get("character_animation_per_frame")
+    if direct is None:
+        ratios = values.get("render_telemetry_ratios")
+        if isinstance(ratios, dict):
+            direct = ratios.get("characterAnimationPerFrame")
+    return _required_finite(direct)
+
+
+def calculate_metrics(doc: dict[str, Any]) -> dict[str, Any]:
     values = doc.get("metrics", doc)
     if not isinstance(values, dict):
         values = {}
-    metrics: dict[str, float | None] = {}
+    metrics: dict[str, Any] = {}
+    fps_p05 = _required_finite(values.get("fps_p05"))
+    animation_ratio = _character_animation_ratio(values)
+    if fps_p05 is None:
+        animation_mode = ANIMATION_MODE_MISSING
+    elif fps_p05 > ANIMATION_SAMPLE_FPS_THRESHOLD:
+        animation_mode = ANIMATION_MODE_HZ
+    else:
+        animation_mode = ANIMATION_MODE_RATIO
+    metrics["character_animation_per_frame"] = animation_ratio
+    metrics["character_anim_validation_mode"] = animation_mode
     for _, metric, _, _, _ in WINDOWS:
         raw = values.get(metric)
         measured = (
@@ -134,6 +159,20 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | None]:
     return metrics
 
 
+def _character_animation_check(metrics: dict[str, Any]) -> tuple[str, Any, float, float]:
+    mode = metrics.get("character_anim_validation_mode")
+    if mode == ANIMATION_MODE_HZ:
+        return "character_anim_hz", metrics.get("character_anim_hz"), 11.5, 12.5
+    if mode == ANIMATION_MODE_RATIO:
+        return (
+            "character_animation_per_frame",
+            metrics.get("character_animation_per_frame"),
+            0.0,
+            ANIMATION_RATIO_MAX,
+        )
+    return "character_anim_hz", None, 11.5, 12.5
+
+
 def _relative_gap(actual: float, low: float, high: float) -> float:
     if actual < low:
         return (low - actual) / (high - low)
@@ -143,7 +182,7 @@ def _relative_gap(actual: float, low: float, high: float) -> float:
 
 
 def build_verdict(
-    metrics: dict[str, float | None],
+    metrics: dict[str, Any],
     *,
     round_number: int = 3,
     artifact: str = "loop/round-3/artifacts/perf-proxy.json",
@@ -152,7 +191,10 @@ def build_verdict(
     checks = []
     failures = []
     for metric_id, metric_name, low, high, priority in WINDOWS:
-        actual = metrics.get(metric_name)
+        if metric_id == "4.1":
+            metric_name, actual, low, high = _character_animation_check(metrics)
+        else:
+            actual = metrics.get(metric_name)
         if actual is None:
             # Keep the schema's numeric `actual` field while making the
             # missing measurement visible in the failure explanation.  This
@@ -180,12 +222,13 @@ def build_verdict(
     if failures:
         priority, _, metric_id, delta = failures[0]
         largest_gap = {"id": metric_id, "delta": delta, "priority_rank": priority}
+    animation_mode = metrics.get("character_anim_validation_mode", ANIMATION_MODE_MISSING)
     return {
         "round": round_number,
         "wave": "W2",
         "element": "perf-validator",
         "verdict": verdict,
-        "bar_ref": "BAR-PERF.md §2–§5",
+        "bar_ref": f"BAR-PERF.md §2–§5; §4.1 mode={animation_mode}",
         "checks": checks,
         "largest_gap": largest_gap,
         "artifacts": [artifact],

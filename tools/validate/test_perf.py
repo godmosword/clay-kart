@@ -68,7 +68,7 @@ def test_missing_rendered_frames_does_not_synthesize_section_four_rates():
 
 
 def test_measured_character_animation_is_validated_when_present():
-    metrics = calculate_metrics({"metrics": {"character_anim_hz": 12}})
+    metrics = calculate_metrics({"metrics": {"character_anim_hz": 12, "fps_p05": 60}})
 
     verdict = build_verdict(metrics)
 
@@ -83,6 +83,7 @@ def test_measured_render_telemetry_rates_pass_section_four():
             "character_anim_hz": 12,
             "vehicle_transform_hz": 60,
             "camera_hz": 60,
+            "fps_p05": 60,
         },
     }))
 
@@ -201,3 +202,65 @@ def test_load_timings_are_valid_with_recorded_four_g_profile():
         check = next(check for check in verdict["checks"] if check["id"] == metric_id)
         assert check["actual"] == 0.1
         assert check["status"] == "PASS"
+
+
+def test_high_render_rate_uses_the_hz_window_for_character_animation():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "fps_p05": 60,
+            "character_anim_hz": 12,
+            "character_animation_per_frame": 0.8,
+        },
+    }))
+
+    check = next(check for check in verdict["checks"] if check["id"] == "4.1")
+    assert check["metric"] == "character_anim_hz"
+    assert check["window"] == [11.5, 12.5]
+    assert check["status"] == "PASS"
+    assert "mode=hz_12_window" in verdict["bar_ref"]
+
+
+def test_low_render_rate_uses_the_quantization_ratio_window():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "fps_p05": 20,
+            "character_anim_hz": 9,
+            "render_telemetry_ratios": {
+                "characterAnimationPerFrame": 0.8,
+            },
+        },
+    }))
+
+    check = next(check for check in verdict["checks"] if check["id"] == "4.1")
+    assert check["metric"] == "character_animation_per_frame"
+    assert check["window"] == [0.0, 0.95]
+    assert check["actual"] == 0.8
+    assert check["status"] == "PASS"
+    assert "mode=quantization_ratio_proves_quantization_only" in verdict["bar_ref"]
+
+
+def test_smooth_animation_ratio_one_fails_at_high_render_rate():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "fps_p05": 60,
+            "character_anim_hz": 60,
+            "character_animation_per_frame": 1.0,
+        },
+    }))
+
+    check = next(check for check in verdict["checks"] if check["id"] == "4.1")
+    assert check["status"] == "FAIL"
+
+
+def test_smooth_animation_ratio_one_fails_at_low_render_rate():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "fps_p05": 20,
+            "character_anim_hz": 20,
+            "character_animation_per_frame": 1.0,
+        },
+    }))
+
+    check = next(check for check in verdict["checks"] if check["id"] == "4.1")
+    assert check["metric"] == "character_animation_per_frame"
+    assert check["status"] == "FAIL"

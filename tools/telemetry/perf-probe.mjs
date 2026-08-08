@@ -380,8 +380,8 @@ function browserProbeScript() {
       }
       : null;
   };
-  const readHeapMb = () => performance.memory
-    ? performance.memory.usedJSHeapSize / (1024 * 1024)
+  const readHeapBytes = () => performance.memory
+    ? performance.memory.usedJSHeapSize
     : null;
   const readLapSnapshot = () => {
     const values = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
@@ -397,19 +397,28 @@ function browserProbeScript() {
   };
   const finishHeapMeasurement = (status, now) => {
     state.heapRunning = false;
-    const startMb = state.heapSamples.find((sample) => Number.isFinite(sample)) ?? null;
-    const endMb = [...state.heapSamples].reverse().find((sample) => Number.isFinite(sample)) ?? null;
-    const deltaMb = startMb !== null && endMb !== null
-      ? Math.max(0, endMb - startMb)
+    const startBytes = state.heapSamples.find((sample) => Number.isFinite(sample)) ?? null;
+    const endBytes = [...state.heapSamples].reverse().find((sample) => Number.isFinite(sample)) ?? null;
+    const peakBytes = state.heapSamples.length ? Math.max(...state.heapSamples) : null;
+    const deltaBytesRaw = startBytes !== null && endBytes !== null
+      ? endBytes - startBytes
       : null;
+    const deltaBytes = deltaBytesRaw === null ? null : Math.max(0, deltaBytesRaw);
     state.heapMeasurement = {
       ...state.heapMeasurement,
       status,
       endedAt: now,
       completedLaps: state.heapMeasurement?.completedLaps ?? 0,
-      heapStartMb: startMb,
-      heapEndMb: endMb,
-      heapDeltaMb: deltaMb,
+      // Keep raw values: a zero delta can be a real zero or memory-info
+      // quantization, and the byte values make that distinction auditable.
+      heapStartBytes: startBytes,
+      heapEndBytes: endBytes,
+      heapPeakBytes: peakBytes,
+      heapDeltaBytesRaw: deltaBytesRaw,
+      heapDeltaBytes: deltaBytes,
+      heapStartMb: startBytes === null ? null : startBytes / (1024 * 1024),
+      heapEndMb: endBytes === null ? null : endBytes / (1024 * 1024),
+      heapDeltaMb: deltaBytes === null ? null : deltaBytes / (1024 * 1024),
       heapSampleCount: state.heapSamples.length,
     };
   };
@@ -430,7 +439,7 @@ function browserProbeScript() {
       lastTime: initial?.time ?? null,
       stableFinalFrames: 0,
     };
-    const initialHeap = readHeapMb();
+    const initialHeap = readHeapBytes();
     if (initialHeap !== null) state.heapSamples.push(initialHeap);
   };
   const observeLapHeapMeasurement = () => {
@@ -504,7 +513,7 @@ function browserProbeScript() {
       scriptMs: 0,
     };
     state.raf.push({ timestamp, now: frame.start, frame });
-    const heap = readHeapMb();
+    const heap = readHeapBytes();
     if (heap !== null) {
       state.frameHeapSamples.push(heap);
       if (state.heapRunning) state.heapSamples.push(heap);
@@ -926,13 +935,56 @@ async function measureBrowser() {
           }
           : null;
         const telemetryRenderedFrames = telemetryDeltaValid ? telemetryDeltas.renderedFrames : null;
+        const hudValues = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
+        const standingMatch = (hudValues[2]?.textContent ?? '').match(/^\\d+\\/(\\d+)$/);
+        const characterAnimationInstances = standingMatch ? Number(standingMatch[1]) : null;
+        const rawCharacterAnimationHz = telemetryHz?.characterAnimationFrames ?? null;
+        const rawCharacterAnimationPerFrame = telemetryRenderedFrames > 0
+          ? telemetryDeltas.characterAnimationFrames / telemetryRenderedFrames
+          : null;
+        const characterAnimationHz = rawCharacterAnimationHz !== null
+          && Number.isFinite(characterAnimationInstances)
+          && characterAnimationInstances > 0
+          ? rawCharacterAnimationHz / characterAnimationInstances
+          : null;
+        const characterAnimationPerFrame = rawCharacterAnimationPerFrame !== null
+          && Number.isFinite(characterAnimationInstances)
+          && characterAnimationInstances > 0
+          ? rawCharacterAnimationPerFrame / characterAnimationInstances
+          : null;
         const telemetryRatios = telemetryRenderedFrames > 0
           ? {
             vehicleTransformPerFrame: telemetryDeltas.vehicleTransformUpdates / telemetryRenderedFrames,
             cameraPerFrame: telemetryDeltas.cameraUpdates / telemetryRenderedFrames,
-            characterAnimationPerFrame: telemetryDeltas.characterAnimationFrames / telemetryRenderedFrames,
+            characterAnimationPerFrame,
+            characterAnimationPerFrameRaw: rawCharacterAnimationPerFrame,
           }
           : null;
+        const fpsP05 = fps.length ? percentile(fps, 5) : null;
+        const characterAnimationValidation = fpsP05 === null
+          ? {
+            mode: 'missing_fps_sampling',
+            conclusion: 'character animation validation requires measured frame samples',
+            fps_p05: null,
+            character_anim_hz: characterAnimationHz,
+            character_animation_per_frame: characterAnimationPerFrame,
+          }
+          : fpsP05 > 24
+            ? {
+            mode: 'hz_12_window',
+            conclusion: '12Hz frequency is resolvable at this sampling rate',
+            fps_p05: fpsP05,
+            character_anim_hz: characterAnimationHz,
+            character_animation_per_frame: characterAnimationPerFrame,
+          }
+            : {
+              mode: 'quantization_ratio_proves_quantization_only',
+              conclusion: 'only quantization is tested; 12Hz frequency is not resolvable at this sampling rate',
+              fps_p05: fpsP05,
+              character_anim_hz: characterAnimationHz,
+              character_animation_per_frame: characterAnimationPerFrame,
+              max_per_frame_ratio: 0.95,
+            };
         const navigation = performance.getEntriesByType('navigation')[0];
         const heap = state?.frameHeapSamples ?? [];
         const drawCallsPerFrame = state?.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
@@ -971,15 +1023,20 @@ async function measureBrowser() {
           long_frame_count: frameIntervals.filter((ms) => ms > 33).length,
           vehicle_transform_hz: telemetryHz?.vehicleTransformUpdates ?? null,
           camera_hz: telemetryHz?.cameraUpdates ?? null,
-          character_anim_hz: telemetryHz?.characterAnimationFrames ?? null,
+          character_anim_hz: characterAnimationHz,
           character_anim_status: renderTelemetryStatus === 'measured'
             ? 'measured_render_telemetry'
             : renderTelemetryStatus,
           character_anim_updates: telemetryDeltas?.characterAnimationFrames ?? null,
+          character_anim_validation_mode: characterAnimationValidation.mode,
+          character_anim_validation: characterAnimationValidation,
           character_anim_measurement: {
             method: 'window.__CLAY_RENDER_TELEMETRY__ counter deltas / measurement elapsed',
             status: renderTelemetryStatus,
             elapsed_s: elapsed,
+            character_instances: characterAnimationInstances,
+            character_animation_hz_per_instance: characterAnimationHz,
+            character_animation_per_frame: characterAnimationPerFrame,
             counters_start: telemetryStart,
             counters_end: telemetryEnd,
             counter_deltas: telemetryDeltas,
@@ -989,7 +1046,7 @@ async function measureBrowser() {
           render_telemetry_ratios: telemetryRatios,
           first_interactive_s: navigation?.domContentLoadedEventEnd ? navigation.domContentLoadedEventEnd / 1000 : null,
           time_to_first_render_s: state?.firstRenderAt === null ? null : (state.firstRenderAt - state.documentStart) / 1000,
-          heap_peak_mb: heap.length ? Math.max(...heap) : null,
+          heap_peak_mb: heap.length ? Math.max(...heap) / (1024 * 1024) : null,
           heap_growth_per_lap_mb: null,
           draw_calls: drawCallsPerFrame.length ? Math.max(...drawCallsPerFrame) : 0,
           triangles_k: trianglesPerFrame.length ? Math.max(...trianglesPerFrame) / 1000 : 0,
@@ -1005,7 +1062,10 @@ async function measureBrowser() {
     });
     const measured = result?.result?.value;
     if (!measured || measured.canvas_count < 1 || measured.rendered_frames < 1) {
-      throw new Error(`headless renderer produced no measurable WebGL frames: ${JSON.stringify(measured)}`);
+      throw new Error(`headless renderer metrics evaluation failed: ${JSON.stringify({
+        measured,
+        exception: result?.exceptionDetails ?? null,
+      })}`);
     }
     const traceOffsetMs = Number.isFinite(traceAnchorPageMs) && traceAnchorTraceMs !== null
       ? traceAnchorTraceMs - traceAnchorPageMs

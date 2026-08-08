@@ -270,6 +270,7 @@ function remoteProbeScript(durationMs, inputSegments) {
       renderTelemetryStart: null, renderTelemetryEnd: null,
       rafInstalled: false, glInstalled: false,
       inputTimers: [],
+      characterAnimationInstances: null,
     };
     if (!state.rafInstalled) {
       const originalRaf = window.requestAnimationFrame.bind(window);
@@ -303,6 +304,9 @@ function remoteProbeScript(durationMs, inputSegments) {
     state.frames = [];
     state.drawCalls = 0;
     state.triangles = 0;
+    const hudValues = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
+    const standingMatch = (hudValues[2]?.textContent ?? '').match(/^\\d+\\/(\\d+)$/);
+    state.characterAnimationInstances = standingMatch ? Number(standingMatch[1]) : null;
     const snapshotRenderTelemetry = () => {
       const telemetry = window.__CLAY_RENDER_TELEMETRY__;
       return telemetry && Number.isFinite(telemetry.renderedFrames)
@@ -378,6 +382,8 @@ function summarizeRemote(measurement, kind, transport, url, fixtureName) {
   const first = measurement.frames[0]?.now ?? measurement.startedAt;
   const last = measurement.frames.at(-1)?.now ?? first;
   const elapsed = Math.max(0, last - first) / 1000;
+  const fpsP50 = percentile(fps, 50);
+  const fpsP05 = percentile(fps, 5);
   const telemetryStart = measurement.renderTelemetryStart;
   const telemetryEnd = measurement.renderTelemetryEnd;
   const telemetryDeltas = telemetryStart && telemetryEnd
@@ -403,13 +409,45 @@ function summarizeRemote(measurement, kind, transport, url, fixtureName) {
     }
     : null;
   const telemetryRenderedFrames = telemetryDeltaValid ? telemetryDeltas.renderedFrames : null;
+  const characterAnimationInstances = Number.isFinite(measurement.characterAnimationInstances)
+    && measurement.characterAnimationInstances > 0
+    ? measurement.characterAnimationInstances
+    : null;
+  const characterAnimationHz = telemetryHz?.characterAnimationFrames !== null
+    && telemetryHz?.characterAnimationFrames !== undefined
+    && characterAnimationInstances !== null
+    ? telemetryHz.characterAnimationFrames / characterAnimationInstances
+    : null;
+  const rawCharacterAnimationPerFrame = telemetryRenderedFrames > 0
+    ? telemetryDeltas.characterAnimationFrames / telemetryRenderedFrames
+    : null;
+  const characterAnimationPerFrame = rawCharacterAnimationPerFrame !== null && characterAnimationInstances !== null
+    ? rawCharacterAnimationPerFrame / characterAnimationInstances
+    : null;
   const telemetryRatios = telemetryRenderedFrames > 0
     ? {
       vehicleTransformPerFrame: telemetryDeltas.vehicleTransformUpdates / telemetryRenderedFrames,
       cameraPerFrame: telemetryDeltas.cameraUpdates / telemetryRenderedFrames,
-      characterAnimationPerFrame: telemetryDeltas.characterAnimationFrames / telemetryRenderedFrames,
+      characterAnimationPerFrame,
+      characterAnimationPerFrameRaw: rawCharacterAnimationPerFrame,
     }
     : null;
+  const characterAnimationValidation = fpsP05 > 24
+    ? {
+      mode: 'hz_12_window',
+      conclusion: '12Hz frequency is resolvable at this sampling rate',
+      fps_p05: fpsP05,
+      character_anim_hz: characterAnimationHz,
+      character_animation_per_frame: characterAnimationPerFrame,
+    }
+    : {
+      mode: 'quantization_ratio_proves_quantization_only',
+      conclusion: 'only quantization is tested; 12Hz frequency is not resolvable at this sampling rate',
+      fps_p05: fpsP05,
+      character_anim_hz: characterAnimationHz,
+      character_animation_per_frame: characterAnimationPerFrame,
+      max_per_frame_ratio: 0.95,
+    };
   return {
     meta: {
       fixture: fixtureName,
@@ -426,16 +464,18 @@ function summarizeRemote(measurement, kind, transport, url, fixtureName) {
       },
     },
     metrics: {
-      fps_p50: percentile(fps, 50),
-      fps_p05: percentile(fps, 5),
+      fps_p50: fpsP50,
+      fps_p05: fpsP05,
       frame_time_p99_ms: percentile(frameTimes, 99),
       long_frame_count: frameTimes.filter((value) => value > 33).length,
       gc_pause_max_ms: null,
-      character_anim_hz: telemetryHz?.characterAnimationFrames ?? null,
+      character_anim_hz: characterAnimationHz,
       character_anim_status: renderTelemetryStatus === 'measured'
         ? 'measured_render_telemetry'
         : renderTelemetryStatus,
       character_anim_updates: telemetryDeltas?.characterAnimationFrames ?? null,
+      character_anim_validation_mode: characterAnimationValidation.mode,
+      character_anim_validation: characterAnimationValidation,
       vehicle_transform_hz: telemetryHz?.vehicleTransformUpdates ?? null,
       camera_hz: telemetryHz?.cameraUpdates ?? null,
       render_telemetry_status: renderTelemetryStatus,
