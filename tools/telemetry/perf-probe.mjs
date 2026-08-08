@@ -19,6 +19,33 @@ const outputPath = process.argv[3] ?? 'loop/round-16/artifacts/perf-proxy.json';
 const device = process.argv[4] ?? 'proxy';
 const environment = process.argv[5] ?? process.env.PERF_ENV ?? 'local';
 const MEASUREMENT_SECONDS = 5;
+const HEAP_REQUIRED_LAPS = 5;
+const HEAP_RACE_LAPS = [3, 2];
+const HEAP_DRIVER_INPUT = {
+  throttle: 1,
+  // The page driver is keyboard-only: ArrowRight maps to the simulation's
+  // steer=-1 in src/ui/player-input.ts and is the stable circular route.
+  steer: 1,
+  brake: false,
+  reverse: false,
+  drift: false,
+  jump: false,
+};
+const FOUR_G_PROFILE = {
+  name: '4g-4mbps-20ms',
+  offline: false,
+  latency_ms: 20,
+  download_throughput_bps: 4 * 1024 * 1024 / 8,
+  upload_throughput_bps: 1 * 1024 * 1024 / 8,
+  connection_type: 'cellular4g',
+  cdp_method: 'Network.emulateNetworkConditions',
+};
+const UNTHROTTLED_PROFILE = {
+  offline: false,
+  latency: 0,
+  downloadThroughput: -1,
+  uploadThroughput: -1,
+};
 const fixture = await readFixture(fixturePath);
 const TICK_HZ = 120;
 const BUILD_ROOT = resolve(REPO_ROOT, 'build/out');
@@ -311,7 +338,6 @@ function browserProbeScript() {
     frameTriangles: new Map(),
     glDrawCalls: 0,
     triangles: 0,
-    heapSamples: [],
     firstRenderAt: null,
     documentStart: performance.now(),
     measurementStart: performance.now(),
@@ -319,6 +345,11 @@ function browserProbeScript() {
     textureBytes: 0,
     textureContexts: new Map(),
     renderTelemetryStart: null,
+    heapRunning: false,
+    heapSamples: [],
+    frameHeapSamples: [],
+    heapMeasurement: null,
+    lapProbe: null,
   };
   state.reset = () => {
     for (const timer of state.inputTimers) clearTimeout(timer);
@@ -330,7 +361,11 @@ function browserProbeScript() {
     state.frameTriangles = new Map();
     state.glDrawCalls = 0;
     state.triangles = 0;
+    state.heapRunning = false;
     state.heapSamples = [];
+    state.frameHeapSamples = [];
+    state.heapMeasurement = null;
+    state.lapProbe = null;
     state.measurementStart = performance.now();
     const telemetry = window.__CLAY_RENDER_TELEMETRY__;
     state.renderTelemetryStart = telemetry && Number.isFinite(telemetry.renderedFrames)
@@ -345,6 +380,88 @@ function browserProbeScript() {
       }
       : null;
   };
+  const readHeapMb = () => performance.memory
+    ? performance.memory.usedJSHeapSize / (1024 * 1024)
+    : null;
+  const readLapSnapshot = () => {
+    const values = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
+    const lapText = values[0]?.textContent ?? '';
+    const timeText = values[1]?.textContent ?? '';
+    const lapMatch = lapText.match(/^(\d+)\/(\d+)$/);
+    const current = lapMatch ? Number(lapMatch[1]) : null;
+    const total = lapMatch ? Number(lapMatch[2]) : null;
+    const time = Number.parseFloat(timeText);
+    return Number.isInteger(current) && Number.isInteger(total) && Number.isFinite(time)
+      ? { current, total, time }
+      : null;
+  };
+  const finishHeapMeasurement = (status, now) => {
+    state.heapRunning = false;
+    const startMb = state.heapSamples.find((sample) => Number.isFinite(sample)) ?? null;
+    const endMb = [...state.heapSamples].reverse().find((sample) => Number.isFinite(sample)) ?? null;
+    const deltaMb = startMb !== null && endMb !== null
+      ? Math.max(0, endMb - startMb)
+      : null;
+    state.heapMeasurement = {
+      ...state.heapMeasurement,
+      status,
+      endedAt: now,
+      completedLaps: state.heapMeasurement?.completedLaps ?? 0,
+      heapStartMb: startMb,
+      heapEndMb: endMb,
+      heapDeltaMb: deltaMb,
+      heapSampleCount: state.heapSamples.length,
+    };
+  };
+  state.beginLapHeapMeasurement = (targetLaps) => {
+    const initial = readLapSnapshot();
+    state.heapRunning = true;
+    state.heapSamples = [];
+    state.heapMeasurement = {
+      status: 'running',
+      targetLaps,
+      completedLaps: 0,
+      startedAt: performance.now(),
+      endedAt: null,
+      initial_snapshot: initial,
+    };
+    state.lapProbe = {
+      lastCurrent: initial?.current ?? null,
+      lastTime: initial?.time ?? null,
+      stableFinalFrames: 0,
+    };
+    const initialHeap = readHeapMb();
+    if (initialHeap !== null) state.heapSamples.push(initialHeap);
+  };
+  const observeLapHeapMeasurement = () => {
+    if (!state.heapRunning || !state.heapMeasurement || !state.lapProbe) return;
+    const snapshot = readLapSnapshot();
+    if (!snapshot) return;
+    const now = performance.now();
+    const probe = state.lapProbe;
+    if (probe.lastCurrent !== null && snapshot.current > probe.lastCurrent) {
+      state.heapMeasurement.completedLaps += snapshot.current - probe.lastCurrent;
+    }
+    if (snapshot.current === snapshot.total
+      && state.heapMeasurement.completedLaps === snapshot.total - 1) {
+      const timeStable = probe.lastTime !== null && Math.abs(snapshot.time - probe.lastTime) < 0.005;
+      probe.stableFinalFrames = timeStable ? probe.stableFinalFrames + 1 : 0;
+      // A finished SimSnapshot freezes currentTime. Require enough rendered
+      // frames for that freeze, so a rounded two-decimal HUD value during a
+      // live final lap is not mistaken for the finish line.
+      if (probe.stableFinalFrames >= 45) {
+        state.heapMeasurement.completedLaps += 1;
+      }
+    } else {
+      probe.stableFinalFrames = 0;
+    }
+    probe.lastCurrent = snapshot.current;
+    probe.lastTime = snapshot.time;
+    if (state.heapMeasurement.completedLaps >= state.heapMeasurement.targetLaps) {
+      finishHeapMeasurement('complete', now);
+    }
+  };
+  state.finishLapHeapMeasurement = (status) => finishHeapMeasurement(status, performance.now());
   state.scheduleInput = (segments, tickHz) => {
     const held = new Set();
     const codeFor = (input) => {
@@ -387,7 +504,11 @@ function browserProbeScript() {
       scriptMs: 0,
     };
     state.raf.push({ timestamp, now: frame.start, frame });
-    if (performance.memory) state.heapSamples.push(performance.memory.usedJSHeapSize / (1024 * 1024));
+    const heap = readHeapMb();
+    if (heap !== null) {
+      state.frameHeapSamples.push(heap);
+      if (state.heapRunning) state.heapSamples.push(heap);
+    }
     state.activeFrame = frame;
     try {
       return callback(timestamp);
@@ -395,6 +516,7 @@ function browserProbeScript() {
       frame.callbackEnd = performance.now();
       frame.scriptMs = Math.max(0, frame.callbackEnd - frame.start - frame.drawMs);
       state.activeFrame = null;
+      observeLapHeapMeasurement();
     }
   });
   const patchGl = (prototype) => {
@@ -592,6 +714,91 @@ function fixtureSegmentsForWindow() {
     .filter((segment) => segment.end_tick > segment.start_tick);
 }
 
+function heapDriverSegments() {
+  return [{ start_tick: 0, input: { ...HEAP_DRIVER_INPUT } }];
+}
+
+async function evaluatePage(session, expression) {
+  const result = await session.call('Runtime.evaluate', {
+    expression,
+    returnByValue: true,
+  });
+  return result?.result?.value;
+}
+
+async function measureHeapRace(session, serverPort, targetLaps) {
+  await session.call('Page.navigate', {
+    url: `http://127.0.0.1:${serverPort}/index.html?perfHeap=1`,
+  });
+  await sleep(1500);
+  await evaluatePage(
+    session,
+    `window.__R16_PERF__?.reset(); window.__R16_PERF__?.beginLapHeapMeasurement(${targetLaps}); window.__R16_PERF__?.scheduleInput(${JSON.stringify(heapDriverSegments())}, ${TICK_HZ});`,
+  );
+
+  // The timeout only prevents a broken page from hanging the entire probe.
+  // Completion is decided by the HUD's SimSnapshot-derived lap state, never by
+  // this duration or by an estimated lap time.
+  const timeoutMs = targetLaps * 30_000;
+  const deadline = Date.now() + timeoutMs;
+  let measurement = null;
+  while (Date.now() < deadline) {
+    await sleep(250);
+    measurement = await evaluatePage(
+      session,
+      'window.__R16_PERF__?.heapMeasurement ?? null',
+    );
+    if (measurement?.status && measurement.status !== 'running') break;
+  }
+  if (measurement?.status === 'running' || !measurement) {
+    measurement = await evaluatePage(
+      session,
+      "(() => { window.__R16_PERF__?.finishLapHeapMeasurement('timeout'); return window.__R16_PERF__?.heapMeasurement ?? null; })()",
+    );
+  }
+  return measurement;
+}
+
+async function measureHeapLaps(session, serverPort) {
+  const runs = [];
+  for (const targetLaps of HEAP_RACE_LAPS) {
+    const run = await measureHeapRace(session, serverPort, targetLaps);
+    runs.push(run ?? {
+      status: 'missing_measurement',
+      targetLaps,
+      completedLaps: 0,
+      heapDeltaMb: null,
+    });
+    if (run?.status !== 'complete' || run.completedLaps < targetLaps) break;
+  }
+  const lapsMeasured = runs.reduce(
+    (total, run) => total + Math.max(0, Number(run?.completedLaps) || 0),
+    0,
+  );
+  const perRunGrowth = runs
+    .filter((run) => run?.status === 'complete'
+      && Number(run.completedLaps) > 0
+      && Number.isFinite(run.heapDeltaMb))
+    .map((run) => run.heapDeltaMb / run.completedLaps);
+  const fullRun = lapsMeasured >= HEAP_REQUIRED_LAPS
+    && runs.length === HEAP_RACE_LAPS.length
+    && runs.every((run, index) => run?.status === 'complete' && run.completedLaps >= HEAP_RACE_LAPS[index]);
+  return {
+    status: !fullRun
+      ? 'incomplete_five_lap_run'
+      : perRunGrowth.length === runs.length
+        ? 'measured'
+        : 'missing_heap_measurement',
+    lapsMeasured,
+    requiredLaps: HEAP_REQUIRED_LAPS,
+    method: 'mean of each completed race-session heap delta divided by that session\'s SimSnapshot lap count',
+    growthPerLapMb: fullRun && perRunGrowth.length === runs.length
+      ? perRunGrowth.reduce((sum, value) => sum + value, 0) / perRunGrowth.length
+      : null,
+    runs,
+  };
+}
+
 async function measureBrowser() {
   const chromePath = await findChrome();
   const { server, port: serverPort } = await startStaticServer();
@@ -615,6 +822,7 @@ async function measureBrowser() {
     session = new CdpSession(page.webSocketDebuggerUrl);
     await session.connect();
     await session.call('Page.enable');
+    await session.call('Network.enable');
     await session.call('Runtime.enable');
     await session.call('Page.addScriptToEvaluateOnNewDocument', { source: browserProbeScript() });
     await session.call('Emulation.setDeviceMetricsOverride', {
@@ -623,9 +831,19 @@ async function measureBrowser() {
       deviceScaleFactor: 1,
       mobile: false,
     });
+    await session.call('Network.emulateNetworkConditions', {
+      offline: FOUR_G_PROFILE.offline,
+      latency: FOUR_G_PROFILE.latency_ms,
+      downloadThroughput: FOUR_G_PROFILE.download_throughput_bps,
+      uploadThroughput: FOUR_G_PROFILE.upload_throughput_bps,
+      connectionType: FOUR_G_PROFILE.connection_type,
+    });
     await session.call('Page.navigate', { url: `http://127.0.0.1:${serverPort}/index.html` });
     await sleep(1500);
     const segments = fixtureSegmentsForWindow();
+    // Network throttling belongs to §3.1/§3.4 load timing only. Disable it
+    // before the short render window so §2/§4 are not network-throttled.
+    await session.call('Network.emulateNetworkConditions', UNTHROTTLED_PROFILE);
     await session.call('Tracing.start', {
       categories: 'disabled-by-default-v8.gc,blink.user_timing',
       transferMode: 'ReturnAsStream',
@@ -716,7 +934,7 @@ async function measureBrowser() {
           }
           : null;
         const navigation = performance.getEntriesByType('navigation')[0];
-        const heap = state?.heapSamples ?? [];
+        const heap = state?.frameHeapSamples ?? [];
         const drawCallsPerFrame = state?.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
         const trianglesPerFrame = state?.frameTriangles ? [...state.frameTriangles.values()] : [];
         const frameSamples = raf.slice(1).map((entry, index) => {
@@ -772,7 +990,7 @@ async function measureBrowser() {
           first_interactive_s: navigation?.domContentLoadedEventEnd ? navigation.domContentLoadedEventEnd / 1000 : null,
           time_to_first_render_s: state?.firstRenderAt === null ? null : (state.firstRenderAt - state.documentStart) / 1000,
           heap_peak_mb: heap.length ? Math.max(...heap) : null,
-          heap_growth_per_lap_mb: heap.length > 1 ? Math.max(0, heap.at(-1) - heap[0]) : null,
+          heap_growth_per_lap_mb: null,
           draw_calls: drawCallsPerFrame.length ? Math.max(...drawCallsPerFrame) : 0,
           triangles_k: trianglesPerFrame.length ? Math.max(...trianglesPerFrame) / 1000 : 0,
           texture_memory_mb: (state?.textureBytes ?? 0) / (1024 * 1024),
@@ -835,8 +1053,12 @@ async function measureBrowser() {
         attribution_note: 'GC could not be aligned to the p99 frame because the trace anchor was unavailable.',
       };
     }
+    const heapMeasurement = await measureHeapLaps(session, serverPort);
     return {
       ...measured,
+      heap_growth_per_lap_mb: heapMeasurement.growthPerLapMb,
+      heap_measurement_status: heapMeasurement.status,
+      heap_measurement: heapMeasurement,
       chrome_path: chromePath,
       gc_pause_max_ms: gcPauseMaxMs(gcEvents),
       gc_pause_max_event: maxGcEvent,
@@ -872,6 +1094,13 @@ const report = {
     device,
     device_note: 'Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement',
     measurement_method: 'External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
+    network_profile: FOUR_G_PROFILE,
+    render_measurement_network: 'unthrottled_after_load',
+    laps_required: HEAP_REQUIRED_LAPS,
+    laps_measured: measurementMetrics.heap_measurement?.lapsMeasured ?? 0,
+    heap_measurement_status: measurementMetrics.heap_measurement?.status ?? 'missing_measurement',
+    heap_growth_measurement: measurementMetrics.heap_measurement?.method ?? null,
+    heap_lap_runs: measurementMetrics.heap_measurement?.runs ?? [],
     render_telemetry: {
       global: '__CLAY_RENDER_TELEMETRY__',
       counters: ['renderedFrames', 'vehicleTransformUpdates', 'cameraUpdates', 'characterAnimationFrames'],

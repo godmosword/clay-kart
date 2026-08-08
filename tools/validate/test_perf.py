@@ -95,6 +95,19 @@ def test_measured_render_telemetry_rates_pass_section_four():
 
 def test_missing_gc_and_texture_measurements_are_explicit_failures():
     verdict = build_verdict(calculate_metrics({
+        "meta": {
+            "laps_measured": 5,
+            "heap_measurement_status": "measured",
+            "heap_growth_measurement": "mean of each completed race-session heap delta divided by that session's SimSnapshot lap count",
+            "network_profile": {
+                "name": "4g-4mbps-20ms",
+                "latency_ms": 20,
+                "download_throughput_bps": 524288,
+                "upload_throughput_bps": 131072,
+                "connection_type": "cellular4g",
+                "cdp_method": "Network.emulateNetworkConditions",
+            },
+        },
         "metrics": {
             "character_anim_hz": 12,
             "character_anim_status": "not_applicable_no_character_animation",
@@ -134,4 +147,57 @@ def test_measured_zero_for_gc_and_texture_is_a_real_pass():
     for metric_id in ("2.5", "5.5"):
         check = next(check for check in verdict["checks"] if check["id"] == metric_id)
         assert check["actual"] == 0.0
+        assert check["status"] == "PASS"
+
+
+def test_heap_growth_is_missing_until_five_simulation_laps_are_recorded():
+    verdict = build_verdict(calculate_metrics({
+        "meta": {
+            "laps_measured": 4,
+            "heap_measurement_status": "incomplete_five_lap_run",
+            "heap_growth_measurement": "mean of each completed race-session heap delta divided by that session's SimSnapshot lap count",
+        },
+        "metrics": {"heap_growth_per_lap_mb": 0.1},
+    }))
+
+    check = next(check for check in verdict["checks"] if check["id"] == "5.2")
+    assert check["actual"] == 0.0
+    assert check["status"] == "FAIL"
+
+
+def test_load_timings_require_a_recorded_four_g_profile():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "first_interactive_s": 0.1,
+            "time_to_first_render_s": 0.1,
+        },
+    }))
+
+    for metric_id in ("3.1", "3.4"):
+        check = next(check for check in verdict["checks"] if check["id"] == metric_id)
+        assert check["actual"] == 0.0
+        assert check["status"] == "FAIL"
+
+
+def test_load_timings_are_valid_with_recorded_four_g_profile():
+    verdict = build_verdict(calculate_metrics({
+        "meta": {
+            "network_profile": {
+                "name": "4g-4mbps-20ms",
+                "latency_ms": 20,
+                "download_throughput_bps": 524288,
+                "upload_throughput_bps": 131072,
+                "connection_type": "cellular4g",
+                "cdp_method": "Network.emulateNetworkConditions",
+            },
+        },
+        "metrics": {
+            "first_interactive_s": 0.1,
+            "time_to_first_render_s": 0.1,
+        },
+    }))
+
+    for metric_id in ("3.1", "3.4"):
+        check = next(check for check in verdict["checks"] if check["id"] == metric_id)
+        assert check["actual"] == 0.1
         assert check["status"] == "PASS"

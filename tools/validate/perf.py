@@ -31,7 +31,62 @@ WINDOWS: tuple[tuple[str, str, float, float, int], ...] = (
 # These metrics cannot honestly be inferred as zero.  A zero from a real
 # probe means "no pause/allocation was observed"; a missing value means the
 # probe did not measure the resource at all and must fail explicitly.
-REQUIRED_MEASUREMENTS = frozenset({"gc_pause_max_ms", "texture_memory_mb"})
+REQUIRED_MEASUREMENTS = frozenset({
+    "gc_pause_max_ms",
+    "texture_memory_mb",
+    "heap_growth_per_lap_mb",
+    "first_interactive_s",
+    "time_to_first_render_s",
+})
+
+
+def _has_full_heap_lap_measurement(doc: dict[str, Any]) -> bool:
+    meta = doc.get("meta")
+    if not isinstance(meta, dict):
+        return False
+    try:
+        laps_measured = float(meta.get("laps_measured"))
+    except (TypeError, ValueError):
+        return False
+    return (
+        math.isfinite(laps_measured)
+        and laps_measured >= 5
+        and meta.get("heap_measurement_status") == "measured"
+        and isinstance(meta.get("heap_growth_measurement"), str)
+        and bool(meta["heap_growth_measurement"])
+    )
+
+
+def _has_four_g_profile(doc: dict[str, Any]) -> bool:
+    meta = doc.get("meta")
+    profile = meta.get("network_profile") if isinstance(meta, dict) else None
+    if not isinstance(profile, dict):
+        return False
+    required = {
+        "name",
+        "latency_ms",
+        "download_throughput_bps",
+        "upload_throughput_bps",
+        "connection_type",
+        "cdp_method",
+    }
+    if not required.issubset(profile):
+        return False
+    try:
+        latency = float(profile["latency_ms"])
+        download = float(profile["download_throughput_bps"])
+        upload = float(profile["upload_throughput_bps"])
+    except (TypeError, ValueError):
+        return False
+    return (
+        math.isfinite(latency)
+        and math.isfinite(download)
+        and math.isfinite(upload)
+        and latency >= 0
+        and download > 0
+        and upload > 0
+        and profile["cdp_method"] == "Network.emulateNetworkConditions"
+    )
 
 
 def _finite(value: Any) -> float:
@@ -59,7 +114,20 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | None]:
     metrics: dict[str, float | None] = {}
     for _, metric, _, _, _ in WINDOWS:
         raw = values.get(metric)
-        if metric in REQUIRED_MEASUREMENTS:
+        measured = (
+            metric not in {"heap_growth_per_lap_mb", "first_interactive_s", "time_to_first_render_s"}
+            or (
+                metric == "heap_growth_per_lap_mb"
+                and _has_full_heap_lap_measurement(doc)
+            )
+            or (
+                metric in {"first_interactive_s", "time_to_first_render_s"}
+                and _has_four_g_profile(doc)
+            )
+        )
+        if not measured:
+            metrics[metric] = None
+        elif metric in REQUIRED_MEASUREMENTS:
             metrics[metric] = _required_finite(raw)
         else:
             metrics[metric] = _finite(raw)
