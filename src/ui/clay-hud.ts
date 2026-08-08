@@ -1,7 +1,7 @@
 /**
  * ui-hud —— 黏土化圈數／計時／名次牌（BAR-VISUAL §5.12，機械驗收 §1.3）。
  *
- * 可機械判定：底板 `#f0e4cd`、數字 `#3a5f96`、告警 `#ff8c2b`；
+ * 可機械判定：底板 `#f0e4cd`、數字 `#3a5f96`、告警 `#f49862`；
  * 禁純白底、禁半透明（opacity=1、無 backdrop-filter）；
  * 底板短邊 / 畫面短邊 ≤ 1/8（R28：實作目標 ≤ 0.11，留約 12% 餘裕）。
  *
@@ -15,7 +15,7 @@ import { playerStanding } from '@ui/race-standing';
 export const HUD_COLORS = {
   board: '#f0e4cd',
   number: '#3a5f96',
-  alert: '#ff8c2b',
+  alert: '#f49862',
 } as const;
 
 /**

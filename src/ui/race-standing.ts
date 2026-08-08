@@ -3,6 +3,12 @@
  * 不寫回模擬、不依賴物理內部狀態（FROZEN 的 world.ts 只讀契約面）。
  *
  * 進度：完成圈數 × 2π + 目前軌道角（與 world 的 atan2(z-cz, x-cx) 同慣例）。
+ *
+ * **前提（與 physics 鬆耦合）：起終點線必須在 track angle 0。**
+ * `world.ts` 跨線判定是 `#trackAngle ≥ START_LINE_RETURN_ANGLE (1.75π)` 且
+ * `angle ≤ START_LINE_CROSS_ANGLE (0.25π)`，線在 0，所以本式成立。
+ * 刻意不 import 凍結的 physics——兩邊沒有編譯期綁定；若起終點線搬走，
+ * 名次會靜靜算錯，且不會有 typecheck 失敗。見 `test:race-standing`。
  */
 import type { SimSnapshot } from '@contract/sim';
 

@@ -1,80 +1,28 @@
 #!/usr/bin/env node
 /**
- * 遊戲畫面截圖器。
+ * 場景靜態量測（R30 Cursor）：增減場景物件後回報用的便宜探針。
  *
- * `render-components.mjs` 拍的是拍攝台上的單一元件，證明不了「元件裝進遊戲
- * 之後長什麼樣」——R18／R19 兩輪的元件圖都很正常，但遊戲畫面跑的一直是
- * W1 方塊車。這支腳本拍的是**真的跑起來的遊戲**（`build/out/`），跟
- * `perf-probe.mjs` 量的是同一份產物。
- *
- * 沿用 R16 的 raw CDP + headless Chrome 做法，不新增 npm 依賴。
+ * 載頁 → 等幾幀 → 讀每幀 WebGL draw call / 三角形峰值。
+ * **不跑圈、不節流、不量 fps／heap**——目標數秒內結束。
+ * 超標只回報數字，exit 0（修法在視覺端，見 BAR-PERF §5.3／BACKLOG）。
  *
  * Usage:
- *   node tools/visual/game-shot.mjs --out build/visual/game.png \
- *     [--seconds 3] [--keys ArrowUp,ArrowRight] [--width 1280] [--height 720]
+ *   npm run build && node tools/visual/scene-stats.mjs
+ *   npm run scene-stats
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve, sep } from 'node:path';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { join, resolve, sep, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../..');
 const BUILD_ROOT = resolve(REPO_ROOT, 'build/out');
-
-/** `player-input.ts` 的鍵盤對照表用 `code`，windowsVirtualKeyCode 只影響舊式事件。 */
-const KEY_CODES = {
-  ArrowUp: 38,
-  ArrowDown: 40,
-  ArrowLeft: 37,
-  ArrowRight: 39,
-  ControlLeft: 17,
-  ShiftLeft: 16,
-  Space: 32,
-};
-
-function parseArgs(argv) {
-  const options = {
-    out: resolve(REPO_ROOT, 'build/visual/game.png'),
-    seconds: 3,
-    keys: [],
-    width: 1280,
-    height: 720,
-  };
-  for (let i = 2; i < argv.length; i += 1) {
-    const arg = argv[i];
-    const next = argv[i + 1];
-    if (arg === '--out' && next) {
-      options.out = resolve(next);
-      i += 1;
-    } else if (arg === '--seconds' && next) {
-      options.seconds = Number(next);
-      i += 1;
-    } else if (arg === '--keys' && next) {
-      options.keys = next.split(',').map((key) => key.trim()).filter(Boolean);
-      i += 1;
-    } else if (arg === '--width' && next) {
-      options.width = Number(next);
-      i += 1;
-    } else if (arg === '--height' && next) {
-      options.height = Number(next);
-      i += 1;
-    } else if (arg === '--help' || arg === '-h') {
-      console.log(
-        'Usage: node tools/visual/game-shot.mjs [--out <png>] [--seconds <n>] [--keys A,B] [--width <px>] [--height <px>]',
-      );
-      process.exit(0);
-    } else {
-      throw new Error(`unknown arg: ${arg}`);
-    }
-  }
-  for (const key of options.keys) {
-    if (!(key in KEY_CODES)) throw new Error(`unsupported key: ${key}`);
-  }
-  return options;
-}
+/** §5.3 預算——只印在報告裡，不據此 fail。 */
+const DRAW_CALLS_BUDGET = 150;
+const TRIANGLES_K_BUDGET = 400;
 
 function sleep(ms) {
   return new Promise((done) => setTimeout(done, ms));
@@ -94,17 +42,16 @@ async function findChrome() {
       await access(candidate);
       return candidate;
     } catch {
-      // next candidate
+      // next
     }
   }
-  throw new Error('no Chrome/Chromium executable available for the game screenshot harness');
+  throw new Error('no Chrome/Chromium for scene-stats');
 }
 
 function mimeType(path) {
   if (path.endsWith('.html')) return 'text/html; charset=utf-8';
   if (path.endsWith('.js')) return 'text/javascript; charset=utf-8';
   if (path.endsWith('.css')) return 'text/css; charset=utf-8';
-  if (path.endsWith('.json')) return 'application/json; charset=utf-8';
   return 'application/octet-stream';
 }
 
@@ -166,7 +113,7 @@ async function waitForPageTarget(port) {
       const page = targets.find((target) => target.type === 'page');
       if (page) return page;
     } catch {
-      // Chrome still starting
+      // starting
     }
     await sleep(100);
   }
@@ -178,24 +125,10 @@ class CdpSession {
   #nextId = 0;
   #pending = new Map();
 
-  pageErrors = [];
-
   constructor(url) {
     this.#socket = new WebSocket(url);
     this.#socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
-      if (message.method === 'Runtime.consoleAPICalled' && message.params?.type === 'error') {
-        const text = (message.params.args ?? [])
-          .map((arg) => arg.value ?? arg.description ?? '')
-          .join(' ');
-        if (text.trim()) this.pageErrors.push(`console.error: ${text}`);
-        return;
-      }
-      if (message.method === 'Runtime.exceptionThrown') {
-        const details = message.params?.exceptionDetails;
-        this.pageErrors.push(`exception: ${details?.exception?.description ?? details?.text ?? ''}`);
-        return;
-      }
       const pending = this.#pending.get(message.id);
       if (!pending) return;
       this.#pending.delete(message.id);
@@ -224,12 +157,57 @@ class CdpSession {
   }
 }
 
+/** 最小 WebGL 計數——只為 draw_calls／triangles，不做 texture／heap。 */
+function sceneProbeScript() {
+  return `(() => {
+  const state = {
+    frameIndex: 0,
+    frameDrawCalls: new Map(),
+    frameTriangles: new Map(),
+    glFrames: new Set(),
+  };
+  const originalRaf = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = (callback) => originalRaf((ts) => {
+    state.frameIndex += 1;
+    try {
+      return callback(ts);
+    } finally {
+      // frame closed
+    }
+  });
+  const patchGl = (prototype) => {
+    if (!prototype || prototype.__claySceneStatsPatched) return;
+    Object.defineProperty(prototype, '__claySceneStatsPatched', { value: true });
+    const originalDrawElements = prototype.drawElements;
+    const originalDrawArrays = prototype.drawArrays;
+    const bump = (gl, mode, count) => {
+      const i = state.frameIndex;
+      state.glFrames.add(i);
+      state.frameDrawCalls.set(i, (state.frameDrawCalls.get(i) ?? 0) + 1);
+      if (mode === gl.TRIANGLES) {
+        state.frameTriangles.set(i, (state.frameTriangles.get(i) ?? 0) + count / 3);
+      }
+    };
+    prototype.drawElements = function(mode, count, ...args) {
+      bump(this, mode, count);
+      return originalDrawElements.call(this, mode, count, ...args);
+    };
+    prototype.drawArrays = function(mode, first, count, ...args) {
+      bump(this, mode, count);
+      return originalDrawArrays.call(this, mode, first, count, ...args);
+    };
+  };
+  patchGl(WebGLRenderingContext.prototype);
+  if (window.WebGL2RenderingContext) patchGl(WebGL2RenderingContext.prototype);
+  window.__CLAY_SCENE_STATS__ = state;
+})();`;
+}
+
 async function main() {
-  const options = parseArgs(process.argv);
+  const started = Date.now();
   const { server, port } = await startStaticServer();
   const chromePath = await findChrome();
-  const userDataDir = await mkdtemp(join(tmpdir(), 'clay-kart-game-shot-'));
-
+  const userDataDir = await mkdtemp(join(tmpdir(), 'clay-kart-scene-stats-'));
   const child = spawn(
     chromePath,
     [
@@ -237,10 +215,9 @@ async function main() {
       '--no-sandbox',
       '--disable-extensions',
       '--disable-background-networking',
-      // 同 render-components.mjs：沒有 GPU 也拍得出來，且跨機器一致。
       '--use-gl=angle',
       '--use-angle=swiftshader',
-      `--window-size=${options.width},${options.height}`,
+      '--window-size=800,600',
       '--remote-debugging-address=127.0.0.1',
       '--remote-debugging-port=0',
       `--user-data-dir=${userDataDir}`,
@@ -257,17 +234,17 @@ async function main() {
     await session.connect();
     await session.call('Page.enable');
     await session.call('Runtime.enable');
+    await session.call('Page.addScriptToEvaluateOnNewDocument', { source: sceneProbeScript() });
     await session.call('Emulation.setDeviceMetricsOverride', {
-      width: options.width,
-      height: options.height,
+      width: 800,
+      height: 600,
       deviceScaleFactor: 1,
       mobile: false,
     });
     await session.call('Page.navigate', { url: `http://127.0.0.1:${port}/index.html` });
 
-    // 等 canvas 真的出現，再開始按鍵與計時。
     let ready = false;
-    for (let attempt = 0; attempt < 150; attempt += 1) {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
       const probe = await session.call('Runtime.evaluate', {
         expression: 'Boolean(document.querySelector("#app canvas"))',
         returnByValue: true,
@@ -276,63 +253,62 @@ async function main() {
         ready = true;
         break;
       }
-      await sleep(100);
+      await sleep(50);
     }
-    if (!ready) throw new Error('game never mounted a canvas');
+    if (!ready) throw new Error('canvas never mounted');
 
-    for (const key of options.keys) {
-      await session.call('Input.dispatchKeyEvent', {
-        type: 'keyDown',
-        code: key,
-        key,
-        windowsVirtualKeyCode: KEY_CODES[key],
-        nativeVirtualKeyCode: KEY_CODES[key],
-      });
-    }
+    // 等幾幀把 AI 車 ensure 進來
+    await sleep(1500);
 
-    await sleep(options.seconds * 1000);
-
-    const shot = await session.call('Page.captureScreenshot', { format: 'png' });
-    if (session.pageErrors.length > 0) {
-      throw new Error(`page reported errors:\n  ${session.pageErrors.join('\n  ')}`);
-    }
-    await mkdir(dirname(options.out), { recursive: true });
-    await writeFile(options.out, Buffer.from(shot.data, 'base64'));
-
-    // 必須讀 clay-hud——`#app div` 會先命中 render 裡仍在 DOM、已被
-    // display:none 的 W1 monospace stub（沒有 POS，也不是 §5.12 那塊牌）。
-    const state = await session.call('Runtime.evaluate', {
+    const measured = await session.call('Runtime.evaluate', {
       expression: `(() => {
-        const hud = document.querySelector('[data-role="clay-hud"]');
-        if (!hud) return { error: 'missing clay-hud', hud: '' };
-        const text = (hud.innerText || hud.textContent || '').trim();
-        return { hud: text, hasPos: /\\bPOS\\b/i.test(text) };
+        const state = window.__CLAY_SCENE_STATS__;
+        if (!state) return { error: 'missing __CLAY_SCENE_STATS__' };
+        const draws = state.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
+        const tris = state.frameTriangles ? [...state.frameTriangles.values()] : [];
+        return {
+          canvas_count: document.querySelectorAll('canvas').length,
+          sampled_frames: state.glFrames?.size ?? 0,
+          draw_calls: draws.length ? Math.max(...draws) : 0,
+          triangles_k: tris.length ? Math.max(...tris) / 1000 : 0,
+        };
       })()`,
       returnByValue: true,
     });
-    const hudState = state?.result?.value ?? { error: 'evaluate failed', hud: '', hasPos: false };
-    if (hudState.error) {
-      throw new Error(`game-shot HUD probe: ${hudState.error}`);
+
+    const data = measured?.result?.value;
+    if (!data || data.error || data.canvas_count < 1 || data.sampled_frames < 1) {
+      throw new Error(`scene-stats measure failed: ${JSON.stringify(data)}`);
     }
-    if (!hudState.hasPos) {
-      throw new Error(
-        `clay-hud text missing POS row (got ${JSON.stringify(hudState.hud)}); ` +
-          'likely still reading the hidden W1 monospace stub',
+
+    const elapsed_s = (Date.now() - started) / 1000;
+    const report = {
+      ok: true,
+      mode: 'scene-only',
+      draw_calls: data.draw_calls,
+      triangles_k: Number(data.triangles_k.toFixed(3)),
+      budgets: {
+        draw_calls: DRAW_CALLS_BUDGET,
+        triangles_k: TRIANGLES_K_BUDGET,
+      },
+      over_budget: {
+        draw_calls: data.draw_calls > DRAW_CALLS_BUDGET,
+        triangles_k: data.triangles_k > TRIANGLES_K_BUDGET,
+      },
+      sampled_frames: data.sampled_frames,
+      elapsed_s: Number(elapsed_s.toFixed(2)),
+      note:
+        '超標只回報不修（§5.3 在視覺端）。增減場景物件的 Cursor 回報必須附 draw_calls 與 triangles_k。',
+    };
+    console.log(JSON.stringify(report, null, 2));
+    if (report.over_budget.draw_calls || report.over_budget.triangles_k) {
+      console.error(
+        `\nscene-stats: OVER BUDGET (reporting only) draw_calls=${report.draw_calls}/${DRAW_CALLS_BUDGET} ` +
+          `triangles_k=${report.triangles_k}/${TRIANGLES_K_BUDGET}`,
       );
+    } else {
+      console.error('\nscene-stats: within §5.3/§5.4 budgets');
     }
-    console.log(
-      JSON.stringify(
-        {
-          ok: true,
-          out: options.out,
-          seconds: options.seconds,
-          keys: options.keys,
-          hud: hudState.hud,
-        },
-        null,
-        2,
-      ),
-    );
   } finally {
     session?.close();
     child.kill('SIGTERM');

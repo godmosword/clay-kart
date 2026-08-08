@@ -2,7 +2,7 @@
 /**
  * ui-hud 機械驗收（BAR-VISUAL §1.3 / §5.12）。
  *
- * 可程式判定：底板 `#f0e4cd`、數字 `#3a5f96`、告警 `#ff8c2b`；
+ * 可程式判定：底板 `#f0e4cd`、數字 `#3a5f96`、告警 `#f49862`；
  * 禁純白底；opacity 必須為 1、無 backdrop-filter；
  * 底板短邊 / 畫面短邊 ≤ 1/8（§1.3）；R28 實作目標收緊為 ≤ 0.11。
  *
@@ -27,7 +27,7 @@ const BUILD_ROOT = resolve(REPO_ROOT, 'build/out');
 const EXPECT = {
   board: { r: 0xf0, g: 0xe4, b: 0xcd },
   number: { r: 0x3a, g: 0x5f, b: 0x96 },
-  alert: { r: 0xff, g: 0x8c, b: 0x2b },
+  alert: { r: 0xf4, g: 0x98, b: 0x62 },
 };
 const RGB_TOL = 2;
 
@@ -245,45 +245,77 @@ async function main() {
     }
     if (!ready) throw new Error('clay-hud board never mounted');
 
-    // 等一幀 layout / fitBoard
-    await sleep(200);
-
-    const measured = await session.call('Runtime.evaluate', {
-      expression: `(() => {
-        const board = document.querySelector('[data-role="clay-hud-board"]');
-        const root = document.querySelector('[data-role="clay-hud"]');
-        const mount = document.getElementById('app');
-        if (!board || !root || !mount) return { error: 'missing nodes' };
-        const bs = getComputedStyle(board);
-        const rs = getComputedStyle(root);
-        const values = [...document.querySelectorAll('[data-role="clay-hud-value"]')].map((el) => {
-          const s = getComputedStyle(el);
-          return { color: s.color, opacity: s.opacity, backdrop: s.backdropFilter || s.webkitBackdropFilter || 'none' };
-        });
-        const alert = document.querySelector('[data-role="clay-hud-alert"]');
-        const as_ = alert ? getComputedStyle(alert) : null;
-        const rect = board.getBoundingClientRect();
-        // 用未 scale 的 offset 量「底板」本體；scale 是為了守 1/8，視覺短邊看 bounding
-        const visualShort = Math.min(rect.width, rect.height);
-        const viewShort = Math.min(mount.clientWidth, mount.clientHeight);
-        return {
-          boardBg: bs.backgroundColor,
-          boardOpacity: bs.opacity,
-          boardBackdrop: bs.backdropFilter || bs.webkitBackdropFilter || 'none',
-          rootOpacity: rs.opacity,
-          rootBackdrop: rs.backdropFilter || rs.webkitBackdropFilter || 'none',
-          values,
-          alertColor: as_ ? as_.color : null,
-          alertOpacity: as_ ? as_.opacity : null,
-          visualShort,
-          viewShort,
-          ratio: viewShort > 0 ? visualShort / viewShort : null,
-        };
-      })()`,
-      returnByValue: true,
-    });
-
-    const data = measured?.result?.value;
+    // 等首幀 update 寫入 POS（bootstrap 接 3 台 AI → 場上 4 車）
+    let data = null;
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const measured = await session.call('Runtime.evaluate', {
+        expression: `(() => {
+          const board = document.querySelector('[data-role="clay-hud-board"]');
+          const root = document.querySelector('[data-role="clay-hud"]');
+          const mount = document.getElementById('app');
+          if (!board || !root || !mount) return { error: 'missing nodes' };
+          const bs = getComputedStyle(board);
+          const rs = getComputedStyle(root);
+          const valueEls = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
+          const values = valueEls.map((el) => {
+            const s = getComputedStyle(el);
+            return {
+              text: (el.textContent || '').trim(),
+              color: s.color,
+              opacity: s.opacity,
+              backdrop: s.backdropFilter || s.webkitBackdropFilter || 'none',
+            };
+          });
+          // 依 DOM 列順序（LAP/TIME/POS/BEST），含 alert 列
+          const rowLabels = [...board.children].map((row) => {
+            const label = row.querySelector('[data-role="clay-hud-label"], [data-role="clay-hud-alert"]');
+            return (label?.textContent || '').trim();
+          });
+          const alerts = [...document.querySelectorAll('[data-role="clay-hud-alert"]')].map((el) =>
+            (el.textContent || '').trim(),
+          );
+          const alert = document.querySelector('[data-role="clay-hud-alert"]');
+          const as_ = alert ? getComputedStyle(alert) : null;
+          const rect = board.getBoundingClientRect();
+          const visualShort = Math.min(rect.width, rect.height);
+          const viewShort = Math.min(mount.clientWidth, mount.clientHeight);
+          const foreign = [...mount.children]
+            .filter((el) => el instanceof HTMLElement)
+            .filter((el) => el.tagName !== 'CANVAS')
+            .filter((el) => {
+              const role = el.dataset.role;
+              return role !== 'clay-hud' && role !== 'touch-controls';
+            })
+            .map((el) => ({
+              role: el.dataset.role || null,
+              display: getComputedStyle(el).display,
+              ariaHidden: el.getAttribute('aria-hidden'),
+            }));
+          return {
+            boardBg: bs.backgroundColor,
+            boardOpacity: bs.opacity,
+            boardBackdrop: bs.backdropFilter || bs.webkitBackdropFilter || 'none',
+            rootOpacity: rs.opacity,
+            rootBackdrop: rs.backdropFilter || rs.webkitBackdropFilter || 'none',
+            values,
+            rowLabels,
+            alerts,
+            alertColor: as_ ? as_.color : null,
+            alertOpacity: as_ ? as_.opacity : null,
+            visualShort,
+            viewShort,
+            ratio: viewShort > 0 ? visualShort / viewShort : null,
+            foreignOverlays: foreign,
+          };
+        })()`,
+        returnByValue: true,
+      });
+      data = measured?.result?.value;
+      if (data && !data.error && Array.isArray(data.values) && data.values[2]?.text) {
+        break;
+      }
+      await sleep(100);
+    }
     if (!data || data.error) throw new Error(`measure failed: ${JSON.stringify(data)}`);
 
     const failures = [];
@@ -326,13 +358,46 @@ async function main() {
       }
     }
     if (!near(parseRgb(data.alertColor), EXPECT.alert)) {
-      failures.push(`alert color want #ff8c2b, got ${data.alertColor}`);
+      failures.push(`alert color want #f49862, got ${data.alertColor}`);
     }
     if (data.ratio == null || !(data.ratio <= MAX_SHORT_RATIO + 1e-6)) {
       failures.push(
         `board short/view short must be ≤ ${MAX_SHORT_RATIO}, got ${data.ratio} ` +
           `(visualShort=${data.visualShort}, viewShort=${data.viewShort}; §1.3 ceiling is 1/8)`,
       );
+    }
+
+    // —— 行為斷言（R31 harness 收緊）——
+    const EXPECTED_LABELS = ['LAP', 'TIME', 'POS', 'BEST'];
+    if (!Array.isArray(data.rowLabels) || data.rowLabels.join('|') !== EXPECTED_LABELS.join('|')) {
+      failures.push(
+        `row labels want ${EXPECTED_LABELS.join('/')}, got ${JSON.stringify(data.rowLabels)}`,
+      );
+    }
+    if (!Array.isArray(data.alerts) || data.alerts.length !== 1 || data.alerts[0] !== 'BEST') {
+      failures.push(`expected exactly one clay-hud-alert "BEST", got ${JSON.stringify(data.alerts)}`);
+    }
+    // bootstrap DEFAULT_AI_OPPONENTS = 3 → 場上 4 車；POS 形如 n/4
+    const posText = data.values?.[2]?.text ?? '';
+    if (!/^[1-4]\/4$/.test(posText)) {
+      failures.push(`POS value want n/4 (4 karts), got ${JSON.stringify(posText)}`);
+    }
+    if (!Array.isArray(data.foreignOverlays)) {
+      failures.push('missing foreignOverlays probe');
+    } else {
+      for (const overlay of data.foreignOverlays) {
+        if (overlay.display !== 'none') {
+          failures.push(
+            `foreign overlay must be display:none (W1 monospace HUD), got ` +
+              `role=${JSON.stringify(overlay.role)} display=${overlay.display}`,
+          );
+        }
+        if (overlay.ariaHidden !== 'true') {
+          failures.push(
+            `foreign overlay must aria-hidden=true, got role=${JSON.stringify(overlay.role)}`,
+          );
+        }
+      }
     }
 
     if (session.pageErrors.length > 0) {
