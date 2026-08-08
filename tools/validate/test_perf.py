@@ -264,3 +264,37 @@ def test_smooth_animation_ratio_one_fails_at_low_render_rate():
     check = next(check for check in verdict["checks"] if check["id"] == "4.1")
     assert check["metric"] == "character_animation_per_frame"
     assert check["status"] == "FAIL"
+
+
+def test_scene_only_artifact_only_verdicts_static_scene_metrics():
+    verdict = build_verdict(calculate_metrics({
+        "meta": {"mode": "scene-only"},
+        "metrics": {
+            "draw_calls": 100,
+            "triangles_k": 200,
+            "texture_memory_mb": 10,
+            "fps_p50": 60,
+            "character_anim_hz": 12,
+            "vehicle_transform_hz": 60,
+            "camera_hz": 60,
+            "heap_growth_per_lap_mb": 0,
+        },
+    }))
+
+    statuses = {check["id"]: check["status"] for check in verdict["checks"]}
+    assert statuses["5.3"] == "PASS"
+    assert statuses["5.4"] == "PASS"
+    assert statuses["5.5"] == "PASS"
+    for metric_id in ("2.1", "2.2", "2.3", "2.4", "2.5", "4.1", "4.2", "4.3", "5.1", "5.2"):
+        assert statuses[metric_id] == "FAIL"
+
+
+def test_scene_only_missing_static_metric_is_not_a_zero_pass():
+    verdict = build_verdict(calculate_metrics({
+        "meta": {"mode": "scene-only"},
+        "metrics": {"draw_calls": 100, "triangles_k": 200},
+    }))
+
+    texture_check = next(check for check in verdict["checks"] if check["id"] == "5.5")
+    assert texture_check["actual"] == 0.0
+    assert texture_check["status"] == "FAIL"

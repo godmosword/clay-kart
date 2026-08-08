@@ -14,10 +14,13 @@ import {
   REPO_ROOT,
 } from './runtime.mjs';
 
-const fixturePath = process.argv[2] ?? 'fixtures/lap-a.json';
-const outputPath = process.argv[3] ?? 'loop/round-16/artifacts/perf-proxy.json';
-const device = process.argv[4] ?? 'proxy';
-const environment = process.argv[5] ?? process.env.PERF_ENV ?? 'local';
+const cliArgs = process.argv.slice(2);
+const sceneOnly = cliArgs.includes('--scene-only');
+const positionalArgs = cliArgs.filter((argument) => argument !== '--scene-only');
+const fixturePath = positionalArgs[0] ?? 'fixtures/lap-a.json';
+const outputPath = positionalArgs[1] ?? 'loop/round-16/artifacts/perf-proxy.json';
+const device = positionalArgs[2] ?? 'proxy';
+const environment = positionalArgs[3] ?? process.env.PERF_ENV ?? 'local';
 const MEASUREMENT_SECONDS = 5;
 const HEAP_REQUIRED_LAPS = 5;
 const HEAP_RACE_LAPS = [3, 2];
@@ -808,6 +811,83 @@ async function measureHeapLaps(session, serverPort) {
   };
 }
 
+async function measureSceneOnly() {
+  const chromePath = await findChrome();
+  const { server, port: serverPort } = await startStaticServer();
+  const userDataDir = await mkdtemp(join(tmpdir(), 'clay-kart-r30-scene-chrome-'));
+  const child = spawn(chromePath, [
+    '--headless=new',
+    '--no-sandbox',
+    '--disable-extensions',
+    '--disable-background-networking',
+    '--use-gl=angle',
+    '--use-angle=swiftshader',
+    '--remote-debugging-address=127.0.0.1',
+    '--remote-debugging-port=0',
+    `--user-data-dir=${userDataDir}`,
+    'about:blank',
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let session = null;
+  try {
+    const debugPort = await waitForDevtoolsPort(child);
+    const page = await waitForPageTarget(debugPort);
+    session = new CdpSession(page.webSocketDebuggerUrl);
+    await session.connect();
+    await session.call('Page.enable');
+    await session.call('Runtime.enable');
+    await session.call('Page.addScriptToEvaluateOnNewDocument', { source: browserProbeScript() });
+    await session.call('Emulation.setDeviceMetricsOverride', {
+      width: 800,
+      height: 600,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await session.call('Page.navigate', { url: `http://127.0.0.1:${serverPort}/index.html` });
+    await sleep(1500);
+    const result = await session.call('Runtime.evaluate', {
+      expression: `(() => {
+        const state = window.__R16_PERF__;
+        const drawCallsPerFrame = state?.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
+        const trianglesPerFrame = state?.frameTriangles ? [...state.frameTriangles.values()] : [];
+        return {
+          canvas_count: document.querySelectorAll('canvas').length,
+          rendered_frames: state?.glFrames?.size ?? 0,
+          draw_calls: drawCallsPerFrame.length ? Math.max(...drawCallsPerFrame) : 0,
+          triangles_k: trianglesPerFrame.length ? Math.max(...trianglesPerFrame) / 1000 : 0,
+          texture_memory_mb: (state?.textureBytes ?? 0) / (1024 * 1024),
+          scene_only_source: 'post-load WebGL instrumentation; renderer.info is private to src/render/renderer.ts',
+        };
+      })()`,
+      returnByValue: true,
+    });
+    const measured = result?.result?.value;
+    if (!measured || measured.canvas_count < 1 || measured.rendered_frames < 1) {
+      throw new Error(`scene-only metrics evaluation failed: ${JSON.stringify({
+        measured,
+        exception: result?.exceptionDetails ?? null,
+      })}`);
+    }
+    return {
+      ...measured,
+      mode: 'scene-only',
+      chrome_path: chromePath,
+      measurement_seconds: 1.5,
+      unsupported_metrics: [
+        'fps_p50', 'fps_p05', 'frame_time_p99_ms', 'long_frame_count',
+        'gc_pause_max_ms', 'character_anim_hz', 'vehicle_transform_hz', 'camera_hz',
+        'heap_peak_mb', 'heap_growth_per_lap_mb', 'first_interactive_s',
+        'time_to_first_render_s',
+      ],
+    };
+  } finally {
+    session?.close();
+    child.kill('SIGTERM');
+    await new Promise((resolveExit) => child.once('exit', resolveExit));
+    await new Promise((resolveServer) => server.close(resolveServer));
+    await rm(userDataDir, { recursive: true, force: true });
+  }
+}
+
 async function measureBrowser() {
   const chromePath = await findChrome();
   const { server, port: serverPort } = await startStaticServer();
@@ -1134,7 +1214,7 @@ async function measureBrowser() {
   }
 }
 
-const measured = await measureBrowser();
+const measured = sceneOnly ? await measureSceneOnly() : await measureBrowser();
 const { chrome_path: chromePath, ...measurementMetrics } = measured;
 const assets = await assetMetrics();
 const build = {
@@ -1153,12 +1233,18 @@ const report = {
     seed: fixture.seed,
     device,
     device_note: 'Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement',
-    measurement_method: 'External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
-    network_profile: FOUR_G_PROFILE,
-    render_measurement_network: 'unthrottled_after_load',
+    mode: measured.mode ?? 'full',
+    measurement_method: sceneOnly
+      ? 'One post-load scene snapshot from external WebGL draw/triangle/texture instrumentation; renderer.info is private to src/render/renderer.ts.'
+      : 'External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
+    ...(sceneOnly ? {} : { network_profile: FOUR_G_PROFILE }),
+    render_measurement_network: sceneOnly ? 'unthrottled_no_network_emulation' : 'unthrottled_after_load',
+    measurement_status: sceneOnly ? 'static_scene_only' : 'full_runtime_measurement',
     laps_required: HEAP_REQUIRED_LAPS,
     laps_measured: measurementMetrics.heap_measurement?.lapsMeasured ?? 0,
-    heap_measurement_status: measurementMetrics.heap_measurement?.status ?? 'missing_measurement',
+    heap_measurement_status: sceneOnly
+      ? 'not_measured_scene_only'
+      : measurementMetrics.heap_measurement?.status ?? 'missing_measurement',
     heap_growth_measurement: measurementMetrics.heap_measurement?.method ?? null,
     heap_lap_runs: measurementMetrics.heap_measurement?.runs ?? [],
     render_telemetry: {
