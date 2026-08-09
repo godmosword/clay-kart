@@ -111,7 +111,12 @@ export interface AiTelemetry {
   readonly radialError: number;
 }
 
-interface InternalWorldOptions extends WorldOptions {
+type PhysicsWorldOptions = WorldOptions & {
+  /** Probe-only lap count; the gameplay default remains TOTAL_LAPS (3). */
+  totalLaps?: number;
+};
+
+interface InternalWorldOptions extends PhysicsWorldOptions {
   /** Probe-only deterministic starting angles; not part of the shared contract. */
   playerStartAngle?: number;
   aiStartAngles?: readonly number[];
@@ -120,6 +125,14 @@ interface InternalWorldOptions extends WorldOptions {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
+}
+
+function resolveTotalLaps(value: number | undefined): number {
+  if (value === undefined) return TOTAL_LAPS;
+  if (!Number.isInteger(value) || value < 1) {
+    throw new RangeError(`WorldOptions.totalLaps must be a positive integer, got ${value}`);
+  }
+  return value;
 }
 
 function moveTowardZero(value: number, amount: number): number {
@@ -197,11 +210,19 @@ class Kart {
   #currentLap = 1;
   #lapStartTick = 0;
   #finished = false;
+  readonly #totalLaps: number;
   #bestTime: number | null = null;
   readonly #splits: number[] = [];
 
-  constructor(characterId: CharacterId, spawnIndex: number, ai: boolean, startAngle = 0) {
+  constructor(
+    characterId: CharacterId,
+    spawnIndex: number,
+    ai: boolean,
+    startAngle = 0,
+    totalLaps = TOTAL_LAPS,
+  ) {
     this.characterId = characterId;
+    this.#totalLaps = totalLaps;
     const tangentOffset = spawnIndex * (KART_BOUNDING_RADIUS * 2 + 1);
     const radialX = Math.cos(startAngle);
     const radialZ = Math.sin(startAngle);
@@ -290,7 +311,7 @@ class Kart {
       : (this.#currentTick - this.#lapStartTick) * fixedDt;
     const lap: LapState = {
       current: this.#currentLap,
-      total: TOTAL_LAPS,
+      total: this.#totalLaps,
       currentTime: lapTime,
       bestTime: this.#bestTime,
       splits: this.#splits.slice(),
@@ -656,13 +677,13 @@ class Kart {
       this.#hasLeftStartLine = true;
     }
 
-    if (crossedStartLine && !this.#finished && this.#currentLap <= TOTAL_LAPS) {
+    if (crossedStartLine && !this.#finished && this.#currentLap <= this.#totalLaps) {
       const lapTime = (tick - this.#lapStartTick) * dt;
       this.#splits.push(lapTime);
       if (this.#bestTime === null || lapTime < this.#bestTime) {
         this.#bestTime = lapTime;
       }
-      if (this.#currentLap < TOTAL_LAPS) {
+      if (this.#currentLap < this.#totalLaps) {
         this.#currentLap += 1;
         this.#lapStartTick = tick;
       } else {
@@ -683,13 +704,15 @@ class World implements PhysicsWorld {
   readonly #aiKarts: Kart[];
   #aiTelemetry: AiTelemetry[] = [];
 
-  constructor(options: WorldOptions = {}) {
+  constructor(options: PhysicsWorldOptions = {}) {
     const internalOptions = options as InternalWorldOptions;
+    const totalLaps = resolveTotalLaps((options as { totalLaps?: number }).totalLaps);
     this.#karts = [new Kart(
       options.playerCharacterId ?? 'xiaohong',
       0,
       false,
       internalOptions.playerStartAngle ?? 0,
+      totalLaps,
     )];
     this.#aiDifficulties = [];
     this.#aiKarts = [];
@@ -699,6 +722,7 @@ class World implements PhysicsWorld {
         index + 1,
         true,
         internalOptions.aiStartAngles?.[index] ?? 0,
+        totalLaps,
       );
       this.#karts.push(kart);
       this.#aiKarts.push(kart);
@@ -796,7 +820,7 @@ class World implements PhysicsWorld {
   }
 }
 
-export function createWorld(options?: WorldOptions): PhysicsWorld {
+export function createWorld(options?: PhysicsWorldOptions): PhysicsWorld {
   return new World(options);
 }
 

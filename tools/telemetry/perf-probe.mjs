@@ -338,6 +338,10 @@ function browserProbeScript() {
     glFrames: new Set(),
     frameDrawCalls: new Map(),
     frameTriangles: new Map(),
+    drawBreakdown: new Map(),
+    frameDrawBreakdown: new Map(),
+    framebufferIds: new Map(),
+    nextFramebufferId: 0,
     glDrawCalls: 0,
     triangles: 0,
     firstRenderAt: null,
@@ -365,6 +369,10 @@ function browserProbeScript() {
     state.glFrames = new Set();
     state.frameDrawCalls = new Map();
     state.frameTriangles = new Map();
+    state.drawBreakdown = new Map();
+    state.frameDrawBreakdown = new Map();
+    state.framebufferIds = new Map();
+    state.nextFramebufferId = 0;
     state.glDrawCalls = 0;
     state.triangles = 0;
     state.heapRunning = false;
@@ -719,42 +727,141 @@ function browserProbeScript() {
         return result;
       };
     }
-    prototype.drawElements = function(mode, count, ...args) {
-      const frame = state.activeFrame;
-      const drawStart = performance.now();
-      state.glDrawCalls += 1;
+    const modeName = (gl, mode) => ({
+      [gl.POINTS]: 'POINTS',
+      [gl.LINES]: 'LINES',
+      [gl.LINE_LOOP]: 'LINE_LOOP',
+      [gl.LINE_STRIP]: 'LINE_STRIP',
+      [gl.TRIANGLES]: 'TRIANGLES',
+      [gl.TRIANGLE_STRIP]: 'TRIANGLE_STRIP',
+      [gl.TRIANGLE_FAN]: 'TRIANGLE_FAN',
+    }[mode] ?? 'mode_' + mode);
+    const framebufferName = (gl) => {
+      try {
+        const framebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+        if (!framebuffer) return 'default';
+        let id = state.framebufferIds?.get(framebuffer);
+        if (!id) {
+          id = (state.nextFramebufferId ?? 0) + 1;
+          state.nextFramebufferId = id;
+          if (!state.framebufferIds) state.framebufferIds = new Map();
+          state.framebufferIds.set(framebuffer, id);
+        }
+        return 'fbo-' + id;
+      } catch {
+        return 'unknown';
+      }
+    };
+    const viewportName = (gl) => {
+      try {
+        const viewport = gl.getParameter(gl.VIEWPORT);
+        return Array.from(viewport ?? []).join('x');
+      } catch {
+        return 'unknown';
+      }
+    };
+    const recordDraw = (gl, method, mode, count, instanceCount, frame) => {
+      const instances = Math.max(1, Number(instanceCount) || 1);
+      const indexCount = Math.max(0, Number(count) || 0);
+      // Instanced TRIANGLES contribute count / 3 * instanceCount triangles.
+      // Missing instanced methods are tolerated on WebGL1; WebGL2 is patched
+      // whenever the browser exposes the corresponding method.
+      const triangles = mode === gl.TRIANGLES ? indexCount / 3 * instances : 0;
       const frameIndex = frame?.index ?? state.raf.length - 1;
+      state.glDrawCalls += 1;
       state.glFrames.add(frameIndex);
       state.frameDrawCalls.set(frameIndex, (state.frameDrawCalls.get(frameIndex) ?? 0) + 1);
+      state.triangles += triangles;
+      state.frameTriangles.set(frameIndex, (state.frameTriangles.get(frameIndex) ?? 0) + triangles);
       if (state.firstRenderAt === null) state.firstRenderAt = performance.now();
-      if (mode === this.TRIANGLES) {
-        state.triangles += count / 3;
-        state.frameTriangles.set(frameIndex, (state.frameTriangles.get(frameIndex) ?? 0) + count / 3);
-      }
+
+      const modeLabel = modeName(gl, mode);
+      const framebuffer = framebufferName(gl);
+      const viewport = viewportName(gl);
+      const key = [method, modeLabel, framebuffer, viewport].join('|');
+      const existing = state.drawBreakdown.get(key) ?? {
+        method,
+        mode: modeLabel,
+        framebuffer,
+        viewport,
+        calls: 0,
+        instance_count: 0,
+        index_count: 0,
+        triangles: 0,
+      };
+      existing.calls += 1;
+      existing.instance_count += instances;
+      existing.index_count += indexCount;
+      existing.triangles += triangles;
+      state.drawBreakdown.set(key, existing);
+
+      const frameKey = [frameIndex, method, modeLabel, framebuffer, viewport].join('|');
+      const frameExisting = state.frameDrawBreakdown.get(frameKey) ?? {
+        frame_index: frameIndex,
+        method,
+        mode: modeLabel,
+        framebuffer,
+        viewport,
+        calls: 0,
+        instance_count: 0,
+        index_count: 0,
+        triangles: 0,
+      };
+      frameExisting.calls += 1;
+      frameExisting.instance_count += instances;
+      frameExisting.index_count += indexCount;
+      frameExisting.triangles += triangles;
+      state.frameDrawBreakdown.set(frameKey, frameExisting);
+    };
+    const invokeDraw = (gl, method, original, mode, count, instanceCount, frame, args) => {
+      const drawStart = performance.now();
+      recordDraw(gl, method, mode, count, instanceCount, frame);
       try {
-        return originalDrawElements.call(this, mode, count, ...args);
+        return original.apply(gl, args);
       } finally {
         if (frame) frame.drawMs += performance.now() - drawStart;
       }
     };
-    prototype.drawArrays = function(mode, first, count, ...args) {
-      const frame = state.activeFrame;
-      const drawStart = performance.now();
-      state.glDrawCalls += 1;
-      const frameIndex = frame?.index ?? state.raf.length - 1;
-      state.glFrames.add(frameIndex);
-      state.frameDrawCalls.set(frameIndex, (state.frameDrawCalls.get(frameIndex) ?? 0) + 1);
-      if (state.firstRenderAt === null) state.firstRenderAt = performance.now();
-      if (mode === this.TRIANGLES) {
-        state.triangles += count / 3;
-        state.frameTriangles.set(frameIndex, (state.frameTriangles.get(frameIndex) ?? 0) + count / 3);
-      }
-      try {
-        return originalDrawArrays.call(this, mode, first, count, ...args);
-      } finally {
-        if (frame) frame.drawMs += performance.now() - drawStart;
-      }
-    };
+    if (originalDrawElements) {
+      prototype.drawElements = function(mode, count, ...args) {
+        return invokeDraw(this, 'drawElements', originalDrawElements, mode, count, 1, state.activeFrame, [mode, count, ...args]);
+      };
+    }
+    if (originalDrawArrays) {
+      prototype.drawArrays = function(mode, first, count, ...args) {
+        return invokeDraw(this, 'drawArrays', originalDrawArrays, mode, count, 1, state.activeFrame, [mode, first, count, ...args]);
+      };
+    }
+    const originalDrawElementsInstanced = prototype.drawElementsInstanced;
+    const originalDrawArraysInstanced = prototype.drawArraysInstanced;
+    if (originalDrawElementsInstanced) {
+      prototype.drawElementsInstanced = function(mode, count, type, offset, instanceCount) {
+        return invokeDraw(
+          this,
+          'drawElementsInstanced',
+          originalDrawElementsInstanced,
+          mode,
+          count,
+          instanceCount,
+          state.activeFrame,
+          [mode, count, type, offset, instanceCount],
+        );
+      };
+    }
+    if (originalDrawArraysInstanced) {
+      prototype.drawArraysInstanced = function(mode, first, count, instanceCount) {
+        return invokeDraw(
+          this,
+          'drawArraysInstanced',
+          originalDrawArraysInstanced,
+          mode,
+          count,
+          instanceCount,
+          state.activeFrame,
+          [mode, first, count, instanceCount],
+        );
+      };
+    }
   };
   patchGl(WebGLRenderingContext.prototype);
   patchGl(window.WebGL2RenderingContext && WebGL2RenderingContext.prototype);
@@ -1027,11 +1134,29 @@ async function measureSceneOnly() {
         const state = window.__R16_PERF__;
         const drawCallsPerFrame = state?.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
         const trianglesPerFrame = state?.frameTriangles ? [...state.frameTriangles.values()] : [];
+        const drawBreakdown = state?.drawBreakdown ? [...state.drawBreakdown.values()] : [];
+        const instancedBreakdown = drawBreakdown.filter((entry) => entry.method.includes('Instanced'));
+        const frameDrawBreakdown = state?.frameDrawBreakdown ? [...state.frameDrawBreakdown.values()] : [];
+        const peakFrameEntry = state?.frameTriangles
+          ? [...state.frameTriangles.entries()].sort((left, right) => right[1] - left[1])[0]
+          : null;
+        const peakFrameIndex = peakFrameEntry?.[0] ?? null;
+        const peakFrameDrawBreakdown = peakFrameIndex === null
+          ? []
+          : frameDrawBreakdown.filter((entry) => entry.frame_index === peakFrameIndex);
         return {
           canvas_count: document.querySelectorAll('canvas').length,
           rendered_frames: state?.glFrames?.size ?? 0,
           draw_calls: drawCallsPerFrame.length ? Math.max(...drawCallsPerFrame) : 0,
           triangles_k: trianglesPerFrame.length ? Math.max(...trianglesPerFrame) / 1000 : 0,
+          draw_breakdown: drawBreakdown,
+          instanced_draw_calls: instancedBreakdown.reduce((sum, entry) => sum + entry.calls, 0),
+          instanced_triangles: instancedBreakdown.reduce((sum, entry) => sum + entry.triangles, 0),
+          instanced_draw_breakdown: instancedBreakdown,
+          peak_frame_index: peakFrameIndex,
+          peak_frame_draw_calls: peakFrameIndex === null ? 0 : state.frameDrawCalls.get(peakFrameIndex) ?? 0,
+          peak_frame_triangles: peakFrameEntry?.[1] ?? 0,
+          peak_frame_draw_breakdown: peakFrameDrawBreakdown,
           texture_memory_mb: (state?.textureBytes ?? 0) / (1024 * 1024),
           scene_only_source: 'post-load WebGL instrumentation; renderer.info is private to src/render/renderer.ts',
         };
@@ -1112,6 +1237,16 @@ async function measureBrowser() {
       expression: `(() => {
         const state = window.__R16_PERF__;
         const raf = state?.raf ?? [];
+        const drawBreakdown = state?.drawBreakdown ? [...state.drawBreakdown.values()] : [];
+        const instancedBreakdown = drawBreakdown.filter((entry) => entry.method.includes('Instanced'));
+        const frameDrawBreakdown = state?.frameDrawBreakdown ? [...state.frameDrawBreakdown.values()] : [];
+        const peakFrameEntry = state?.frameTriangles
+          ? [...state.frameTriangles.entries()].sort((left, right) => right[1] - left[1])[0]
+          : null;
+        const peakFrameIndex = peakFrameEntry?.[0] ?? null;
+        const peakFrameDrawBreakdown = peakFrameIndex === null
+          ? []
+          : frameDrawBreakdown.filter((entry) => entry.frame_index === peakFrameIndex);
         const first = raf[0]?.now ?? state?.measurementStart ?? 0;
         const last = raf.at(-1)?.now ?? first;
         const elapsed = Math.max(0, last - (state?.measurementStart ?? first)) / 1000;
@@ -1289,6 +1424,14 @@ async function measureBrowser() {
           heap_growth_per_lap_mb: null,
           draw_calls: drawCallsPerFrame.length ? Math.max(...drawCallsPerFrame) : 0,
           triangles_k: trianglesPerFrame.length ? Math.max(...trianglesPerFrame) / 1000 : 0,
+          draw_breakdown: drawBreakdown,
+          instanced_draw_calls: instancedBreakdown.reduce((sum, entry) => sum + entry.calls, 0),
+          instanced_triangles: instancedBreakdown.reduce((sum, entry) => sum + entry.triangles, 0),
+          instanced_draw_breakdown: instancedBreakdown,
+          peak_frame_index: peakFrameIndex,
+          peak_frame_draw_calls: peakFrameIndex === null ? 0 : state.frameDrawCalls.get(peakFrameIndex) ?? 0,
+          peak_frame_triangles: peakFrameEntry?.[1] ?? 0,
+          peak_frame_draw_breakdown: peakFrameDrawBreakdown,
           texture_memory_mb: (state?.textureBytes ?? 0) / (1024 * 1024),
           frame_breakdown: {
             method: 'nearest_rank_p99_frame_interval',
@@ -1409,7 +1552,7 @@ const report = {
     mode: measured.mode ?? 'full',
     measurement_method: sceneOnly
       ? 'One post-load scene snapshot from external WebGL draw/triangle/texture instrumentation; renderer.info is private to src/render/renderer.ts.'
-      : 'External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
+      : 'External requestAnimationFrame and WebGL draw instrumentation (including drawElementsInstanced/drawArraysInstanced when exposed; TRIANGLES use count / 3 * instanceCount); GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.',
     ...(sceneOnly ? {} : { network_profile: FOUR_G_PROFILE }),
     render_measurement_network: sceneOnly ? 'unthrottled_no_network_emulation' : 'unthrottled_after_load',
     measurement_status: sceneOnly ? 'static_scene_only' : 'full_runtime_measurement',
