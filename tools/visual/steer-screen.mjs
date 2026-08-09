@@ -35,8 +35,19 @@ const TARGET_SIM_SECONDS = 0.45;
  */
 const MAX_WALL_WAIT_MS = 20_000;
 /**
- * 每模擬秒的橫向位移門檻（世界單位 / 模擬秒）。
- * solo 預期 ~5；multi 貼門檻（~0.8）是誠實的——兩邊共用同一數字。
+ * 每模擬秒的橫向位移門檻（世界單位 / 模擬秒）。兩邊共用同一數字。
+ *
+ * **不要在這裡寫「預期 rate 是多少」。** R33 拆兩條斷言時的前提是
+ * 「solo ~5 很厚、multi ~0.8 貼門檻」，那個 0.8 來自 R28 的單次量測，
+ * 在 BACKLOG 上被當成事實壓了五輪並驅動了一次裁決。R33 實測全部證偽：
+ *
+ *     Cursor 兩次   solo 2.71–2.91 / -3.49–-3.79   multi 3.84–3.89 / -3.53–-4.14
+ *     Lead  一次    solo      … / -4.39           multi 4.81 / -3.57
+ *
+ * 三次跑下來 solo 與 multi 都落在 2.7–4.8，**solo 不比 multi 厚**，
+ * 而 R28 那個 0.8 是 5 倍離群值。這個量測本身有約 ±25% 的跑間變異
+ * （SwiftShader 負載敏感），寫死任何「預期值」都會在下一台機器上變成謊。
+ * 要看實際值就跑，輸出每次都印 rate／lateral／simDt／yawDelta。
  */
 const RATE_THRESHOLD = 0.5;
 
@@ -45,7 +56,7 @@ const SCENARIOS = [
     id: 'solo',
     query: 'solo=1',
     purpose: 'direction-contract',
-    note: '單車：R20 轉向接反回歸；預期 rate ~5、餘裕很厚',
+    note: '單車：R20 轉向接反回歸。決定性場景，不受 AI 車擠壓影響',
     /** POS 分母——單車場上只有玩家 */
     expectPosField: 1,
   },
@@ -53,7 +64,7 @@ const SCENARIOS = [
     id: 'multi',
     query: '',
     purpose: 'multi-kart-still-steers',
-    note: '多車：玩家真實場景仍轉得動；貼門檻是誠實的',
+    note: '多車：玩家真實場景仍轉得動。R28 記的 0.8 未能重現，見 RATE_THRESHOLD',
     expectPosField: 4,
   },
 ];

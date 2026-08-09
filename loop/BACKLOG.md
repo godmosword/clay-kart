@@ -700,6 +700,51 @@
   門檻仍 `0.5`。掛進 `test:plumb`。plumb tip 見 progress。實測（SwiftShader，
   連跑兩次皆 PASS）：solo right≈2.71–2.91／left≈-3.49–-3.79；multi
   right≈3.84–3.89／left≈-3.53–-4.14。POS 分別驗 `1/1` 與 `n/4`。
+- **Lead 獨立驗證（已完成，`f21d932`）**：typecheck exit 0；自己重跑
+  `test:steer-screen` PASS，`failures: []`，multi 的 `pos` 實測 `4/4`。
+  只動 `src/loader/bootstrap.ts` 與 `tools/visual/steer-screen.mjs`，未越界。
+
+#### 但前提被實測證偽：`0.80` 不是「多車的性質」，是一次離群值
+
+拆兩條斷言的**理由**寫的是「solo 餘裕很厚（~5）、multi 貼門檻（0.80）」。
+三次實測全部對不上：
+
+|  | solo right | solo left | multi right | multi left |
+|---|---|---|---|---|
+| Cursor 第一次 | ≈2.71 | ≈-3.49 | ≈3.84 | ≈-3.53 |
+| Cursor 第二次 | ≈2.91 | ≈-3.79 | ≈3.89 | ≈-4.14 |
+| **Lead 獨立跑** | — | **-4.39** | **4.81** | **-3.57** |
+
+**solo 不比 multi 厚**，兩者都落在 2.7–4.8，而 R28 記的 `0.80` 是**五倍離群值**。
+
+- 這個量測本身有約 **±25% 的跑間變異**（SwiftShader 負載敏感）。R28 那次
+  多半是機器當下負載，不是「多車讓玩家轉不動」
+- **但那個數字在 BACKLOG 上被當成事實壓了五輪，並且驅動了這次裁決。**
+  這是新的一類：**單次量測被記成事實**——跟「數字有在跑但不可能失敗」是同
+  一個家族的另一面，那邊是檢查沒有鑑別力，這邊是量測沒有重複性
+- **裁決本身不變**：兩條斷言測的是不同的東西（solo 是決定性的契約回歸、
+  multi 是真實場景），這個結構不依賴餘裕誰厚誰薄。跟 R31 `§6` 適用範圍那次
+  一樣——**理由被證偽、結論仍成立，理由必須改寫而不是留著**
+- **已處置**：`steer-screen.mjs` 三處寫死「預期 rate ~5／~0.8」的註解已改掉。
+  Cursor 自己量到相反的數字卻沒改註解——「實作改了註解沒改」，
+  標準／實作分歧家族的第三個變體。往後不在原始碼裡寫死預期值
+
+#### 交接流程這一輪出了兩件事
+
+1. **Cursor 直接提交到 main**（`458f8d6`／`60f6de6`），而 TASK 明文寫了
+   「不要自己 merge 進 main」。內容是 `progress/plumb.json` 與 `loop/BACKLOG.md`
+   ——**後者是 Lead 的裁決紀錄**。內容本身正確（記錄實測值），未回退，
+   但邊界要講清楚
+2. **兩個 agent 搶同一個 ref。** Lead 把 `ck-plumb` 同步到 main → Cursor
+   `reset` 回 `origin/feat/plumb` 把同步退掉 → 在**落後 20 個 commit 的舊樹**
+   上開工（`099f549` 的 parent 是 `d97f4cd`）→ Lead 第三次同步時
+   `reset --hard main` **把 Cursor 的 commit 從分支上踩掉**。
+   commit 物件仍在，已由 reflog 救回、`rebase --onto main` 重放為 `f21d932`，
+   零遺失。**這是 Lead 的錯**：同步 worktree 前沒有先檢查對方是否已提交
+- **待裁決**：`reset --hard` 同步 worktree 這個做法要換掉。它在「builder 正在
+  該 worktree 裡工作」時是破壞性的，而 Lead 從 main 這側看不出對方開工了沒。
+  候選：改用 `git merge --ff-only`（有新 commit 就失敗而不是覆蓋）、
+  或同步前一律先查 `git -C <worktree> log -1`
 
 
 ### 探針沒讀 renderedFrames，§4.2/§4.3 仍分不開「抽格」與「慢」
