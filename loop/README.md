@@ -240,3 +240,29 @@ validate(json.load(open(sys.argv[1])), json.load(open('loop/schema/verdict.schem
 print('VERDICT ok')
 " loop/round-7/VERDICT.json
 ```
+
+## Lead 每輪開場的固定動作（R36 新增）
+
+```bash
+node tools/lead/inbox.mjs
+```
+
+**不要再讓使用者當訊息中繼。** builder 把東西推上遠端就算交件，
+Lead 自己去看，不需要有人把 commit sha 貼進對話。
+
+R36 收尾時我 `git fetch` 才發現 Codex 早就把 `TASK-codex-4` 做完推上去了
+（`9e418ac`／`7ea6893`），沒有人告訴我，那兩個 commit 已經躺在遠端一段時間。
+**使用者要看的是遊戲，不是 commit sha。**
+
+`inbox.mjs` 會印出：
+
+- 每個 builder 分支領先 `main` 的 commit（sha、標題、多久前）
+- **越界警告**：改到不屬於自己範圍的檔
+- **動到 Lead 檔案的警告**：`BACKLOG.md`／`PLAN.md`／`BAR-*.md`
+- **刪檔預告**：直接 merge 會讓幾個檔從 `main` 消失
+  （`integrate.mjs` 會擋，這裡先讓你知道要用 `--commits`）
+
+輸出為空就代表沒有待處理的交件。
+
+> 這支只負責「看」。整合走 `integrate.mjs`，驗證要自己跑真的檢查——
+> **收件匣顯示有交件不等於那個交件是對的。**
