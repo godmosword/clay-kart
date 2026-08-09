@@ -1,0 +1,305 @@
+{
+  "meta": {
+    "fixture": "r36-item-probe",
+    "seed": "20260730",
+    "tick_hz": 120,
+    "tick_dt_s": 0.008333333333333333,
+    "build_sha": "841327ca9e4a0d2bd88399dfe79a9eddd783139f",
+    "deterministic_item_assignment": "seed phase plus alternating box/respawn deck; no Math.random"
+  },
+  "boxes": [
+    {
+      "box_index": 0,
+      "box_id": "item-box-0",
+      "item": "shockwave",
+      "pickup_tick": 1,
+      "held_before_use": "shockwave",
+      "speed_before_use": 0,
+      "use": {
+        "item": "shockwave",
+        "effect": "shockwave",
+        "target_kart_indices": []
+      },
+      "speed_peak_after_use": 6.05816897415747,
+      "effect_samples": [
+        {
+          "tick": 3,
+          "speed": 0.1375,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 4,
+          "speed": 0.27499548678927954,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 5,
+          "speed": 0.41247743453894753,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 6,
+          "speed": 0.5499368200863859,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 7,
+          "speed": 0.6873646253041169,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 46,
+          "speed": 5.929060713967562,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 47,
+          "speed": 6.05816897415747,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        }
+      ],
+      "respawn": {
+        "pickup_tick": 361,
+        "cooldown_ticks": 360
+      }
+    },
+    {
+      "box_index": 1,
+      "box_id": "item-box-1",
+      "item": "boost",
+      "pickup_tick": 1,
+      "held_before_use": "boost",
+      "speed_before_use": 0,
+      "use": {
+        "item": "boost",
+        "effect": "boost",
+        "target_kart_indices": []
+      },
+      "speed_peak_after_use": 13.072741695197532,
+      "effect_samples": [
+        {
+          "tick": 3,
+          "speed": 0.30416666666666664,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 4,
+          "speed": 0.6083112480257765,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 5,
+          "speed": 0.9123895798764878,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 6,
+          "speed": 1.216357526877353,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 7,
+          "speed": 1.5201710081715132,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 46,
+          "speed": 12.807733413668704,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 47,
+          "speed": 13.072741695197532,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        }
+      ],
+      "respawn": {
+        "pickup_tick": 361,
+        "cooldown_ticks": 360
+      }
+    },
+    {
+      "box_index": 2,
+      "box_id": "item-box-2",
+      "item": "shockwave",
+      "pickup_tick": 1,
+      "held_before_use": "shockwave",
+      "speed_before_use": 0,
+      "use": {
+        "item": "shockwave",
+        "effect": "shockwave",
+        "target_kart_indices": []
+      },
+      "speed_peak_after_use": 6.058168974157475,
+      "effect_samples": [
+        {
+          "tick": 3,
+          "speed": 0.1375,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 4,
+          "speed": 0.27499548678927954,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 5,
+          "speed": 0.41247743453894753,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 6,
+          "speed": 0.5499368200863859,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 7,
+          "speed": 0.6873646253041168,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 46,
+          "speed": 5.929060713967568,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        },
+        {
+          "tick": 47,
+          "speed": 6.058168974157475,
+          "held_item": null,
+          "item_effect": "none",
+          "surface": "asphalt"
+        }
+      ],
+      "respawn": {
+        "pickup_tick": 361,
+        "cooldown_ticks": 360
+      }
+    },
+    {
+      "box_index": 3,
+      "box_id": "item-box-3",
+      "item": "boost",
+      "pickup_tick": 1,
+      "held_before_use": "boost",
+      "speed_before_use": 0,
+      "use": {
+        "item": "boost",
+        "effect": "boost",
+        "target_kart_indices": []
+      },
+      "speed_peak_after_use": 13.072741695197529,
+      "effect_samples": [
+        {
+          "tick": 3,
+          "speed": 0.3041666666666667,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 4,
+          "speed": 0.6083112480257764,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 5,
+          "speed": 0.9123895798764878,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 6,
+          "speed": 1.216357526877353,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 7,
+          "speed": 1.5201710081715132,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 46,
+          "speed": 12.807733413668702,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        },
+        {
+          "tick": 47,
+          "speed": 13.072741695197529,
+          "held_item": null,
+          "item_effect": "boost",
+          "surface": "boost"
+        }
+      ],
+      "respawn": {
+        "pickup_tick": 361,
+        "cooldown_ticks": 360
+      }
+    }
+  ],
+  "shockwave_effect": {
+    "item": "shockwave",
+    "source_kart_index": 0,
+    "target_kart_indices": [
+      1
+    ],
+    "target_speed_before": 8.069296234444346,
+    "target_speed_after": 4.570913003103703,
+    "target_speed_ratio": 0.5664574543183142
+  },
+  "ai_usage": {
+    "picked_item": "shockwave",
+    "use_tick": 2,
+    "use_item": "shockwave",
+    "kart_index": 1
+  },
+  "deterministic_byte_identical": true
+}
