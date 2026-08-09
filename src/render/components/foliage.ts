@@ -268,9 +268,32 @@ function trunkGeometry(): BufferGeometry {
   return applyHandPressedRelief(geometry, { amplitude: 0.022, wavelength: 0.45 });
 }
 
+/**
+ * 葉瓣段數 `10`（R33，原本是 `6`）。
+ *
+ * **為什麼改**：R31 換成單視角微距 A/B 圖之後，6 段的球貼滿 512² 的格子時
+ * 每一片都讀成明顯的多面體切面。舊的四視角合成把它藏了整整一輪——這條本身
+ * 就是新做法有效的證據。
+ *
+ * **為什麼不需要 LOD**（BACKLOG 上壓了兩輪的那個「架構取捨」不存在）：
+ *
+ *     seg=6    84 tri/片 × 1440 片 = 121k
+ *     seg=10  140 tri/片 × 1440 片 = 202k
+ *
+ * 當初估的是「96→200 tri/片、138k→288k」，高估 43%——因為 `clayBlob()` 是
+ * `SphereGeometry(r, seg, Math.max(8, round(seg * 0.6)))`，**heightSegments
+ * 被夾在 8**，`6→10` 只抬 widthSegments，不是兩軸一起長。
+ *
+ * 而且分母也錯了：`BAR-PERF §5.4` 的 `triangles_k` 是 `renderer.info.render`
+ * 的**每幀已算繪數（過完視錐裁切）**，實測 58.8k，不是整個 scene 的 170k。
+ * 最壞情況（假設 58.8k 全是葉瓣）也只到 98k，對窗口 `[0, 400]`。
+ *
+ * 所以不分 LOD，critic 評的幾何與玩家看到的維持一致。
+ */
+const LEAF_PAD_SEGMENTS = 10;
+
 function leafPadGeometry(): BufferGeometry {
-  // 低面數：這是全場 instance 數最多的東西，每多一段就乘上葉瓣總數。
-  return clayBlob(LEAF_PAD_RADIUS, 6);
+  return clayBlob(LEAF_PAD_RADIUS, LEAF_PAD_SEGMENTS);
 }
 
 function tuftGeometry(): BufferGeometry {

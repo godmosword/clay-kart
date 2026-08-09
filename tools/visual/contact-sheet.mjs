@@ -11,6 +11,7 @@
  * Usage:
  *   node tools/visual/contact-sheet.mjs \
  *     --out-dir loop/round-25/artifacts \
+ *     --game-shot build/visual/game.png \
  *     [--manifest tools/visual/contact-sheet.manifest.json] \
  *     [--seed 42] \
  *     [--repo-root .]
@@ -34,12 +35,40 @@ const BG = { r: 0x8a, g: 0x8a, b: 0x8a, alpha: 1 };
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_MANIFEST = resolve(HERE, 'contact-sheet.manifest.json');
 
+/**
+ * 「這張圖沒有被量化」的門檻，相異色數。
+ *
+ * 算繪半邊實測 814–2697、參考半邊 30k–50k，而任何一次 256 色量化都會落在
+ * 256 以下。取 300 留一點餘裕。純色佔位圖（2 色）由呼叫端排除。
+ *
+ * 對比表的半邊與 `§1.4` 的實景圖共用這個數字——**兩者都是算繪圖，
+ * 受同一種傷害**。R32 就是因為只檢查了其中一支腳本才漏掉的。
+ */
+const MIN_DISTINCT_COLOURS = 300;
+
+/** 數一張 PNG 的相異色（跟半邊檢查同樣每 2 px 取樣一次，數量級一致）。 */
+async function countDistinctColours(pngBuffer) {
+  const { data, info } = await sharp(pngBuffer)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const seen = new Set();
+  for (let y = 0; y < info.height; y += 2) {
+    for (let x = 0; x < info.width; x += 2) {
+      const i = (y * info.width + x) * 3;
+      seen.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
+    }
+  }
+  return seen.size;
+}
+
 function parseArgs(argv) {
   const out = {
     manifest: DEFAULT_MANIFEST,
     outDir: null,
     seed: null,
     repoRoot: resolve('.'),
+    gameShot: null,
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -56,9 +85,13 @@ function parseArgs(argv) {
     } else if (a === '--repo-root' && next) {
       out.repoRoot = resolve(next);
       i++;
+    } else if (a === '--game-shot' && next) {
+      out.gameShot = resolve(next);
+      i++;
     } else if (a === '--help' || a === '-h') {
-      console.log(`Usage: node tools/visual/contact-sheet.mjs --out-dir <path> [options]
+      console.log(`Usage: node tools/visual/contact-sheet.mjs --out-dir <path> --game-shot <path> [options]
   --out-dir <path>    REQUIRED. write contact-sheet.png + contact-sheet.key.json
+  --game-shot <path>  REQUIRED (§1.4). in-game screenshot from tools/visual/game-shot.mjs
   --manifest <path>   pairing manifest (default: tools/visual/contact-sheet.manifest.json)
   --seed <int>        override manifest.seed
   --repo-root <path>  resolve relative image paths (default: cwd)`);
@@ -70,6 +103,24 @@ function parseArgs(argv) {
   if (!out.outDir) {
     throw new Error(
       'missing required --out-dir <path> (refusing to default to a historical round artifacts dir)',
+    );
+  }
+  // **`--game-shot` 必填，而且刻意沒有預設值。**
+  //
+  // `BAR-VISUAL §1.4`（R32 裁決）規定評審材料除了對比表還要有一張遊戲實景圖，
+  // 因為 `§5.3` 明文說「元件圖看得到不構成通過」——只給對比表的話，那一條
+  // **依其構造永遠無法被判定通過**。
+  //
+  // R32 為了這張圖**主動放棄了盲測**（原文：「用一個已經失效的性質，去換一條
+  // 原本無法驗收的條款，這筆交換划算」）。但標準改了、這支工具沒改，
+  // 到 R33 才發現——付了代價卻沒拿到東西。
+  //
+  // 給預設值或允許省略，等於讓 `§1.4` 可以被靜靜跳過，那就是同一個錯再犯一次。
+  if (!out.gameShot) {
+    throw new Error(
+      'missing required --game-shot <path> (BAR-VISUAL §1.4: the review package '
+      + 'needs an in-game screenshot, or §5.3 can never be judged). '
+      + 'Produce one with: npm run game-shot',
     );
   }
   return out;
@@ -212,7 +263,7 @@ async function assertNotPalettised(pngPath) {
  * 30k–50k,而任何一次 256 色量化都會落在 256 以下。純色佔位圖(2 色)排除。
  */
 function assertHalvesNotQuantised(pixels, width, slots, cell) {
-  const MIN_DISTINCT = 300;
+  const MIN_DISTINCT = MIN_DISTINCT_COLOURS;
   const problems = [];
   const countHalf = (x0, y0) => {
     const seen = new Set();
@@ -369,6 +420,57 @@ async function main() {
   assertHalvesNotQuantised(sheetPixels, sheetInfo.width, slots, CELL);
 
   const sheetHash = createHash('sha256').update(cleaned).digest('hex');
+
+  // ---- `§1.4` 的遊戲實景圖 ----------------------------------------------
+  // 不參與 A/B 給分，只用來判「組裝後」那類條款（元件裝上車還看不看得到、
+  // 接地陰影有沒有真的落在地上、同一個場景裡燈光是否一致）。
+  const gameShotRaw = await readFile(args.gameShot);
+  // 它是一張算繪圖，跟對比表我們那半邊受同一種傷害——R32 的單邊量化就是
+  // 從「有一支腳本沒被檢查」漏的。這裡不重蹈覆轍，同一道門檻照樣套。
+  const gameShotDistinct = await countDistinctColours(gameShotRaw);
+  if (gameShotDistinct < MIN_DISTINCT_COLOURS) {
+    throw new Error(
+      `§1.4 的遊戲實景圖只有 ${gameShotDistinct} 種顏色（門檻 ${MIN_DISTINCT_COLOURS}）——`
+      + '它在進評審材料之前就被量化了。量化會逼出抖動，而抖動看起來就是 §6 禁止的'
+      + '程序化雜訊。檢查產生這張圖的工具有沒有 palette 量化。',
+    );
+  }
+  const gameShotHash = createHash('sha256').update(gameShotRaw).digest('hex');
+  const gameShotName = 'game-scene.png';
+  await writeFile(resolve(args.outDir, gameShotName), gameShotRaw);
+
+  // ---- 評審材料清單 ------------------------------------------------------
+  // **這份跟 key 不同，critic 讀得到。** 它只列檔案與用途，不含任何配對資訊，
+  // 也不含 `§1.2` 校驗組的身分——那是 critic 要自己回報的東西，寫進來就廢了。
+  //
+  // 存在的理由是 `§1.1` 要三輪獨立 session：三輪必須判的是同一張圖，
+  // 而「同一張」需要有東西可以引用。每一輪的輸出回填 sha256 就能事後核對。
+  const reviewPackage = {
+    version: 1,
+    round_protocol: 'BAR-VISUAL §1.1 — 3 independent sessions, median of 3',
+    files: [
+      {
+        file: 'contact-sheet.png',
+        sha256: sheetHash,
+        role: 'A/B scoring (§1). Paired halves, order shuffled, no labels.',
+      },
+      {
+        file: gameShotName,
+        sha256: gameShotHash,
+        role: '§1.4 in-game screenshot. NOT scored. Judge assembled-state clauses only (§5.3).',
+      },
+    ],
+    note:
+      'Each of the 3 critic runs must record these sha256 values, proving all three judged '
+      + 'the same images. A run whose hashes differ is not part of the same round.',
+    generatedAt: new Date().toISOString(),
+  };
+  await writeFile(
+    resolve(args.outDir, 'REVIEW-PACKAGE.json'),
+    `${JSON.stringify(reviewPackage, null, 2)}\n`,
+    'utf8',
+  );
+
   const key = {
     version: 1,
     seed,
@@ -397,11 +499,14 @@ async function main() {
         ok: true,
         sheet: sheetPath,
         key: keyPath,
+        reviewPackage: resolve(args.outDir, 'REVIEW-PACKAGE.json'),
         seed,
         paired: pairedCount,
         unpaired: unpaired.length,
         unpairedIds: unpaired.map((u) => u.id),
         sha256: sheetHash,
+        gameShotSha256: gameShotHash,
+        gameShotDistinctColours: gameShotDistinct,
       },
       null,
       2,
