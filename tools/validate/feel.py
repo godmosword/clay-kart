@@ -55,7 +55,7 @@ WINDOWS: tuple[tuple[str, str, float | bool, float | bool, int], ...] = (
     ("5.9", "turn_radius_monotonic", True, True, 5),
     ("6.1", "wall_speed_retention", 0.55, 0.75, 6),
     ("6.2", "wall_head_on_retention", 0.05, 0.20, 6),
-    ("6.3", "collision_recovery_time_s", 0.20, 0.45, 6),
+    ("6.3", "collision_recovery_time_s", 0.15, 0.45, 6),
     ("6.4", "kart_kart_impulse_symmetry", 0.92, 1.08, 6),
     ("6.5", "wall_stick_frames", 0.0, 3.0, 6),
     ("7.1", "air_control_yaw_rate_ratio", 0.20, 0.40, 8),
