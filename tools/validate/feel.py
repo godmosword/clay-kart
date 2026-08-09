@@ -125,19 +125,49 @@ def _longitudinal_speed(frame: dict[str, Any]) -> float:
     return vx * math.sin(yaw) + vz * math.cos(yaw)
 
 
-def _baseline(doc: dict[str, Any], tier: int) -> float:
+def _baseline_item(doc: dict[str, Any], tier: int) -> dict[str, Any] | None:
     baselines = _meta(doc).get("baselines", {})
     if not isinstance(baselines, dict):
-        return 0.0
+        return None
     item = baselines.get(str(tier), baselines.get(tier, {}))
-    if not isinstance(item, dict):
-        return 0.0
+    return item if isinstance(item, dict) else None
+
+
+def _baseline(doc: dict[str, Any], tier: int) -> float | None:
+    item = _baseline_item(doc, tier)
+    if item is None:
+        return None
+    if item.get("measurement_status") == "wall_contaminated_measurement":
+        return None
+    if (
+        _finite(item.get("contact_frames_in_window")) > 0
+        or _finite(item.get("baseline_contact_frames_in_window")) > 0
+    ):
+        return None
     if "car_lengths_gained" in item:
         return _finite(item["car_lengths_gained"])
+    if "drift_distance" not in item or "straight_distance" not in item:
+        return None
     drift = _finite(item.get("drift_distance"))
     straight = _finite(item.get("straight_distance"))
     car_length = _finite(_meta(doc).get("car_length"), CAR_LENGTH)
-    return (drift - straight) / car_length if car_length > 0 else 0.0
+    return (drift - straight) / car_length if car_length > 0 else None
+
+
+def _baseline_contamination_reason(doc: dict[str, Any], tier: int) -> str | None:
+    item = _baseline_item(doc, tier)
+    if item is None:
+        return None
+    status = item.get("measurement_status")
+    contact_frames = _finite(item.get("contact_frames_in_window"))
+    baseline_contact_frames = _finite(item.get("baseline_contact_frames_in_window"))
+    if status != "wall_contaminated_measurement" and contact_frames <= 0 and baseline_contact_frames <= 0:
+        return None
+    return (
+        "environment=wall_contaminated_measurement; "
+        f"tier={tier}; contact_frames_in_window={contact_frames:g}; "
+        f"baseline_contact_frames_in_window={baseline_contact_frames:g}"
+    )
 
 
 def _event_value(events: list[dict[str, Any]], key: str, default: float = 0.0) -> float:
@@ -443,7 +473,7 @@ def _drift_metrics(doc: dict[str, Any], frames: list[dict[str, Any]]) -> tuple[f
     return entry_speed, charge_times
 
 
-def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
+def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool | None]:
     """Calculate every BAR-FEEL metric from a telemetry document."""
     frames = _frames(doc)
     meta = _meta(doc)
@@ -643,7 +673,7 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
     input_feedback = _input_feedback_metrics(doc)
     ai_metrics = _ai_metrics(doc)
 
-    metrics: dict[str, float | bool] = {
+    metrics: dict[str, float | bool | None] = {
         "tick_dt_variance": 0.0 if abs(dt_variance) < 1e-24 else dt_variance,
         "replay_byte_identical": bool(meta.get("replay_byte_identical", False)),
         "max_penetration_depth": penetration,
@@ -691,17 +721,26 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
         "difficulty_lap_time_spread_s": ai_metrics["difficulty_lap_time_spread_s"],
         "rubberband_speed_bonus_ratio": ai_metrics["rubberband_speed_bonus_ratio"],
     }
+    for tier in (1, 2, 3):
+        metric_name = f"car_lengths_gained_tier{tier}"
+        reason = _baseline_contamination_reason(doc, tier)
+        if reason is not None:
+            metrics[f"__{metric_name}_reason"] = reason
     return metrics
 
 
-def _within(actual: float | bool, low: float | bool, high: float | bool) -> bool:
+def _within(actual: float | bool | None, low: float | bool, high: float | bool) -> bool:
+    if actual is None:
+        return False
     if isinstance(low, bool):
         return actual is low
     value = _finite(actual, math.inf)
     return value >= float(low) and value <= float(high)
 
 
-def _relative_gap(actual: float | bool, low: float | bool, high: float | bool) -> float:
+def _relative_gap(actual: float | bool | None, low: float | bool, high: float | bool) -> float:
+    if actual is None:
+        return math.inf
     if isinstance(low, bool):
         return 0.0 if actual is low else 1.0
     value = _finite(actual, math.inf)
@@ -713,7 +752,9 @@ def _relative_gap(actual: float | bool, low: float | bool, high: float | bool) -
     return 0.0
 
 
-def _delta(actual: float | bool, low: float | bool, high: float | bool) -> str:
+def _delta(actual: float | bool | None, low: float | bool, high: float | bool) -> str:
+    if actual is None:
+        return "actual=missing; measurement required"
     if isinstance(low, bool):
         return f"actual={str(actual).lower()}; target={str(low).lower()}"
     value = _finite(actual, math.inf)
@@ -723,7 +764,7 @@ def _delta(actual: float | bool, low: float | bool, high: float | bool) -> str:
 
 
 def build_verdict(
-    metrics: dict[str, float | bool],
+    metrics: dict[str, float | bool | None],
     *,
     round_number: int = 3,
     artifact: str = "telemetry/lap-a.json",
@@ -733,17 +774,27 @@ def build_verdict(
     failures = []
     for metric_id, metric_name, low, high, priority in WINDOWS:
         actual = metrics.get(metric_name, 0.0 if not isinstance(low, bool) else False)
-        status = "PASS" if _within(actual, low, high) else "FAIL"
+        if actual is None:
+            actual_for_schema = False if isinstance(low, bool) else 0.0
+            delta = str(
+                metrics.get(f"__{metric_name}_reason")
+                or "actual=missing; measurement required"
+            )
+            status = "FAIL"
+        else:
+            actual_for_schema = actual
+            status = "PASS" if _within(actual, low, high) else "FAIL"
+            delta = _delta(actual, low, high)
         check = {
             "id": metric_id,
             "metric": metric_name,
-            "actual": actual,
+            "actual": actual_for_schema,
             "window": low if isinstance(low, bool) else [low, high],
             "status": status,
         }
         checks.append(check)
         if status == "FAIL":
-            failures.append((priority, -_relative_gap(actual, low, high), metric_id, _delta(actual, low, high)))
+            failures.append((priority, -_relative_gap(actual, low, high), metric_id, delta))
 
     failures.sort()
     verdict = "PASS" if not failures else "FAIL"

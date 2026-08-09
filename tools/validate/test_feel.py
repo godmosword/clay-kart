@@ -71,6 +71,54 @@ def test_priority_selects_single_largest_gap_and_keeps_core_45_visible() -> None
     }
 
 
+def test_wall_contaminated_tier_baseline_fails_with_environment_reason() -> None:
+    telemetry = {
+        "meta": {
+            "baselines": {
+                "2": {
+                    "measurement_status": "wall_contaminated_measurement",
+                    "contact_frames_in_window": 204,
+                    "baseline_contact_frames_in_window": 0,
+                    "drift_distance": 47.2,
+                    "straight_distance": 43.5,
+                },
+            },
+        },
+        "frames": [],
+        "events": [],
+    }
+    metrics = _metrics_with("car_lengths_gained_tier2", 0.0)
+    measured_metrics = calculate_metrics(telemetry)
+    assert measured_metrics["car_lengths_gained_tier2"] is None
+    metrics["car_lengths_gained_tier2"] = None
+    metrics["__car_lengths_gained_tier2_reason"] = measured_metrics[
+        "__car_lengths_gained_tier2_reason"
+    ]
+    verdict = build_verdict(metrics)
+    check = next(check for check in verdict["checks"] if check["id"] == "4.5")
+    assert check["status"] == "FAIL"
+    assert check["actual"] == 0.0
+    assert "wall_contaminated_measurement" in verdict["largest_gap"]["delta"]
+    assert "contact_frames_in_window=204" in verdict["largest_gap"]["delta"]
+
+
+def test_contact_field_alone_invalidates_a_tier_baseline() -> None:
+    telemetry = {
+        "meta": {
+            "baselines": {
+                "3": {
+                    "contact_frames_in_window": 1,
+                    "car_lengths_gained": 3.2,
+                },
+            },
+        },
+        "frames": [],
+        "events": [],
+    }
+    metrics = calculate_metrics(telemetry)
+    assert metrics["car_lengths_gained_tier3"] is None
+
+
 def test_simulated_telemetry_calculates_fixed_dt_and_nan_metrics() -> None:
     telemetry = {
         "meta": {

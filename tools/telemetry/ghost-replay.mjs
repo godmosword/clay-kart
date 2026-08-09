@@ -271,7 +271,7 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options =
     // advance() owns the world.setInput() + world.step() ordering.
     let requestedInput;
     advance(world, 1, () => {
-      requestedInput = inputAtTick(tick);
+      requestedInput = inputAtTick(tick, world.snapshot());
       return requestedInput;
     });
     const current = world.snapshot();
@@ -844,22 +844,62 @@ async function rubberbandProbe() {
 }
 
 const DRIFT_COVERAGE_ACCELERATION_TICKS = 120;
-const DRIFT_COVERAGE_HOLD_TICKS = Object.freeze({ 1: 110, 3: 432 });
+// The drift state begins on the first simulation tick after the input becomes
+// eligible, and floating-point accumulation can leave the exact 2.0 s
+// threshold infinitesimally below the boundary. Tier 2 therefore holds two
+// extra request ticks before release.
+const DRIFT_COVERAGE_HOLD_TICKS = Object.freeze({ 1: 110, 2: 242, 3: 432 });
+const DRIFT_COVERAGE_PROBE_CONFIG = Object.freeze({
+  1: Object.freeze({
+    playerStartAngle: 4,
+    radialGain: 0.25,
+    radialVelocityGain: 0.15,
+  }),
+  2: Object.freeze({
+    playerStartAngle: 4,
+    radialGain: 0.25,
+    radialVelocityGain: 0.15,
+  }),
+  3: Object.freeze({
+    playerStartAngle: 4,
+    radialGain: 0.25,
+    radialVelocityGain: 0.15,
+  }),
+});
 
-function driftCoverageInput(releaseTick, drift, tick, steer) {
-  if (tick < DRIFT_COVERAGE_ACCELERATION_TICKS) {
-    return {
-      throttle: 1,
-      steer: 0,
-      brake: false,
-      reverse: false,
-      drift: false,
-      jump: false,
-    };
-  }
+const PROBE_MAX_STEER_YAW_RATE = 2.7;
+
+function laneKeepingSteer(snapshot, drift, tick, probeConfig) {
+  const kart = playerKart(snapshot);
+  const dx = kart.pos[0] - TRACK_GEOMETRY.centerX;
+  const dz = kart.pos[2] - TRACK_GEOMETRY.centerZ;
+  const radialDistance = Math.hypot(dx, dz);
+  const speed = groundSpeed(kart);
+  const desiredYaw = -Math.atan2(dz, dx);
+  const yawError = signedAngleDelta(kart.yaw, desiredYaw);
+  const radialError = radialDistance - TRACK_GEOMETRY.radius;
+  const radialSpeed = radialDistance > 0
+    ? (kart.vel[0] * dx + kart.vel[2] * dz) / radialDistance
+    : 0;
+  const targetYawRate = -speed / TRACK_GEOMETRY.radius
+    + yawError * 4
+    - radialError * probeConfig.radialGain
+    - radialSpeed * probeConfig.radialVelocityGain;
+  const driftRatio = drift && tick >= DRIFT_COVERAGE_ACCELERATION_TICKS ? 1.4 : 1;
+  const speedFactor = Math.max(speed / BASE_TOP_SPEED, 0.05);
+  return Math.max(
+    -0.8,
+    Math.min(
+      0.8,
+      targetYawRate / (PROBE_MAX_STEER_YAW_RATE * speedFactor * driftRatio),
+    ),
+  );
+}
+
+function driftCoverageInput(releaseTick, drift, tick, probeConfig, snapshot) {
   return {
     throttle: 1,
-    steer,
+    steer: laneKeepingSteer(snapshot, drift, tick, probeConfig),
     brake: false,
     reverse: false,
     drift: drift && tick < releaseTick,
@@ -875,23 +915,59 @@ function meanValues(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function boundaryDistance(frame) {
+  const radialDistance = Math.hypot(
+    frame.pos[0] - TRACK_GEOMETRY.centerX,
+    frame.pos[2] - TRACK_GEOMETRY.centerZ,
+  );
+  const kartRadius = Math.hypot(CAR_LENGTH / 2, CAR_WIDTH / 2);
+  const innerBoundary = TRACK_GEOMETRY.radius - TRACK_GEOMETRY.halfWidth + kartRadius;
+  const outerBoundary = TRACK_GEOMETRY.radius + TRACK_GEOMETRY.halfWidth - kartRadius;
+  return Math.min(radialDistance - innerBoundary, outerBoundary - radialDistance);
+}
+
+function measurementWindow(replay, releaseTick) {
+  const startTick = releaseTick + 1;
+  const endTick = releaseTick + 2 * TICK_HZ;
+  const frames = replay.frames.filter((frame) => (
+    frame.tick >= startTick && frame.tick <= endTick
+  ));
+  const wallContactTicks = frames
+    .filter((frame) => frame.wall_contact)
+    .map((frame) => frame.tick);
+  return {
+    start_tick: startTick,
+    end_tick: endTick,
+    frame_count: frames.length,
+    contact_frames_in_window: wallContactTicks.length,
+    wall_contact_ticks: wallContactTicks,
+    min_boundary_distance: Math.min(...frames.map((frame) => boundaryDistance(frame))),
+    frames: frames.map((frame) => ({
+      tick: frame.tick,
+      pos: [...frame.pos],
+      wall_contact: frame.wall_contact,
+      boundary_distance: boundaryDistance(frame),
+    })),
+  };
+}
+
 async function driftCoverageProbe(tier) {
   const holdTicks = DRIFT_COVERAGE_HOLD_TICKS[tier];
+  const probeConfig = DRIFT_COVERAGE_PROBE_CONFIG[tier];
   const releaseTick = DRIFT_COVERAGE_ACCELERATION_TICKS + holdTicks;
   const totalTicks = releaseTick + 2 * TICK_HZ + 1;
-  const steer = tier === 3 ? 0.2 : -0.2;
-  const worldOptions = tier === 3 ? { playerStartAngle: Math.PI / 2 } : undefined;
+  const worldOptions = { playerStartAngle: probeConfig.playerStartAngle };
   const [drift, straight] = await Promise.all([
     replayTicks(
       totalTicks,
-      (tick) => driftCoverageInput(releaseTick, true, tick, steer),
+      (tick, snapshot) => driftCoverageInput(releaseTick, true, tick, probeConfig, snapshot),
       `drift-tier-${tier}`,
       `${fixture.seed}-drift-tier-${tier}`,
       { worldOptions },
     ),
     replayTicks(
       totalTicks,
-      (tick) => driftCoverageInput(releaseTick, false, tick, steer),
+      (tick, snapshot) => driftCoverageInput(releaseTick, false, tick, probeConfig, snapshot),
       `drift-tier-${tier}-baseline`,
       `${fixture.seed}-drift-tier-${tier}-baseline`,
       { worldOptions },
@@ -910,15 +986,41 @@ async function driftCoverageProbe(tier) {
   if (!driftReleaseFrame || !driftAfterFrame || !straightReleaseFrame || !straightAfterFrame) {
     throw new Error(`drift tier-${tier} probe is too short for the two-second baseline`);
   }
+  const driftMeasurementWindow = measurementWindow(drift, releaseEvent.tick);
+  const straightMeasurementWindow = measurementWindow(straight, releaseEvent.tick);
+  const expectedWindowFrames = 2 * TICK_HZ;
+  if (
+    driftMeasurementWindow.frame_count !== expectedWindowFrames
+    || straightMeasurementWindow.frame_count !== expectedWindowFrames
+  ) {
+    throw new Error(`drift tier-${tier} probe shortened its fixed measurement window`);
+  }
   const driftDistance = distance2d(driftReleaseFrame, driftAfterFrame);
   const straightDistance = distance2d(straightReleaseFrame, straightAfterFrame);
   const tierUp = drift.events.find((event) => (
     event.type === 'drift_tier_up' && event.data?.tier === tier
   ));
   const driftStartTick = drift.events.find((event) => event.type === 'drift_start')?.tick ?? null;
-  return {
+  const contactFramesInWindow = driftMeasurementWindow.contact_frames_in_window;
+  const baselineContactFramesInWindow = straightMeasurementWindow.contact_frames_in_window;
+  const measurementStatus = contactFramesInWindow > 0 || baselineContactFramesInWindow > 0
+    ? 'wall_contaminated_measurement'
+    : 'clean_measurement';
+  const probe = {
     name: `drift-tier-${tier}`,
     tier,
+    setup: {
+      acceleration_ticks: DRIFT_COVERAGE_ACCELERATION_TICKS,
+      hold_ticks: holdTicks,
+      player_start_angle: probeConfig.playerStartAngle,
+      steering_controller: {
+        type: 'annular_lane_tangent_with_radial_error_feedback',
+        radial_gain: probeConfig.radialGain,
+        radial_velocity_gain: probeConfig.radialVelocityGain,
+        max_steer: 0.8,
+      },
+      measurement_window_ticks: expectedWindowFrames,
+    },
     drift_start_tick: driftStartTick,
     tier_up_tick: tierUp?.tick ?? null,
     charge_time_s: driftStartTick !== null && tierUp
@@ -927,23 +1029,32 @@ async function driftCoverageProbe(tier) {
     release_tick: releaseEvent.tick,
     drift_distance: driftDistance,
     straight_distance: straightDistance,
-    car_lengths_gained: (driftDistance - straightDistance) / CAR_LENGTH,
+    contact_frames_in_window: contactFramesInWindow,
+    baseline_contact_frames_in_window: baselineContactFramesInWindow,
+    measurement_status: measurementStatus,
+    measurement_window: driftMeasurementWindow,
+    baseline_measurement_window: straightMeasurementWindow,
     deterministic_byte_identical: JSON.stringify(drift) === JSON.stringify(
       await replayTicks(
         totalTicks,
-        (tick) => driftCoverageInput(releaseTick, true, tick, steer),
+        (tick, snapshot) => driftCoverageInput(releaseTick, true, tick, probeConfig, snapshot),
         `drift-tier-${tier}`,
         `${fixture.seed}-drift-tier-${tier}`,
         { worldOptions },
       ),
     ),
   };
+  if (measurementStatus === 'clean_measurement') {
+    probe.car_lengths_gained = (driftDistance - straightDistance) / CAR_LENGTH;
+  }
+  return probe;
 }
 
 const driftReplays = await Promise.all([replayOnce(), replayOnce(), replayOnce()]);
 const baseline = await replayOnce((input) => ({ ...input, drift: false }));
 const driftCoverageProbes = await Promise.all([
   driftCoverageProbe(1),
+  driftCoverageProbe(2),
   driftCoverageProbe(3),
 ]);
 const collisionProbes = await Promise.all([
@@ -1025,30 +1136,18 @@ const steeringRadiusSamples = steeringCalibration.frames
   }));
 const releaseEvent = driftReplays[0].events.find((event) => event.type === 'miniturbo_release' && event.data?.tier === 2);
 if (!releaseEvent) throw new Error('fixture did not produce a tier-2 miniturbo release');
-const releaseTick = releaseEvent.tick;
-const driftReleaseFrame = driftReplays[0].frames.find((frame) => frame.tick === releaseTick);
-const driftAfterFrame = driftReplays[0].frames.find((frame) => frame.tick === releaseTick + 2 * TICK_HZ);
-const straightReleaseFrame = baseline.frames.find((frame) => frame.tick === releaseTick);
-const straightAfterFrame = baseline.frames.find((frame) => frame.tick === releaseTick + 2 * TICK_HZ);
-if (!driftReleaseFrame || !driftAfterFrame || !straightReleaseFrame || !straightAfterFrame) {
-  throw new Error('fixture is too short for the two-second tier-2 baseline');
-}
-const driftDistance = distance2d(driftReleaseFrame, driftAfterFrame);
-const straightDistance = distance2d(straightReleaseFrame, straightAfterFrame);
-const baselines = {
-  '2': {
-    release_tick: releaseTick,
-    drift_distance: driftDistance,
-    straight_distance: straightDistance,
-    car_lengths_gained: (driftDistance - straightDistance) / CAR_LENGTH,
-  },
-};
+const baselines = {};
 for (const probe of driftCoverageProbes) {
   baselines[String(probe.tier)] = {
     release_tick: probe.release_tick,
     drift_distance: probe.drift_distance,
     straight_distance: probe.straight_distance,
-    car_lengths_gained: probe.car_lengths_gained,
+    contact_frames_in_window: probe.contact_frames_in_window,
+    baseline_contact_frames_in_window: probe.baseline_contact_frames_in_window,
+    measurement_status: probe.measurement_status,
+    ...(probe.car_lengths_gained === undefined
+      ? {}
+      : { car_lengths_gained: probe.car_lengths_gained }),
   };
 }
 const activeDriftFrames = driftReplays[0].frames.filter((frame) => frame.drift_state !== 'none');
