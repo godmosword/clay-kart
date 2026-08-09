@@ -23,7 +23,8 @@
       "@physics/*": ["./src/physics/*"],
       "@render/*": ["./src/render/*"],
       "@ui/*": ["./src/ui/*"],
-      "@loader/*": ["./src/loader/*"]
+      "@loader/*": ["./src/loader/*"],
+      "@audio/*": ["./src/audio/*"]
     }
   },
   "include": ["src", "tools", "vite.config.ts"]

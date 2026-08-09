@@ -11,6 +11,7 @@ export default defineConfig({
       '@render': r('./src/render'),
       '@ui': r('./src/ui'),
       '@loader': r('./src/loader'),
+      '@audio': r('./src/audio'),
     },
   },
   server: { host: true, port: 5173 },

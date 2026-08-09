@@ -18,7 +18,9 @@
     "game-shot": "npm run build && node tools/visual/game-shot.mjs",
     "contact-sheet": "node tools/visual/contact-sheet.mjs",
     "progress": "python3 -m http.server 8080",
-    "render-components": "node tools/visual/render-components.mjs"
+    "render-components": "node tools/visual/render-components.mjs",
+    "test:audio": "npm run build && node tools/visual/check-audio.mjs",
+    "test:content": "npm run build && node tools/visual/check-audio.mjs"
   },
   "dependencies": {
     "three": "^0.185.1"

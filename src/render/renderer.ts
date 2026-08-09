@@ -39,6 +39,7 @@ import { createTrackSurfaceRing, ROAD_SURFACE_Y } from './components/track-surfa
 import { createFoliageScatter } from './components/foliage.js';
 import { createClayMaterial } from './clay/material.js';
 import { CAR_PARK, TERRAIN, XIAOHONG } from './clay/palette.js';
+import { createClayAudio, type ClayAudio } from '@audio/index';
 
 const CAMERA_FOV_DEG = 55;
 const CAMERA_FOLLOW_DISTANCE = 8;
@@ -98,6 +99,13 @@ class ClayRenderer implements Renderer {
   //
   // 「元件圖有、遊戲裡沒有」正是 `§5.3` 明文要排除的那種通過方式。
   readonly #lighting = createClayLighting({ shadows: true });
+
+  /**
+   * 遊戲音訊。合成，不播音檔——上游素材是 6.6 分鐘的 podcast 旁白，
+   * 不是音效（`CHARACTERS.md §7` 說「可 100% 複用」是錯的，R36 實測）。
+   * 沒有 Web Audio 的環境下所有方法是 no-op，不會擋住算繪。
+   */
+  readonly #audio: ClayAudio = createClayAudio();
   /**
    * 每台車一塊接地色塊。**不只玩家車**——R32 有一版只給玩家，
    * 對手因此完全沒有接地感，看起來像浮在路面上。
@@ -136,6 +144,13 @@ class ClayRenderer implements Renderer {
     // `BAR-PERF §4` 的量測來源。掛在這裡而不是 `src/loader/`——那是 Cursor
     // 的範圍，而計數器是 render 端遞增的，掛載點跟遞增點放在一起比較不會漂。
     exposeRenderTelemetry();
+
+    // `BAR-CONTENT §2.3`／`§2.4` 的量測掛鉤。跟 `exposeRenderTelemetry()`
+    // 同一個理由掛在這裡：曝露點與擁有者放在一起才不會漂。
+    (window as unknown as { __CLAY_AUDIO__?: unknown }).__CLAY_AUDIO__ = {
+      debugState: () => this.#audio.debugState(),
+      __forceSpeedRatio: (r: number) => this.#audio.forceSpeedRatio(r),
+    };
 
     this.#buildGround();
     this.#buildTrack();
@@ -294,6 +309,11 @@ class ClayRenderer implements Renderer {
     // `BAR-PERF §4` 的分母。有它才分得開「抽格」與「慢」：
     // updates / renderedFrames 該是 1.0，與機器快慢無關。
     renderTelemetry.renderedFrames += 1;
+
+    // 音訊從這裡驅動而不是 bootstrap——後者是 Cursor 的範圍，
+    // 而音訊要的正是「每幀最新的 snapshot」，renderer 本來就有。
+    // 詳見 `src/audio/index.ts` 的檔頭。
+    this.#audio.update(snap);
 
     let playerIx = 0, playerIy = 0, playerIz = 0, playerIyaw = 0;
     let characterAnimationInstances = 0;
