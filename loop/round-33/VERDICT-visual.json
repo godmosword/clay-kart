@@ -1,0 +1,36 @@
+{
+  "round": 33,
+  "wave": "W3",
+  "element": "visual-contact-sheet",
+  "verdict": "FAIL",
+  "bar_ref": "BAR-VISUAL.md §1, §5",
+  "checks": [
+    {"id": "track-surface", "metric": "clay_score_1to5", "actual": 3, "window": [4, 5], "status": "FAIL"},
+    {"id": "track-barriers", "metric": "clay_score_1to5", "actual": 3, "window": [4, 5], "status": "FAIL"},
+    {"id": "kart-body", "metric": "clay_score_1to5", "actual": 3, "window": [4, 5], "status": "FAIL"},
+    {"id": "driver-face", "metric": "clay_score_1to5", "actual": 3, "window": [4, 5], "status": "FAIL"}
+  ],
+  "largest_gap": {
+    "id": "visual-clay-detail",
+    "delta": "四個有效 A/B 配對的中位數都是 3；三輪之間只有 track-barriers 出現 3/4/3 的一分變異，其餘三組零變異。共同落差是即時算繪的壓痕、接縫與手捏不規則度比近拍參考弱。",
+    "priority_rank": 1
+  },
+  "assembled_scene": {
+    "driver_face_front_visibility": "not_established_rear_view",
+    "contact_shadow": "observed_short_soft_low_contrast",
+    "road_barrier_assembly": "observed_readable",
+    "shared_lighting": "observed_coherent_soft_daylight"
+  },
+  "artifacts": [
+    "loop/round-33/CRITIC-PROMPT.md",
+    "loop/round-33/artifacts/contact-sheet.png",
+    "loop/round-33/artifacts/game-scene.png",
+    "loop/round-33/artifacts/CRITIC-run1.md",
+    "loop/round-33/artifacts/CRITIC-run2.md",
+    "loop/round-33/artifacts/CRITIC-run3.md",
+    "loop/round-33/CRITIC-NOTES.md"
+  ],
+  "next_owner": "claude-code",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 0
+}

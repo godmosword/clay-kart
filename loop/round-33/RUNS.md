@@ -25,10 +25,10 @@
 
 ## 進度
 
-- [ ] run 1 → `artifacts/CRITIC-run1.md`
-- [ ] run 2 → `artifacts/CRITIC-run2.md`
-- [ ] run 3 → `artifacts/CRITIC-run3.md`
-- [ ] 彙整 → `VERDICT-visual.json` + `CRITIC-NOTES.md`
+- [x] run 1 → `artifacts/CRITIC-run1.md`
+- [x] run 2 → `artifacts/CRITIC-run2.md`
+- [x] run 3 → `artifacts/CRITIC-run3.md`
+- [x] 彙整 → `VERDICT-visual.json` + `CRITIC-NOTES.md`
 
 ## 讀法（R33 裁決時先講死，數字出來後不得更改）
 
