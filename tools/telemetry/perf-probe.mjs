@@ -346,6 +346,10 @@ function browserProbeScript() {
     inputTimers: [],
     textureBytes: 0,
     textureContexts: new Map(),
+    glRenderer: null,
+    glVendor: null,
+    glRendererSource: null,
+    glContextType: null,
     renderTelemetryStart: null,
     heapRunning: false,
     heapSamples: [],
@@ -387,6 +391,37 @@ function browserProbeScript() {
   const readHeapBytes = () => performance.memory
     ? performance.memory.usedJSHeapSize
     : null;
+  const captureGlInfo = (gl, contextType) => {
+    if (!gl) return;
+    let renderer = null;
+    let vendor = null;
+    let source = null;
+    try {
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      if (debugInfo) {
+        renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+        source = 'WEBGL_debug_renderer_info.UNMASKED_RENDERER_WEBGL';
+      } else {
+        renderer = gl.getParameter(gl.RENDERER);
+        vendor = gl.getParameter(gl.VENDOR);
+        source = 'WebGLRenderingContext.RENDERER (debug extension unavailable)';
+      }
+    } catch {
+      // Keep the renderer explicitly missing; launch flags are not evidence
+      // that a hardware backend was actually selected.
+    }
+    if (typeof renderer === 'string' && renderer.length > 0) state.glRenderer = renderer;
+    if (typeof vendor === 'string' && vendor.length > 0) state.glVendor = vendor;
+    if (typeof source === 'string') state.glRendererSource = source;
+    if (typeof contextType === 'string') state.glContextType = contextType;
+  };
+  const originalCanvasGetContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+    const context = originalCanvasGetContext.call(this, type, ...args);
+    if (typeof type === 'string' && /webgl/i.test(type)) captureGlInfo(context, type);
+    return context;
+  };
   const readLapSnapshot = () => {
     const values = [...document.querySelectorAll('[data-role="clay-hud-value"]')];
     const lapText = values[0]?.textContent ?? '';
@@ -748,6 +783,165 @@ async function evaluatePage(session, expression) {
   return result?.result?.value;
 }
 
+const HARDWARE_GL_FLAGS = [
+  '--enable-gpu',
+  '--use-gl=angle',
+  '--use-angle=metal',
+  '--disable-software-rasterizer',
+];
+const SOFTWARE_GL_FLAGS = [
+  '--use-gl=angle',
+  '--use-angle=swiftshader',
+];
+
+function chromeFlags(backend, userDataDir) {
+  const glFlags = backend === 'hardware_gl' ? HARDWARE_GL_FLAGS : SOFTWARE_GL_FLAGS;
+  return [
+    '--headless=new',
+    '--no-sandbox',
+    '--disable-extensions',
+    '--disable-background-networking',
+    ...glFlags,
+    '--remote-debugging-address=127.0.0.1',
+    '--remote-debugging-port=0',
+    `--user-data-dir=${userDataDir}`,
+    'about:blank',
+  ];
+}
+
+function rendererLooksSoftware(renderer) {
+  return typeof renderer !== 'string'
+    || renderer.length === 0
+    || /swiftshader|software|llvmpipe|softpipe|basic render/i.test(renderer);
+}
+
+async function closeBrowserSession(browser) {
+  if (!browser) return;
+  browser.session?.close();
+  if (browser.child.exitCode === null) browser.child.kill('SIGTERM');
+  if (browser.child.exitCode === null) {
+    await new Promise((resolveExit) => browser.child.once('exit', resolveExit));
+  }
+  await rm(browser.userDataDir, { recursive: true, force: true });
+}
+
+async function openBrowserSession(chromePath, serverPort, { sceneOnly, backend }) {
+  const userDataDir = await mkdtemp(join(
+    tmpdir(),
+    sceneOnly ? 'clay-kart-r33-scene-chrome-' : 'clay-kart-r33-chrome-',
+  ));
+  const child = spawn(chromePath, chromeFlags(backend, userDataDir), {
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let session = null;
+  try {
+    const debugPort = await waitForDevtoolsPort(child);
+    const page = await waitForPageTarget(debugPort);
+    session = new CdpSession(page.webSocketDebuggerUrl);
+    await session.connect();
+    await session.call('Page.enable');
+    if (!sceneOnly) await session.call('Network.enable');
+    await session.call('Runtime.enable');
+    await session.call('Page.addScriptToEvaluateOnNewDocument', { source: browserProbeScript() });
+    await session.call('Emulation.setDeviceMetricsOverride', {
+      width: 800,
+      height: 600,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    if (!sceneOnly) {
+      await session.call('Network.emulateNetworkConditions', {
+        offline: FOUR_G_PROFILE.offline,
+        latency: FOUR_G_PROFILE.latency_ms,
+        downloadThroughput: FOUR_G_PROFILE.download_throughput_bps,
+        uploadThroughput: FOUR_G_PROFILE.upload_throughput_bps,
+        connectionType: FOUR_G_PROFILE.connection_type,
+      });
+    }
+    await session.call('Page.navigate', { url: `http://127.0.0.1:${serverPort}/index.html` });
+    await sleep(1500);
+    const renderer = await evaluatePage(
+      session,
+      `(() => {
+        const state = window.__R16_PERF__;
+        return {
+          canvas_count: document.querySelectorAll('canvas').length,
+          rendered_frames: state?.glFrames?.size ?? 0,
+          gl_renderer: state?.glRenderer ?? null,
+          gl_vendor: state?.glVendor ?? null,
+          gl_renderer_source: state?.glRendererSource ?? null,
+          gl_context_type: state?.glContextType ?? null,
+        };
+      })()`,
+    );
+    if (!renderer || renderer.canvas_count < 1 || renderer.rendered_frames < 1) {
+      throw new Error(`headless GL context unavailable: ${JSON.stringify(renderer)}`);
+    }
+    return {
+      child,
+      session,
+      userDataDir,
+      glRenderer: renderer.gl_renderer,
+      glVendor: renderer.gl_vendor,
+      glRendererSource: renderer.gl_renderer_source,
+      glContextType: renderer.gl_context_type,
+    };
+  } catch (error) {
+    await closeBrowserSession({ child, session, userDataDir });
+    throw error;
+  }
+}
+
+async function selectBrowserSession(chromePath, serverPort, { sceneOnly }) {
+  const hardwareAttempt = {
+    requested_backend: 'hardware_gl',
+    requested_flags: HARDWARE_GL_FLAGS,
+    status: 'unavailable',
+    observed_renderer: null,
+    conclusion: null,
+  };
+  let hardware = null;
+  try {
+    hardware = await openBrowserSession(chromePath, serverPort, {
+      sceneOnly,
+      backend: 'hardware_gl',
+    });
+    hardwareAttempt.observed_renderer = hardware.glRenderer;
+    if (!rendererLooksSoftware(hardware.glRenderer)) {
+      hardwareAttempt.status = 'selected';
+      hardwareAttempt.conclusion = 'headless hardware GL selected for this measurement';
+      return {
+        ...hardware,
+        renderBackend: 'hardware_gl',
+        hardwareGlAttempt: hardwareAttempt,
+      };
+    }
+    hardwareAttempt.conclusion = (
+      'headless hardware GL flags produced a software renderer; the probe will report '
+      + 'the software environment instead of treating it as hardware'
+    );
+    // A detected software backend is evidence of an environment limitation,
+    // never an escape hatch that makes timing checks pass or disappear.
+    await closeBrowserSession(hardware);
+    hardware = null;
+  } catch (error) {
+    hardwareAttempt.conclusion = (
+      `headless hardware GL unavailable: ${error instanceof Error ? error.message : String(error)}`
+    );
+    if (hardware) await closeBrowserSession(hardware);
+  }
+
+  const software = await openBrowserSession(chromePath, serverPort, {
+    sceneOnly,
+    backend: 'swiftshader_software',
+  });
+  return {
+    ...software,
+    renderBackend: 'swiftshader_software',
+    hardwareGlAttempt: hardwareAttempt,
+  };
+}
+
 async function measureHeapRace(session, serverPort, targetLaps) {
   await session.call('Page.navigate', {
     url: `http://127.0.0.1:${serverPort}/index.html?perfHeap=1`,
@@ -825,37 +1019,10 @@ async function measureHeapLaps(session, serverPort) {
 async function measureSceneOnly() {
   const chromePath = await findChrome();
   const { server, port: serverPort } = await startStaticServer();
-  const userDataDir = await mkdtemp(join(tmpdir(), 'clay-kart-r30-scene-chrome-'));
-  const child = spawn(chromePath, [
-    '--headless=new',
-    '--no-sandbox',
-    '--disable-extensions',
-    '--disable-background-networking',
-    '--use-gl=angle',
-    '--use-angle=swiftshader',
-    '--remote-debugging-address=127.0.0.1',
-    '--remote-debugging-port=0',
-    `--user-data-dir=${userDataDir}`,
-    'about:blank',
-  ], { stdio: ['ignore', 'ignore', 'pipe'] });
-  let session = null;
+  let browser = null;
   try {
-    const debugPort = await waitForDevtoolsPort(child);
-    const page = await waitForPageTarget(debugPort);
-    session = new CdpSession(page.webSocketDebuggerUrl);
-    await session.connect();
-    await session.call('Page.enable');
-    await session.call('Runtime.enable');
-    await session.call('Page.addScriptToEvaluateOnNewDocument', { source: browserProbeScript() });
-    await session.call('Emulation.setDeviceMetricsOverride', {
-      width: 800,
-      height: 600,
-      deviceScaleFactor: 1,
-      mobile: false,
-    });
-    await session.call('Page.navigate', { url: `http://127.0.0.1:${serverPort}/index.html` });
-    await sleep(1500);
-    const result = await session.call('Runtime.evaluate', {
+    browser = await selectBrowserSession(chromePath, serverPort, { sceneOnly: true });
+    const result = await browser.session.call('Runtime.evaluate', {
       expression: `(() => {
         const state = window.__R16_PERF__;
         const drawCallsPerFrame = state?.frameDrawCalls ? [...state.frameDrawCalls.values()] : [];
@@ -882,6 +1049,10 @@ async function measureSceneOnly() {
       ...measured,
       mode: 'scene-only',
       chrome_path: chromePath,
+      render_backend: browser.renderBackend,
+      gl_renderer: browser.glRenderer,
+      gl_renderer_source: browser.glRendererSource,
+      hardware_gl_attempt: browser.hardwareGlAttempt,
       measurement_seconds: 1.5,
       unsupported_metrics: [
         'fps_p50', 'fps_p05', 'frame_time_p99_ms', 'long_frame_count',
@@ -891,55 +1062,19 @@ async function measureSceneOnly() {
       ],
     };
   } finally {
-    session?.close();
-    child.kill('SIGTERM');
-    await new Promise((resolveExit) => child.once('exit', resolveExit));
+    await closeBrowserSession(browser);
     await new Promise((resolveServer) => server.close(resolveServer));
-    await rm(userDataDir, { recursive: true, force: true });
   }
 }
 
 async function measureBrowser() {
   const chromePath = await findChrome();
   const { server, port: serverPort } = await startStaticServer();
-  const userDataDir = await mkdtemp(join(tmpdir(), 'clay-kart-r16-chrome-'));
-  const child = spawn(chromePath, [
-    '--headless=new',
-    '--no-sandbox',
-    '--disable-extensions',
-    '--disable-background-networking',
-    '--use-gl=angle',
-    '--use-angle=swiftshader',
-    '--remote-debugging-address=127.0.0.1',
-    '--remote-debugging-port=0',
-    `--user-data-dir=${userDataDir}`,
-    'about:blank',
-  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let browser = null;
   let session = null;
   try {
-    const debugPort = await waitForDevtoolsPort(child);
-    const page = await waitForPageTarget(debugPort);
-    session = new CdpSession(page.webSocketDebuggerUrl);
-    await session.connect();
-    await session.call('Page.enable');
-    await session.call('Network.enable');
-    await session.call('Runtime.enable');
-    await session.call('Page.addScriptToEvaluateOnNewDocument', { source: browserProbeScript() });
-    await session.call('Emulation.setDeviceMetricsOverride', {
-      width: 800,
-      height: 600,
-      deviceScaleFactor: 1,
-      mobile: false,
-    });
-    await session.call('Network.emulateNetworkConditions', {
-      offline: FOUR_G_PROFILE.offline,
-      latency: FOUR_G_PROFILE.latency_ms,
-      downloadThroughput: FOUR_G_PROFILE.download_throughput_bps,
-      uploadThroughput: FOUR_G_PROFILE.upload_throughput_bps,
-      connectionType: FOUR_G_PROFILE.connection_type,
-    });
-    await session.call('Page.navigate', { url: `http://127.0.0.1:${serverPort}/index.html` });
-    await sleep(1500);
+    browser = await selectBrowserSession(chromePath, serverPort, { sceneOnly: false });
+    session = browser.session;
     const segments = fixtureSegmentsForWindow();
     // Network throttling belongs to §3.1/§3.4 load timing only. Disable it
     // before the short render window so §2/§4 are not network-throttled.
@@ -1071,13 +1206,23 @@ async function measureBrowser() {
             character_anim_hz: characterAnimationHz,
             character_animation_per_frame: characterAnimationPerFrame,
           }
-            : {
-              mode: 'quantization_ratio_proves_quantization_only',
-              conclusion: 'only quantization is tested; 12Hz frequency is not resolvable at this sampling rate',
+          : fpsP05 > 12.63
+            ? {
+              mode: 'quantization_ratio_two_sided_window',
+              conclusion: 'only quantization is tested; ratio is checked around the expected 12Hz sampling ratio',
               fps_p05: fpsP05,
               character_anim_hz: characterAnimationHz,
               character_animation_per_frame: characterAnimationPerFrame,
-              max_per_frame_ratio: 0.95,
+              expected_ratio: 12 / fpsP05,
+              ratio_window: [0.85 * 12 / fpsP05, Math.min(0.95, 1.15 * 12 / fpsP05)],
+            }
+            : {
+              mode: 'character_anim_unmeasurable_render_too_slow',
+              conclusion: 'FAIL: render rate is too slow; ratio is saturated and cannot resolve animation frequency',
+              fps_p05: fpsP05,
+              character_anim_hz: characterAnimationHz,
+              character_animation_per_frame: characterAnimationPerFrame,
+              render_too_slow_threshold_fps: 12.63,
             };
         const navigation = performance.getEntriesByType('navigation')[0];
         const heap = state?.frameHeapSamples ?? [];
@@ -1218,18 +1363,26 @@ async function measureBrowser() {
       gc_pause_max_event: maxGcEvent,
       frame_breakdown: frameBreakdown,
       trace_gc_event_count: gcEvents.length,
+      render_backend: browser.renderBackend,
+      gl_renderer: browser.glRenderer,
+      gl_renderer_source: browser.glRendererSource,
+      hardware_gl_attempt: browser.hardwareGlAttempt,
     };
   } finally {
-    session?.close();
-    child.kill('SIGTERM');
-    await new Promise((resolveExit) => child.once('exit', resolveExit));
+    await closeBrowserSession(browser);
     await new Promise((resolveServer) => server.close(resolveServer));
-    await rm(userDataDir, { recursive: true, force: true });
   }
 }
 
 const measured = sceneOnly ? await measureSceneOnly() : await measureBrowser();
-const { chrome_path: chromePath, ...measurementMetrics } = measured;
+const {
+  chrome_path: chromePath,
+  render_backend: renderBackend,
+  gl_renderer: glRenderer,
+  gl_renderer_source: glRendererSource,
+  hardware_gl_attempt: hardwareGlAttempt,
+  ...measurementMetrics
+} = measured;
 const assets = await assetMetrics();
 const build = {
   sha: process.env.PERF_BUILD_SHA ?? buildSha(),
@@ -1244,9 +1397,15 @@ const report = {
     build_sha: build.sha,
     build,
     environment: environmentMetadata(chromePath),
+    render_backend: renderBackend,
+    gl_renderer: glRenderer,
+    gl_renderer_source: glRendererSource,
+    hardware_gl_attempt: hardwareGlAttempt,
     seed: fixture.seed,
     device,
-    device_note: 'Chrome headless ANGLE/SwiftShader proxy; not a real iPad/Android measurement',
+    device_note: renderBackend === 'swiftshader_software'
+      ? `Chrome headless software renderer (${glRenderer ?? 'renderer unavailable'}); timing metrics are environment-limited`
+      : `Chrome headless ${renderBackend} (${glRenderer ?? 'renderer unavailable'})`,
     mode: measured.mode ?? 'full',
     measurement_method: sceneOnly
       ? 'One post-load scene snapshot from external WebGL draw/triangle/texture instrumentation; renderer.info is private to src/render/renderer.ts.'
@@ -1275,4 +1434,9 @@ const report = {
 const output = resolve(outputPath);
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, JSON.stringify(report, null, 2) + '\n', 'utf8');
+if (renderBackend === 'swiftshader_software') {
+  console.error(
+    `perf-probe: headless hardware GL unavailable; reporting ${glRenderer ?? 'unknown'} as software-rendered environment`,
+  );
+}
 console.log(`perf-probe: headless ${device} -> ${output}`);

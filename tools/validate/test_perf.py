@@ -226,17 +226,80 @@ def test_low_render_rate_uses_the_quantization_ratio_window():
             "fps_p05": 20,
             "character_anim_hz": 9,
             "render_telemetry_ratios": {
-                "characterAnimationPerFrame": 0.8,
+                "characterAnimationPerFrame": 0.6,
             },
         },
     }))
 
     check = next(check for check in verdict["checks"] if check["id"] == "4.1")
     assert check["metric"] == "character_animation_per_frame"
-    assert check["window"] == [0.0, 0.95]
-    assert check["actual"] == 0.8
+    assert check["window"] == [0.51, 0.69]
+    assert check["actual"] == 0.6
     assert check["status"] == "PASS"
-    assert "mode=quantization_ratio_proves_quantization_only" in verdict["bar_ref"]
+    assert "mode=quantization_ratio_two_sided_window" in verdict["bar_ref"]
+
+
+def test_zero_animation_ratio_fails_the_two_sided_ratio_window():
+    verdict = build_verdict(calculate_metrics({
+        "metrics": {
+            "fps_p05": 20,
+            "character_animation_per_frame": 0.0,
+        },
+    }))
+
+    check = next(check for check in verdict["checks"] if check["id"] == "4.1")
+    assert check["window"] == [0.51, 0.69]
+    assert check["status"] == "FAIL"
+
+
+def test_section_four_one_has_three_non_overlapping_sampling_segments():
+    fast = build_verdict(calculate_metrics({
+        "metrics": {"fps_p05": 24.01, "character_anim_hz": 12},
+    }))
+    fast_check = next(check for check in fast["checks"] if check["id"] == "4.1")
+    assert fast_check["metric"] == "character_anim_hz"
+    assert fast_check["window"] == [11.5, 12.5]
+    assert fast_check["status"] == "PASS"
+
+    ratio = build_verdict(calculate_metrics({
+        "metrics": {"fps_p05": 24.0, "character_animation_per_frame": 0.5},
+    }))
+    ratio_check = next(check for check in ratio["checks"] if check["id"] == "4.1")
+    assert ratio_check["window"] == [0.425, 0.575]
+    assert ratio_check["status"] == "PASS"
+
+    too_slow = build_verdict(calculate_metrics({
+        "metrics": {"fps_p05": 12.63, "character_animation_per_frame": 1.0},
+    }))
+    too_slow_check = next(check for check in too_slow["checks"] if check["id"] == "4.1")
+    assert too_slow_check["window"] == [1.0, 1.0]
+    assert too_slow_check["status"] == "FAIL"
+    assert "character_anim_unmeasurable_render_too_slow" in too_slow["largest_gap"]["delta"]
+    assert "fps_p05=12.63" in too_slow["largest_gap"]["delta"]
+
+
+def test_swiftshader_temporal_failures_are_attributed_to_the_environment():
+    verdict = build_verdict(calculate_metrics({
+        "meta": {
+            "render_backend": "swiftshader_software",
+            "gl_renderer": "ANGLE (SwiftShader Device (Subzero))",
+        },
+        "metrics": {
+            "fps_p50": 60,
+            "fps_p05": 60,
+            "frame_time_p99_ms": 10,
+            "long_frame_count": 0,
+            "vehicle_transform_hz": 60,
+            "camera_hz": 60,
+            "character_anim_hz": 12,
+        },
+    }))
+
+    for metric_id in ("2.1", "2.2", "2.3", "2.4", "4.2", "4.3"):
+        check = next(check for check in verdict["checks"] if check["id"] == metric_id)
+        assert check["status"] == "FAIL"
+    assert "render_backend:swiftshader_software" in verdict["largest_gap"]["delta"]
+    assert "application performance is unknown" in verdict["largest_gap"]["delta"]
 
 
 def test_smooth_animation_ratio_one_fails_at_high_render_rate():

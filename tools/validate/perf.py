@@ -40,11 +40,21 @@ REQUIRED_MEASUREMENTS = frozenset({
 })
 
 ANIMATION_SAMPLE_FPS_THRESHOLD = 24.0
+ANIMATION_SLOW_RENDER_FPS_THRESHOLD = 12.63
+# A symmetric ±15% measurement band around 12/f catches both a frozen
+# animation (ratio=0) and an unquantized per-frame animation (ratio=1) while
+# leaving normal frame-scheduling jitter room.
+ANIMATION_RATIO_LOW_FACTOR = 0.85
+ANIMATION_RATIO_HIGH_FACTOR = 1.15
 ANIMATION_RATIO_MAX = 0.95
 ANIMATION_MODE_HZ = "hz_12_window"
-ANIMATION_MODE_RATIO = "quantization_ratio_proves_quantization_only"
+ANIMATION_MODE_RATIO = "quantization_ratio_two_sided_window"
+ANIMATION_MODE_UNMEASURABLE = "character_anim_unmeasurable_render_too_slow"
 ANIMATION_MODE_MISSING = "missing_fps_or_render_ratio"
 SCENE_ONLY_METRICS = frozenset({"draw_calls", "triangles_k", "texture_memory_mb"})
+
+SOFTWARE_RENDER_BACKEND = "swiftshader_software"
+BACKEND_LIMITED_METRICS = frozenset({"2.1", "2.2", "2.3", "2.4", "4.2", "4.3"})
 
 
 def _has_full_heap_lap_measurement(doc: dict[str, Any]) -> bool:
@@ -130,14 +140,19 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, Any]:
     metrics: dict[str, Any] = {}
     meta = doc.get("meta")
     scene_only = isinstance(meta, dict) and meta.get("mode") == "scene-only"
+    if isinstance(meta, dict):
+        metrics["render_backend"] = meta.get("render_backend")
+        metrics["gl_renderer"] = meta.get("gl_renderer")
     fps_p05 = _required_finite(values.get("fps_p05"))
     animation_ratio = _character_animation_ratio(values)
-    if fps_p05 is None:
+    if scene_only or fps_p05 is None:
         animation_mode = ANIMATION_MODE_MISSING
     elif fps_p05 > ANIMATION_SAMPLE_FPS_THRESHOLD:
         animation_mode = ANIMATION_MODE_HZ
-    else:
+    elif fps_p05 > ANIMATION_SLOW_RENDER_FPS_THRESHOLD:
         animation_mode = ANIMATION_MODE_RATIO
+    else:
+        animation_mode = ANIMATION_MODE_UNMEASURABLE
     metrics["character_animation_per_frame"] = animation_ratio
     metrics["character_anim_validation_mode"] = animation_mode
     for _, metric, _, _, _ in WINDOWS:
@@ -165,18 +180,58 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, Any]:
     return metrics
 
 
-def _character_animation_check(metrics: dict[str, Any]) -> tuple[str, Any, float, float]:
+def _character_animation_check(
+    metrics: dict[str, Any],
+) -> tuple[str, Any, float, float, bool, str | None]:
     mode = metrics.get("character_anim_validation_mode")
     if mode == ANIMATION_MODE_HZ:
-        return "character_anim_hz", metrics.get("character_anim_hz"), 11.5, 12.5
+        return "character_anim_hz", metrics.get("character_anim_hz"), 11.5, 12.5, False, None
     if mode == ANIMATION_MODE_RATIO:
+        fps_p05 = metrics["fps_p05"]
+        expected_ratio = 12.0 / fps_p05
         return (
             "character_animation_per_frame",
             metrics.get("character_animation_per_frame"),
-            0.0,
-            ANIMATION_RATIO_MAX,
+            ANIMATION_RATIO_LOW_FACTOR * expected_ratio,
+            min(ANIMATION_RATIO_MAX, ANIMATION_RATIO_HIGH_FACTOR * expected_ratio),
+            False,
+            None,
         )
-    return "character_anim_hz", None, 11.5, 12.5
+    if mode == ANIMATION_MODE_UNMEASURABLE:
+        # The ratio is saturated below the resolvable sampling rate. This is
+        # an unconditional environment FAIL, never a detection-based pass.
+        fps_p05 = metrics["fps_p05"]
+        ratio = metrics.get("character_animation_per_frame")
+        ratio_text = "missing" if ratio is None else f"{ratio:g}"
+        backend = metrics.get("render_backend")
+        backend_text = f"; render_backend={backend}" if backend else ""
+        return (
+            "character_animation_per_frame",
+            ratio,
+            1.0,
+            1.0,
+            True,
+            "environment=character_anim_unmeasurable_render_too_slow; "
+            f"fps_p05={fps_p05:g} <= {ANIMATION_SLOW_RENDER_FPS_THRESHOLD:g}; "
+            f"ratio={ratio_text} is saturated and cannot resolve animation frequency"
+            f"{backend_text}",
+        )
+    return "character_anim_hz", None, 11.5, 12.5, False, None
+
+
+def _backend_limited_reason(metric_id: str, metrics: dict[str, Any]) -> str | None:
+    # Detecting SwiftShader is an environment diagnosis, never a PASS or a
+    # skip. Keep the check failed so this artifact cannot certify app timing.
+    if metric_id not in BACKEND_LIMITED_METRICS:
+        return None
+    if metrics.get("render_backend") != SOFTWARE_RENDER_BACKEND:
+        return None
+    renderer = metrics.get("gl_renderer") or "unknown"
+    return (
+        f"environment=render_backend:{SOFTWARE_RENDER_BACKEND}; "
+        f"gl_renderer={renderer}; {metric_id} was measured with software rendering, "
+        "so application performance is unknown"
+    )
 
 
 def _relative_gap(actual: float, low: float, high: float) -> float:
@@ -197,24 +252,34 @@ def build_verdict(
     checks = []
     failures = []
     for metric_id, metric_name, low, high, priority in WINDOWS:
+        environment_failure = False
+        environment_reason = None
         if metric_id == "4.1":
-            metric_name, actual, low, high = _character_animation_check(metrics)
+            metric_name, actual, low, high, environment_failure, environment_reason = _character_animation_check(metrics)
         else:
             actual = metrics.get(metric_name)
+            environment_reason = _backend_limited_reason(metric_id, metrics)
+            environment_failure = environment_reason is not None
         if actual is None:
             # Keep the schema's numeric `actual` field while making the
             # missing measurement visible in the failure explanation.  This
             # is deliberately not treated as a measured zero.
             actual_for_schema = 0.0
             status = "FAIL"
-            delta = "actual=missing; measurement required"
+            delta = environment_reason or "actual=missing; measurement required"
             failures.append((priority, -math.inf, metric_id, delta))
         else:
             actual_for_schema = actual
-            status = "PASS" if low <= actual <= high else "FAIL"
-            delta = f"actual={actual:g}, below lower bound {low:g}" if actual < low else f"actual={actual:g}, above upper bound {high:g}"
+            status = "FAIL" if environment_failure else ("PASS" if low <= actual <= high else "FAIL")
+            if environment_reason:
+                delta = environment_reason
+            elif actual < low:
+                delta = f"actual={actual:g}, below lower bound {low:g}"
+            else:
+                delta = f"actual={actual:g}, above upper bound {high:g}"
             if status == "FAIL":
-                failures.append((priority, -_relative_gap(actual, low, high), metric_id, delta))
+                gap = -math.inf if environment_failure else -_relative_gap(actual, low, high)
+                failures.append((priority, gap, metric_id, delta))
         checks.append({
             "id": metric_id,
             "metric": metric_name,
