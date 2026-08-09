@@ -5,6 +5,7 @@
  * 會**明確標記為未實作**而不是靜靜消失。這跟 R16 修 perf-probe 是同一個
  * 原則：「還沒做」跟「做了但沒過」必須在產物上分得出來，不能長得一樣。
  */
+import { createItemBoxes } from './item-boxes.js';
 import type { Group } from 'three';
 import { createDriverFace } from '../../characters/driver-face.js';
 import { createKartBody } from './kart-body.js';
@@ -55,7 +56,12 @@ export const COMPONENTS: readonly ComponentEntry[] = [
   { id: 'foliage', scope: '樹木、草叢', create: createFoliage },
   { id: 'skybox-lighting', scope: '天空與全域柔和均勻光', create: null },
   { id: 'drift-sparks', scope: '漂移特效（黏土屑，非火花）', create: null },
-  { id: 'item-boxes', scope: '道具箱與拾取特效', create: null },
+  {
+    id: 'item-boxes',
+    scope: '道具箱與拾取特效',
+    // 拍攝台拍靜態一格：五個箱子排開，讓 §5.9 的「五色輪流」看得到。
+    create: () => createItemBoxes([[-1.4, 0], [-0.7, 0], [0, 0], [0.7, 0], [1.4, 0]]).group,
+  },
   { id: 'shadows-contact', scope: '短柔接地陰影與 AO', create: null },
   { id: 'water-sea', scope: '海面/水面，對齊 map/sea.png', create: null },
   { id: 'ui-hud', scope: 'HUD 的黏土化處理（ck-plumb 範圍）', create: null },
