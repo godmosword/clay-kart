@@ -136,34 +136,85 @@ function valueNoise2(x: number, z: number): number {
   return (nx0 + (nx1 - nx0) * sz) * 2 - 1;
 }
 
+/**
+ * 位移量的**相對變異**下限（`sd / |mean|`）。
+ *
+ * 這是「起伏」與「整塊等比膨脹」的分界。實測（R34）：
+ * 已知正常的 `PlaneGeometry` 是 0.73、`clayBlob` 是 0.55；
+ * 退化成常數的車身尺度 slab 是 0.12。取 0.25 落在兩群中間，
+ * 而且離兩邊都有一倍以上的距離。
+ */
+const MIN_RELIEF_VARIATION = 0.25;
+
+/**
+ * 拒絕「位移了但每個頂點位移一樣多」的呼叫。
+ *
+ * R24 到 R33 之間，`applyHandPressedRelief` 對 `claySlab()` 無條件丟例外，
+ * 理由寫的是「位移算繪不出來，原因未查明」。**那個理由是錯的**——真正的原因是
+ * 波長遠大於物件尺寸時，噪音場在物件範圍內退化成一個常數，整塊等比膨脹。
+ *
+ * 這個守衛量的是它真正要保證的性質，所以它同時擋住任何 primitive 上的同一種
+ * 退化，而不是只擋一個被誤判的來源。三個獨立 critic 在 R33 把
+ * `kart-body`／`driver-face` 判成「表面太平」，根因就是那道誤判的守衛
+ * 讓這兩個元件從來沒有套過起伏。
+ */
+function assertReliefIsNotUniform(
+  geometry: BufferGeometry,
+  sum: number,
+  sumSquares: number,
+  count: number,
+  wavelength: number,
+): void {
+  if (count === 0) return;
+  const mean = sum / count;
+  const variance = Math.max(0, sumSquares / count - mean * mean);
+  const sd = Math.sqrt(variance);
+  const relative = Math.abs(mean) > 1e-9 ? sd / Math.abs(mean) : 0;
+  if (relative >= MIN_RELIEF_VARIATION) return;
+
+  geometry.computeBoundingBox();
+  const box = geometry.boundingBox;
+  const span = box
+    ? Math.max(box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z)
+    : Number.NaN;
+  throw new Error(
+    `applyHandPressedRelief 的位移在這個幾何上退化成常數（sd/mean = ${relative.toFixed(3)}，`
+    + `下限 ${MIN_RELIEF_VARIATION}）：每個頂點被推的距離幾乎相同，結果是整塊等比膨脹，`
+    + '不是手壓起伏。\n'
+    + `原因幾乎一定是波長相對物件太大：wavelength = ${wavelength}，物件最長邊約 `
+    + `${Number.isFinite(span) ? span.toFixed(2) : '?'}，只涵蓋 `
+    + `${Number.isFinite(span) ? (span / wavelength).toFixed(2) : '?'} 個週期。\n`
+    + '把 wavelength 調到物件尺度（經驗值：最長邊的 1/4 到 1/8）再試。',
+  );
+}
+
 /** 就地位移 geometry 的頂點並重算法線。回傳同一個 geometry 方便串接。 */
 export function applyHandPressedRelief(
   geometry: BufferGeometry,
   options: HandPressedReliefOptions,
 ): BufferGeometry {
-  // **`claySlab()` 的產出不吃這個位移，直接拒絕。**
+  // **R34：原本這裡無條件拒絕 `claySlab()` 的產出，理由是錯的。**
   //
-  // R24 做 `track-surface` 時撞到：同一支函式套在 `PlaneGeometry` 上正常
-  // （成品圖的 sd/mean 從 1.98 變 9.19），套在 `claySlab()` 的
-  // `RoundedBoxGeometry` 上算繪出來**完全看不到**——振幅從 0.038 加到 0.25
-  // （6.5 倍）、`segments` 從 40 改到 6，輸出逐位元相同，側視輪廓是一條直線。
+  // R24 的觀察沒錯——「位移寫進了 `position`、包圍盒確實變化 0.031、算繪出來
+  // 卻完全看不到」。錯的是推論：當時判定「失效不在幾何層，原因未查明」。
   //
-  // **失效不在幾何層。** R25 試過用「位移後包圍盒有沒有變」當守衛，實測那組
-  // 參數的包圍盒確實變化 0.031（振幅 0.25），守衛根本不會觸發——位移確實寫進
-  // 了 `position`，看不到的是算繪結果。原因至今未查明。
+  // R34 量了 R24/R25 沒量的那一項——**位移量本身的變異數**（他們量的是包圍盒，
+  // 而整塊等比膨脹會產生一模一樣的包圍盒變化）：
   //
-  // 所以改成拒絕來源：我們不知道為什麼，但知道**這條路徑不行**。想在圓角塊體
-  // 上做起伏的話，拆成「厚度板 + 轉平的 `PlaneGeometry` 表面」——那在幾何上
-  // 本來也比較對（可見表面該是一張夠密的網格，而不是為了 12 個看不到的側面
-  // 頂點付整塊的細分成本）。`track-surface` 就是這樣做的。
-  if (geometry.userData?.clayPrimitive === 'slab') {
-    throw new Error(
-      'applyHandPressedRelief 不支援 claySlab() 的產出（RoundedBoxGeometry）：'
-      + '位移會寫進 position 但算繪不出來，原因未查明（見 loop/BACKLOG.md）。'
-      + '改用「厚度板 + 轉平的 PlaneGeometry 表面」，參考 components/track-surface.ts。',
-    );
-  }
-
+  //     PlaneGeometry 40×40      λ=2.4   mean 0.072  sd 0.052   sd/mean 0.73  ← 正常
+  //     claySlab 1.28×0.62×2.15  λ=2.4   mean 0.161  sd 0.019   sd/mean 0.12  ← 壞
+  //     claySlab 1.28×0.62×2.15  λ=0.3   mean 0.065  sd 0.059   sd/mean 0.91  ← 好
+  //
+  // 車身尺度的 slab 在 λ=2.4 下每個頂點都被推 0.13–0.20：**整塊等比膨脹，
+  // 不是起伏**。因為 `valueNoise2((px+ox)/λ, (pz+oz)/λ)` 在一個 1.28 單位寬的
+  // 物件上只取樣了噪音場的 0.5 個週期，等於一個常數。
+  //
+  // **所以問題從來不是 `RoundedBoxGeometry`，是波長是照 40 單位的地面調的。**
+  // 同樣的退化會發生在任何「尺寸遠小於 λ」的幾何上，跟它是什麼 primitive 無關。
+  //
+  // 因此把「拒絕某個來源」換成「量它宣稱要保證的那個性質」——這跟 R32 那次
+  // 教訓同一個形狀：`assertNotPalettised()` 檢查了最容易檢查的位置（檔頭一個
+  // 位元組），而不是它要保護的性質（色彩沒有損失）。
   const position = geometry.getAttribute('position');
   const normal = geometry.getAttribute('normal');
   if (!position || !normal) return geometry;
@@ -172,6 +223,8 @@ export function applyHandPressedRelief(
   const offsetX = options.offset?.x ?? 0;
   const offsetZ = options.offset?.z ?? 0;
 
+  let sum = 0;
+  let sumSquares = 0;
   for (let i = 0; i < position.count; i++) {
     const px = position.getX(i);
     const py = position.getY(i);
@@ -183,6 +236,8 @@ export function applyHandPressedRelief(
       valueNoise2(wx, wz) * 0.72 + valueNoise2(wx * 2.7, wz * 2.7) * 0.28;
     const displacement =
       (options.positiveOnly ? noise * 0.5 + 0.5 : noise) * options.amplitude;
+    sum += displacement;
+    sumSquares += displacement * displacement;
     position.setXYZ(
       i,
       px + normal.getX(i) * displacement,
@@ -190,6 +245,8 @@ export function applyHandPressedRelief(
       pz + normal.getZ(i) * displacement,
     );
   }
+
+  assertReliefIsNotUniform(geometry, sum, sumSquares, position.count, wavelength);
 
   position.needsUpdate = true;
   geometry.computeVertexNormals();

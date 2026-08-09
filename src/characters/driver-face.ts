@@ -29,7 +29,7 @@
  */
 import { Group, Mesh, TorusGeometry } from 'three';
 import { renderTelemetry } from '@contract/render-telemetry';
-import { clayBlob, claySlab } from '../render/clay/geometry.js';
+import { applyHandPressedRelief, clayBlob, claySlab } from '../render/clay/geometry.js';
 import { createClayMaterial } from '../render/clay/material.js';
 import { FACE } from '../render/clay/palette.js';
 
@@ -109,7 +109,24 @@ export function createDriverFace(): DriverFace {
 
   // ── 臉盤 ────────────────────────────────────────────────────────────
   // 圓角厚片，是眼睛的底。參考圖上臉盤本身也是一塊獨立黏土。
-  const panel = new Mesh(claySlab(0.78, 0.34, 0.08, { bevelRatio: 0.42 }), panelClay);
+  //
+  // **R34 加上手壓起伏。** R33 三輪 critic 各自獨立，都把這個元件判成
+  // 「一塊扁平的長方形板」（§5.0／§5.3），而它從 R20 起就沒套過起伏——
+  // 因為 `applyHandPressedRelief` 當時無條件拒絕 `claySlab()` 的產出，
+  // 理由寫的是「位移算繪不出來，原因未查明」。R34 量出真正的原因是波長相對
+  // 物件太大、噪音退化成常數，那道守衛已經換成量位移變異的版本。
+  //
+  // `wavelength` 取 0.18：臉盤最長邊 0.78，約涵蓋 4 個週期，落在守衛註解的
+  // 經驗值（最長邊的 1/4 到 1/8）偏密那一端——臉是最近距離被看的部位，
+  // `§5.0` 的壓痕在這裡最該讀得出來。
+  // `segments` 也要拉高，`claySlab` 的預設段數只夠撐倒角，承不住表面位移。
+  const panel = new Mesh(
+    applyHandPressedRelief(
+      claySlab(0.78, 0.34, 0.08, { bevelRatio: 0.42, segments: 24 }),
+      { amplitude: 0.016, wavelength: 0.18 },
+    ),
+    panelClay,
+  );
   eyes.add(panel);
 
   // ── 眼睛 ────────────────────────────────────────────────────────────
