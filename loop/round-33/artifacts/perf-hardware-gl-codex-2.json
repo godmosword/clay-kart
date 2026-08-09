@@ -1,0 +1,478 @@
+{
+  "meta": {
+    "fixture": "lap-a",
+    "tick_hz": 120,
+    "total_ticks": 7200,
+    "measurement_seconds": 5,
+    "build_sha": "3bff7bff9d3dcb900e4ec39056c736d036837e80",
+    "build": {
+      "sha": "3bff7bff9d3dcb900e4ec39056c736d036837e80",
+      "assets": {
+        "initial_bundle_kb_gz": 153.8681640625,
+        "total_assets_mb": 3.4980907440185547
+      }
+    },
+    "environment": {
+      "name": "local",
+      "hostname": "MacBook-Air.local",
+      "platform": "darwin 25.6.0",
+      "arch": "arm64",
+      "node_version": "v25.8.0",
+      "cpu_model": "Apple M4",
+      "cpu_count": 10,
+      "memory_total_mb": 16384,
+      "chrome_path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "containerized": false
+    },
+    "render_backend": "hardware_gl",
+    "gl_renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+    "gl_renderer_source": "WEBGL_debug_renderer_info.UNMASKED_RENDERER_WEBGL",
+    "hardware_gl_attempt": {
+      "requested_backend": "hardware_gl",
+      "requested_flags": [
+        "--enable-gpu",
+        "--use-gl=angle",
+        "--use-angle=metal",
+        "--disable-software-rasterizer"
+      ],
+      "status": "selected",
+      "observed_renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "conclusion": "headless hardware GL selected for this measurement"
+    },
+    "seed": 20260730,
+    "device": "codex-hardware",
+    "device_note": "Chrome headless hardware_gl (ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version))",
+    "mode": "full",
+    "measurement_method": "External requestAnimationFrame and WebGL draw instrumentation (including drawElementsInstanced/drawArraysInstanced when exposed; TRIANGLES use count / 3 * instanceCount); GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.",
+    "network_profile": {
+      "name": "4g-4mbps-20ms",
+      "offline": false,
+      "latency_ms": 20,
+      "download_throughput_bps": 524288,
+      "upload_throughput_bps": 131072,
+      "connection_type": "cellular4g",
+      "cdp_method": "Network.emulateNetworkConditions"
+    },
+    "render_measurement_network": "unthrottled_after_load",
+    "measurement_status": "full_runtime_measurement",
+    "laps_required": 5,
+    "laps_measured": 3,
+    "heap_measurement_status": "incomplete_five_lap_run",
+    "heap_growth_measurement": "single continuous race-session heap delta divided by its SimSnapshot lap count",
+    "heap_lap_runs": [
+      {
+        "status": "incomplete_five_lap_run",
+        "targetLaps": 5,
+        "completedLaps": 3,
+        "startedAt": 1548.6000000005588,
+        "endedAt": 54911.299999999814,
+        "initial_snapshot": {
+          "current": 1,
+          "total": 3,
+          "time": 1.42
+        },
+        "heapStartBytes": 41404462,
+        "heapEndBytes": 30226957,
+        "heapPeakBytes": 55357427,
+        "heapDeltaBytesRaw": -11177505,
+        "heapDeltaBytes": 0,
+        "heapStartMb": 39.486371994018555,
+        "heapEndMb": 28.826672554016113,
+        "heapDeltaMb": 0,
+        "heapSampleCount": 3203
+      }
+    ],
+    "render_telemetry": {
+      "global": "__CLAY_RENDER_TELEMETRY__",
+      "counters": [
+        "renderedFrames",
+        "vehicleTransformUpdates",
+        "cameraUpdates",
+        "characterAnimationFrames"
+      ]
+    }
+  },
+  "metrics": {
+    "canvas_count": 1,
+    "raf_callbacks": 307,
+    "rendered_frames": 307,
+    "gl_draw_calls": 36258,
+    "triangles": 491160800,
+    "elapsed_s": 5.108600000000559,
+    "fps_p50": 59.8802395202902,
+    "fps_p05": 57.142857142857146,
+    "frame_time_p99_ms": 18.100000000512228,
+    "long_frame_count": 0,
+    "vehicle_transform_hz": 60.094742199421844,
+    "camera_hz": 60.094742199421844,
+    "character_anim_hz": 12.136397447440242,
+    "character_anim_status": "measured_render_telemetry",
+    "character_anim_updates": 62,
+    "character_anim_validation_mode": "hz_12_window",
+    "character_anim_validation": {
+      "mode": "hz_12_window",
+      "conclusion": "12Hz frequency is resolvable at this sampling rate",
+      "fps_p05": 57.142857142857146,
+      "character_anim_hz": 12.136397447440242,
+      "character_animation_per_frame": 0.20195439739413681
+    },
+    "character_anim_measurement": {
+      "method": "window.__CLAY_RENDER_TELEMETRY__ counter deltas / measurement elapsed",
+      "status": "measured",
+      "elapsed_s": 5.108600000000559,
+      "character_instances": 1,
+      "character_animation_hz_per_instance": 12.136397447440242,
+      "character_animation_per_frame": 0.20195439739413681,
+      "counters_start": {
+        "renderedFrames": 12,
+        "vehicleTransformUpdates": 12,
+        "cameraUpdates": 12,
+        "characterAnimationInstances": 1,
+        "characterAnimationFrames": 3
+      },
+      "counters_end": {
+        "renderedFrames": 319,
+        "vehicleTransformUpdates": 319,
+        "cameraUpdates": 319,
+        "characterAnimationInstances": 1,
+        "characterAnimationFrames": 65
+      },
+      "counter_deltas": {
+        "renderedFrames": 307,
+        "vehicleTransformUpdates": 307,
+        "cameraUpdates": 307,
+        "characterAnimationFrames": 62
+      }
+    },
+    "render_telemetry_status": "measured",
+    "render_telemetry_counters": {
+      "renderedFrames": 307,
+      "vehicleTransformUpdates": 307,
+      "cameraUpdates": 307,
+      "characterAnimationFrames": 62
+    },
+    "render_telemetry_ratios": {
+      "vehicleTransformPerFrame": 1,
+      "cameraPerFrame": 1,
+      "characterAnimationPerFrame": 0.20195439739413681,
+      "characterAnimationPerFrameRaw": 0.20195439739413681
+    },
+    "first_interactive_s": 0.10640000000037253,
+    "time_to_first_render_s": 1.3219000000003724,
+    "heap_peak_mb": 22.396618843078613,
+    "heap_growth_per_lap_mb": null,
+    "draw_calls": 174,
+    "triangles_k": 1614.818,
+    "draw_breakdown": [
+      {
+        "method": "drawElements",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 1842,
+        "instance_count": 1842,
+        "index_count": 1328082,
+        "triangles": 442694
+      },
+      {
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 2149,
+        "instance_count": 110520,
+        "index_count": 9361044,
+        "triangles": 160475040
+      },
+      {
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 1842,
+        "instance_count": 600492,
+        "index_count": 766272,
+        "triangles": 78380784
+      },
+      {
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 450,
+        "instance_count": 450,
+        "index_count": 253173,
+        "triangles": 84391
+      },
+      {
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-2",
+        "viewport": "0x0x512x512",
+        "calls": 307,
+        "instance_count": 307,
+        "index_count": 921,
+        "triangles": 307
+      },
+      {
+        "method": "drawElements",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 20470,
+        "instance_count": 20470,
+        "index_count": 16696920,
+        "triangles": 5565640
+      },
+      {
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 2149,
+        "instance_count": 110520,
+        "index_count": 9361044,
+        "triangles": 160475040
+      },
+      {
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 1842,
+        "instance_count": 600492,
+        "index_count": 766272,
+        "triangles": 78380784
+      },
+      {
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 5207,
+        "instance_count": 5207,
+        "index_count": 22068360,
+        "triangles": 7356120
+      }
+    ],
+    "instanced_draw_calls": 7982,
+    "instanced_triangles": 477711648,
+    "instanced_draw_breakdown": [
+      {
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 2149,
+        "instance_count": 110520,
+        "index_count": 9361044,
+        "triangles": 160475040
+      },
+      {
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 1842,
+        "instance_count": 600492,
+        "index_count": 766272,
+        "triangles": 78380784
+      },
+      {
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 2149,
+        "instance_count": 110520,
+        "index_count": 9361044,
+        "triangles": 160475040
+      },
+      {
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 1842,
+        "instance_count": 600492,
+        "index_count": 766272,
+        "triangles": 78380784
+      }
+    ],
+    "peak_frame_index": 0,
+    "peak_frame_draw_calls": 166,
+    "peak_frame_triangles": 1614818,
+    "peak_frame_draw_breakdown": [
+      {
+        "frame_index": 0,
+        "method": "drawElements",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 6,
+        "instance_count": 6,
+        "index_count": 4326,
+        "triangles": 1442
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 7,
+        "instance_count": 360,
+        "index_count": 30492,
+        "triangles": 522720
+      },
+      {
+        "frame_index": 0,
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 6,
+        "instance_count": 1956,
+        "index_count": 2496,
+        "triangles": 255312
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 4,
+        "instance_count": 4,
+        "index_count": 5295,
+        "triangles": 1765
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-2",
+        "viewport": "0x0x512x512",
+        "calls": 1,
+        "instance_count": 1,
+        "index_count": 3,
+        "triangles": 1
+      },
+      {
+        "frame_index": 0,
+        "method": "drawElements",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 110,
+        "instance_count": 110,
+        "index_count": 91326,
+        "triangles": 30442
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 7,
+        "instance_count": 360,
+        "index_count": 30492,
+        "triangles": 522720
+      },
+      {
+        "frame_index": 0,
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 6,
+        "instance_count": 1956,
+        "index_count": 2496,
+        "triangles": 255312
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 19,
+        "instance_count": 19,
+        "index_count": 75312,
+        "triangles": 25104
+      }
+    ],
+    "texture_memory_mb": 4.9169158935546875,
+    "frame_breakdown": {
+      "method": "nearest_rank_p99_frame_interval",
+      "sample_count": 306,
+      "p99_frame": {
+        "frame_ordinal": 256,
+        "interval_start_ms": 5852,
+        "interval_end_ms": 5870.100000000559,
+        "frame_time_ms": 18.100000000558794,
+        "callback_start_ms": 5870.100000000559,
+        "callback_end_ms": 5870.9000000003725,
+        "draw_ms": 0.2999999998137355,
+        "script_wall_ms": 0.5,
+        "script_ms": 0.5,
+        "gc_ms": 0,
+        "unattributed_ms": 17.300000000745058,
+        "shares_pct": {
+          "draw": 1.657458562455656,
+          "script": 2.762430939141236,
+          "gc": 0,
+          "unattributed": 95.5801104984031
+        }
+      },
+      "trace_gc_events": 591,
+      "trace_anchor": {
+        "status": "aligned",
+        "page_now_ms": 1594,
+        "trace_ts_ms": 4658080.811
+      },
+      "attribution_note": "draw_ms is JS-side WebGL submission time; script_ms excludes draw and trace-aligned GC; unattributed includes browser/vsync/GPU wait."
+    },
+    "heap_measurement_status": "incomplete_five_lap_run",
+    "heap_measurement": {
+      "status": "incomplete_five_lap_run",
+      "lapsMeasured": 3,
+      "requiredLaps": 5,
+      "method": "single continuous race-session heap delta divided by its SimSnapshot lap count",
+      "growthPerLapMb": null,
+      "runs": [
+        {
+          "status": "incomplete_five_lap_run",
+          "targetLaps": 5,
+          "completedLaps": 3,
+          "startedAt": 1548.6000000005588,
+          "endedAt": 54911.299999999814,
+          "initial_snapshot": {
+            "current": 1,
+            "total": 3,
+            "time": 1.42
+          },
+          "heapStartBytes": 41404462,
+          "heapEndBytes": 30226957,
+          "heapPeakBytes": 55357427,
+          "heapDeltaBytesRaw": -11177505,
+          "heapDeltaBytes": 0,
+          "heapStartMb": 39.486371994018555,
+          "heapEndMb": 28.826672554016113,
+          "heapDeltaMb": 0,
+          "heapSampleCount": 3203
+        }
+      ]
+    },
+    "gc_pause_max_ms": 1.577,
+    "gc_pause_max_event": {
+      "name": "V8.GC_SCAVENGER",
+      "startMs": 4658923.92,
+      "durationMs": 1.577
+    },
+    "trace_gc_event_count": 591,
+    "initial_bundle_kb_gz": 153.8681640625,
+    "total_assets_mb": 3.4980907440185547
+  }
+}
