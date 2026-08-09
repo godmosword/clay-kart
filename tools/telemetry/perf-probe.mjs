@@ -1144,6 +1144,24 @@ async function measureSceneOnly() {
         const peakFrameDrawBreakdown = peakFrameIndex === null
           ? []
           : frameDrawBreakdown.filter((entry) => entry.frame_index === peakFrameIndex);
+        const passRows = new Map();
+        for (const entry of frameDrawBreakdown) {
+          const key = [entry.frame_index, entry.framebuffer, entry.viewport].join('|');
+          const existing = passRows.get(key) ?? {
+            frame_index: entry.frame_index,
+            pass: entry.framebuffer === 'default' ? 'main' : 'offscreen',
+            framebuffer: entry.framebuffer,
+            viewport: entry.viewport,
+            draw_calls: 0,
+            triangles: 0,
+          };
+          existing.draw_calls += entry.calls;
+          existing.triangles += entry.triangles;
+          passRows.set(key, existing);
+        }
+        const passBreakdownPerFrame = [...passRows.values()]
+          .sort((left, right) => left.frame_index - right.frame_index || left.framebuffer.localeCompare(right.framebuffer))
+          .map((entry) => ({ ...entry, triangles_k: entry.triangles / 1000 }));
         return {
           canvas_count: document.querySelectorAll('canvas').length,
           rendered_frames: state?.glFrames?.size ?? 0,
@@ -1157,6 +1175,8 @@ async function measureSceneOnly() {
           peak_frame_draw_calls: peakFrameIndex === null ? 0 : state.frameDrawCalls.get(peakFrameIndex) ?? 0,
           peak_frame_triangles: peakFrameEntry?.[1] ?? 0,
           peak_frame_draw_breakdown: peakFrameDrawBreakdown,
+          pass_breakdown_per_frame: passBreakdownPerFrame,
+          peak_frame_pass_breakdown: passBreakdownPerFrame.filter((entry) => entry.frame_index === peakFrameIndex),
           texture_memory_mb: (state?.textureBytes ?? 0) / (1024 * 1024),
           scene_only_source: 'post-load WebGL instrumentation; renderer.info is private to src/render/renderer.ts',
         };
@@ -1247,6 +1267,24 @@ async function measureBrowser() {
         const peakFrameDrawBreakdown = peakFrameIndex === null
           ? []
           : frameDrawBreakdown.filter((entry) => entry.frame_index === peakFrameIndex);
+        const passRows = new Map();
+        for (const entry of frameDrawBreakdown) {
+          const key = [entry.frame_index, entry.framebuffer, entry.viewport].join('|');
+          const existing = passRows.get(key) ?? {
+            frame_index: entry.frame_index,
+            pass: entry.framebuffer === 'default' ? 'main' : 'offscreen',
+            framebuffer: entry.framebuffer,
+            viewport: entry.viewport,
+            draw_calls: 0,
+            triangles: 0,
+          };
+          existing.draw_calls += entry.calls;
+          existing.triangles += entry.triangles;
+          passRows.set(key, existing);
+        }
+        const passBreakdownPerFrame = [...passRows.values()]
+          .sort((left, right) => left.frame_index - right.frame_index || left.framebuffer.localeCompare(right.framebuffer))
+          .map((entry) => ({ ...entry, triangles_k: entry.triangles / 1000 }));
         const first = raf[0]?.now ?? state?.measurementStart ?? 0;
         const last = raf.at(-1)?.now ?? first;
         const elapsed = Math.max(0, last - (state?.measurementStart ?? first)) / 1000;
@@ -1432,6 +1470,8 @@ async function measureBrowser() {
           peak_frame_draw_calls: peakFrameIndex === null ? 0 : state.frameDrawCalls.get(peakFrameIndex) ?? 0,
           peak_frame_triangles: peakFrameEntry?.[1] ?? 0,
           peak_frame_draw_breakdown: peakFrameDrawBreakdown,
+          pass_breakdown_per_frame: passBreakdownPerFrame,
+          peak_frame_pass_breakdown: passBreakdownPerFrame.filter((entry) => entry.frame_index === peakFrameIndex),
           texture_memory_mb: (state?.textureBytes ?? 0) / (1024 * 1024),
           frame_breakdown: {
             method: 'nearest_rank_p99_frame_interval',
