@@ -175,6 +175,50 @@
 
 ## 待裁決
 
+### 兩支探針都沒攔 instanced draw——`§5.3`／`§5.4` 從來沒算過任何 InstancedMesh
+
+- **輪次**：R33（改葉瓣段數之後數字沒動，追下去才發現）
+- **怎麼發現的**：把 `LEAF_PAD_SEGMENTS` 從 6 改成 10（葉瓣面數 +67%，
+  1440 片），重跑 `scene-stats`，`triangles_k` **精確地還是 61.658**，
+  跟 R32 記的一模一樣。一個位元都沒動
+- **根因**：`scene-stats.mjs:191-198` 與 `perf-probe.mjs:687-705` 都只覆寫
+
+      prototype.drawElements
+      prototype.drawArrays
+
+  **而 `InstancedMesh` 走的是 `drawElementsInstanced`／`drawArraysInstanced`。**
+  兩支探針都沒攔，所以每一個 instanced 物件對 `draw_calls` 與 `triangles_k`
+  的貢獻都是零
+- **實測**（把兩個 instanced 進入點也攔起來，同一個 build、同一個場景）：
+
+  | | 現行探針 | 加上 instanced | 預算 |
+  |---|---|---|---|
+  | `draw_calls` | 142 | **168** | 150 → **超標** |
+  | `triangles_k` | 61.658 | **1617.722** | 400 → **超標 4 倍** |
+
+- **影響範圍比 foliage 大得多**：`foliage.ts` 的註解自己寫著「所以每一樣東西
+  都必須是 `InstancedMesh`」——**元件做得越對，對量測就越隱形**。而 session
+  記錄的「`draw_calls` 400 → 140、`triangles_k` 246 → 58.8」這個成果，
+  有多少是真的優化、有多少是把幾何搬進 `InstancedMesh` 之後探針看不見了，
+  **目前無法區分**
+- **這是同一個家族的第七、八例**：`§5.3`／`§5.4` 是兩個「數字有在跑，但它
+  不可能失敗」——這次的形狀最惡劣，因為**它看不見的正是場上最大的貢獻者**
+- **連帶作廢我自己這一輪的兩個結論**：
+  1. 「`draw_calls` 漂到 148、餘裕 1.3%」——真值是 168，已經超標，不是餘裕薄
+  2. foliage `6→10` 的「最壞 98k 對 400k、不需要 LOD」——幾何算術
+     （84→140 tri/片）仍然正確，但那個比較用的基準 58.8k 是瞎的。
+     **LOD 這個問題重新打開**
+- **`1617.722` 的組成還沒查**：純幾何算術估整個場景 foliage 約 251k
+  （seg=10），差 6 倍，多半是陰影 pass 重複算繪同一批 instance——
+  但那對現行探針也一樣成立，兩邊都含 shadow pass，差額純粹是 instanced。
+  **組成要查，但「沒算到」這件事已經三種方式各自證實**（grep、改幾何數字
+  不動、補攔之後跳到 26 倍）
+- **不擋 R33 的 critic 給分**：critic 判的是圖，圖沒有問題
+- **已開 TASK**：`loop/round-33/TASK-cursor-2.md`（`scene-stats.mjs`）；
+  `perf-probe.mjs` 同一個洞要另外給 Codex，它現在正在改那支檔案
+- **狀態**：待兩支探針修好後重新量，然後重新裁決 foliage 要不要 LOD、
+  以及 `§5.3`／`§5.4` 的預算數字本身是否還合理
+
 ### R33 三輪 critic —— 裁決：跑，範圍取「現在的 4 組」，但主產出是變異不是分數
 
 - **輪次**：R33（Lead 裁決）
