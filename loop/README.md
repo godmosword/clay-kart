@@ -154,6 +154,68 @@ Lead      → PASS → 更新 FROZEN.md，開下一元件
 3. **VERDICT.json 必須自我完備。** 假設讀者對本專案一無所知。
 4. **`FROZEN.md` 列出的檔案任何人不得修改。**
 
+## Builder 的邊界（R33 之後補上，因為四條全被踩過）
+
+> 這一節寫給 Codex 與 Cursor。**每一條都對應一次真實發生過的事**，
+> 不是預防性的規矩。踩到了不是災難，但要停下來回報，不要自己繞過。
+
+### 一、分支：只 commit 到自己的分支，永遠不碰 `main`
+
+| 工具 | 你的分支 | 你的 worktree |
+|---|---|---|
+| Codex | `feat/physics` | `../ck-physics` |
+| Cursor | `feat/plumb` | `../ck-plumb` |
+| Claude Code | `feat/visual` | `../ck-visual` |
+
+**`main` 只有 Lead 能寫**，包括 `progress/*.json`。你要回報進度，
+寫在你自己分支的 commit message 與回報文字裡，Lead 收尾時謄進 `main`。
+
+*R33 實際發生*：Cursor 直接在 `main` 上提交了兩個 commit。
+
+### 二、檔案：`loop/` 底下只有 `round-{N}/artifacts/` 可以寫
+
+`loop/BACKLOG.md`、`loop/PLAN.md`、`loop/FROZEN.md`、`loop/budget.json`、
+`BAR-*.md`、`REF-PAIRING.md` **全部是 Lead 的裁決紀錄**。內容再正確也不要動
+——BACKLOG 記的是「誰在什麼時候基於什麼證據做了什麼判斷」，
+被第三方改寫之後那條線就斷了。
+
+要補充的事實（實測值、你發現的缺陷）**寫進回報**，Lead 會轉錄並標明來源。
+
+*R33 實際發生*：Cursor 把實測數字寫進了 `loop/BACKLOG.md`。數字本身是對的。
+
+### 三、Git ref：不要 `reset` 你的分支，尤其不要 reset 回 `origin/`
+
+Lead 會把你的 worktree 同步到 `main`。**那個同步是刻意的**——它把其他工具
+已經合併的東西帶給你。如果你 `git reset --hard origin/feat/xxx` 把它退回去，
+你就在一棵舊樹上開工，而你的 commit 之後要重放才能用。
+
+開工前如果覺得樹不對，**先問**，不要自己動 ref。
+
+*R33 實際發生*：Cursor reset 回 `origin/feat/plumb`，在落後 20 個 commit 的樹上
+完成整個任務。Lead 事後 `rebase --onto main` 重放才可用。
+
+> **對應的 Lead 義務**（寫在這裡才對稱）：Lead 同步 worktree **必須**先確認
+> 該 worktree 沒有未提交改動、也沒有領先 `main` 的 commit，並且用
+> `git merge --ff-only` 而不是 `git reset --hard`。
+> *R33 實際發生*：Lead 用 `reset --hard` 把 Cursor 的 commit 從分支上踩掉了，
+> 靠 reflog 才救回來。
+
+### 四、量到的數字跟原始碼裡寫的預期值衝突時，改註解不要改數字
+
+你跑出來的實測值如果跟檔案裡的註解／常數說明對不上，**那個註解就是過期的**。
+順手改掉並在回報裡講一句。不要留著讓下一個人重新踩。
+
+*R33 實際發生*：`steer-screen.mjs` 的註解寫「solo 預期 ~5、multi ~0.8」，
+Cursor 實測 solo 2.7、multi 3.9，兩者相反，註解沒動。而那句過期的話正是
+Lead 五輪前下裁決的依據。
+
+### 完成一輪的回報要包含
+
+- commit sha（在**你自己的分支**上）
+- 實測數字，不要只寫 PASS
+- 你動過的檔案清單
+- 任何你繞過或沒做到的事——**回報 blocked 永遠比自己想辦法繞過好**
+
 ## 驗證 VERDICT
 
 ```bash
