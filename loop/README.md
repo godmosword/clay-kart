@@ -172,7 +172,15 @@ Lead      → PASS → 更新 FROZEN.md，開下一元件
 
 *R33 實際發生*：Cursor 直接在 `main` 上提交了兩個 commit。
 
-### 二、檔案：`loop/` 底下只有 `round-{N}/artifacts/` 可以寫
+### 二、檔案：`loop/round-{N}/artifacts/` **是你該寫的**，`loop/` 其餘都不是
+
+> **R33 補充**：Codex 把這條讀成「禁止寫 `loop/`」，於是把 artifact 留在
+> `/tmp` 要 Lead 去搬——而「artifact 指向容器暫存路徑、倉庫內無法重建」
+> 正是 R22 明文禁止的事。所以這條改成正面表述：
+>
+> **`loop/round-{N}/artifacts/` 是 builder 的交件位置，請直接寫進去並 commit。**
+> 那是唯一你該寫的 `loop/` 子目錄，也是**必須**寫的——artifact 沒有進倉庫，
+> 那一輪的判決就不可重建。
 
 `loop/BACKLOG.md`、`loop/PLAN.md`、`loop/FROZEN.md`、`loop/budget.json`、
 `BAR-*.md`、`REF-PAIRING.md` **全部是 Lead 的裁決紀錄**。內容再正確也不要動
