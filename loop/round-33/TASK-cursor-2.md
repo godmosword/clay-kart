@@ -110,3 +110,33 @@ R33 我重跑完整探針，量到 `draw_calls = 148`，窗口 `[0, 150]`。
 - push 到 `feat/plumb`，回報 commit sha
 - 回報實測的 baseline 數字與漂移門檻，不要只寫 PASS
 - 回報動過的檔案清單
+
+---
+
+## 任務二（R33 追加，一行的事）：`bootstrap.ts` 沒接 `?totalLaps=`
+
+`BAR-PERF §5.2` 要連續五圈，而比賽總長是 3 圈（`world.ts` 的 `TOTAL_LAPS`），
+所以它**從寫下來那天起就不可能通過**。
+
+Codex 已經把它範圍內的兩半做完了：
+
+- `world.ts` 加了選用的 `WorldOptions.totalLaps`（預設仍是 3，非正整數丟 `RangeError`）
+- `perf-probe.mjs:1054` 送 `?perfHeap=1&totalLaps=5`
+
+**中間那一段在你家**：`src/loader/bootstrap.ts` 沒有讀 `totalLaps` 這個 query
+參數，所以那個 5 到不了 `createWorld()`，實測仍是 `completedLaps: 3 / targetLaps: 5`。
+
+### 要求
+
+跟你 R33 做 `?solo=1` **完全同一個形狀**——在 `resolveAiOpponents()` 旁邊加一個
+讀 `totalLaps` 的函式，傳進 `createWorld()`。
+
+- 只接受正整數，非法值**忽略並沿用預設**（不要丟例外炸掉遊戲，這是玩家路徑）
+- 不帶參數時行為完全不變（總圈數 3）
+- 不要動 `world.ts`／`perf-probe.mjs`（Codex 的範圍，已經做好了）
+
+### 回報
+
+跑一次 `node tools/telemetry/perf-probe.mjs`，回報 `laps_measured` 有沒有變成 5、
+以及 `heap_growth_per_lap_mb` 量到什麼。**那個值可能是 FAIL，沒關係**——
+這一輪的目的是讓 `§5.2` 變成一個能通過也能失敗的檢查，不是讓它通過。
