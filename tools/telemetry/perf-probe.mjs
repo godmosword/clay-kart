@@ -1051,7 +1051,7 @@ async function selectBrowserSession(chromePath, serverPort, { sceneOnly }) {
 
 async function measureHeapRace(session, serverPort, targetLaps) {
   await session.call('Page.navigate', {
-    url: `http://127.0.0.1:${serverPort}/index.html?perfHeap=1`,
+    url: `http://127.0.0.1:${serverPort}/index.html?perfHeap=1&totalLaps=${HEAP_REQUIRED_LAPS}`,
   });
   await sleep(1500);
   await evaluatePage(
