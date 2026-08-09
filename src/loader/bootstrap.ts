@@ -124,6 +124,24 @@ function resolveAiOpponents(): readonly AiOpponentConfig[] {
   return DEFAULT_AI_OPPONENTS;
 }
 
+/**
+ * R33：`?totalLaps=N` → 傳進 `createWorld({ totalLaps })`。
+ * perf-probe 的 §5.2 五圈量測靠這條；非法值忽略、沿用世界預設（3）。
+ * 玩家路徑不丟例外。
+ */
+function resolveTotalLaps(): number | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = new URLSearchParams(window.location.search).get('totalLaps');
+    if (raw === null || raw === '') return undefined;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 1) return undefined;
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function bootstrap(mount: HTMLElement, inputSource: InputSource = NO_OP_INPUT): Promise<void> {
   const [{ createWorld }, { createRenderer }] = await Promise.all([
     import('@physics/world'),
@@ -131,9 +149,11 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
   ]);
 
   const aiOpponents = resolveAiOpponents();
-  const world: SimWorld = createWorld(
-    aiOpponents.length > 0 ? { aiOpponents } : {},
-  );
+  const totalLaps = resolveTotalLaps();
+  const world: SimWorld = createWorld({
+    ...(aiOpponents.length > 0 ? { aiOpponents } : {}),
+    ...(totalLaps !== undefined ? { totalLaps } : {}),
+  });
   const renderer: Renderer = createRenderer(mount);
   // ui-hud（§5.12）在 Cursor 範圍；render 裡的 W1 monospace HUD 會被 clay-hud 藏掉。
   const hud = createClayHud(mount);
