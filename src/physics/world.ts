@@ -11,8 +11,11 @@ import type { AiDecision, AiKartObservation } from '../ai/controller.js';
 import { decideAiInput } from '../ai/controller.js';
 import type {
   CharacterId,
+  ItemBoxState,
+  ItemKind,
   KartState,
   LapState,
+  SimEvent,
   SimSnapshot,
   SimWorld,
   WorldOptions,
@@ -21,6 +24,9 @@ import {
   BASE_TOP_SPEED,
   CAR_LENGTH,
   CAR_WIDTH,
+  ITEM_BOXES,
+  ITEM_BOX_PICKUP_RADIUS,
+  ITEM_BOX_RESPAWN_TICKS,
   REVERSE_MIN_THROTTLE,
   TRACK_CENTER_Z,
   TRACK_GEOMETRY,
@@ -80,6 +86,14 @@ const DRIFT_RELEASE_DRAG_US2 = 1.4;
 const MINI_TURBO_DURATION = 1.05;
 const MINI_TURBO_GAIN_BY_TIER = [0, 1.1, 3.0, 5.5] as const;
 const MINI_TURBO_VELOCITY_KICK_BY_TIER = [0, 0, 0.8, 0] as const;
+// Item effects deliberately live outside the drift/mini-turbo constants and
+// are applied in their own branch below. This keeps BAR-FEEL §4 probes
+// unchanged when a fixture does not use an item.
+const ITEM_BOOST_DURATION = 1.25;
+const ITEM_BOOST_ACCELERATION = 20;
+const ITEM_BOOST_SPEED_BONUS = 8;
+const ITEM_SHOCKWAVE_DURATION = 1.5;
+const ITEM_SHOCKWAVE_SPEED_FACTOR = 0.55;
 const START_LINE_LEAVE_ANGLE = 0.25;
 const START_LINE_RETURN_ANGLE = Math.PI * 1.75;
 const START_LINE_CROSS_ANGLE = Math.PI * 0.25;
@@ -97,6 +111,8 @@ export interface WorldInput {
   drift?: boolean;
   /** One-shot jump request; W1 has no jump button in the loader yet. */
   jump?: boolean;
+  /** One-shot item-use request. */
+  useItem?: boolean;
 }
 
 export interface PhysicsWorld extends SimWorld {
@@ -128,6 +144,37 @@ interface InternalWorldOptions extends PhysicsWorldOptions {
   /** Probe-only deterministic starting angles; not part of the shared contract. */
   playerStartAngle?: number;
   aiStartAngles?: readonly number[];
+}
+
+interface ItemBoxRuntime {
+  readonly id: string;
+  readonly position: readonly [number, number, number];
+  readonly angle: number;
+  available: boolean;
+  respawnTicksRemaining: number;
+  respawnCount: number;
+  item: ItemKind;
+}
+
+function seedToUint32(seed: number | string | undefined): number {
+  if (typeof seed === 'number' && Number.isFinite(seed)) return Math.trunc(seed) >>> 0;
+  const text = seed === undefined ? '0' : String(seed);
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function itemForBox(seed: number, boxIndex: number, respawnCount: number): ItemKind {
+  // The seed selects the phase of a deterministic alternating deck. The
+  // alternating term guarantees the fixed track exposes both item kinds while
+  // still making a fixture seed change the assignment reproducibly.
+  let mixed = seed ^ Math.imul(respawnCount + 1, 0x9e3779b9);
+  mixed = Math.imul(mixed ^ (mixed >>> 16), 0x85ebca6b);
+  const phase = (mixed ^ (mixed >>> 13)) & 1;
+  return ((boxIndex + respawnCount + phase) & 1) === 0 ? 'boost' : 'shockwave';
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -207,6 +254,7 @@ class Kart {
   #steerCommand = 0;
   #jumpHeld = false;
   #jumpQueued = false;
+  #itemUseQueued = false;
 
   #driftState: KartState['driftState'] = 'none';
   #driftCharge = 0;
@@ -214,6 +262,9 @@ class Kart {
   #driftTime = 0;
   #releaseTimer = 0;
   #boostSpeed = 0;
+  #itemBoostTimer = 0;
+  #itemSlowTimer = 0;
+  #heldItem: ItemKind | null = null;
 
   #trackAngle = 0;
   #hasLeftStartLine = false;
@@ -270,6 +321,9 @@ class Kart {
       if (input.jump && !this.#jumpHeld) this.#jumpQueued = true;
       this.#jumpHeld = input.jump;
     }
+    if (input.useItem === true) {
+      this.#itemUseQueued = true;
+    }
   }
 
   applyAiDecision(decision: AiDecision): void {
@@ -285,6 +339,7 @@ class Kart {
     this.#wallContactLastStep = this.#wallContact;
     this.#wallContact = false;
     this.#currentTick = tick;
+    this.#stepItemEffects(dt);
     this.#stepDriftState(dt);
     this.#stepVertical(dt);
 
@@ -318,6 +373,8 @@ class Kart {
       surface: this.#surface,
       collisionImpulse: this.#collisionImpulse,
       wallContact: this.#wallContact,
+      heldItem: this.#heldItem,
+      itemEffect: this.#itemEffect(),
     };
     const lapTime = this.#finished
       ? this.#splits[this.#splits.length - 1] ?? 0
@@ -356,6 +413,10 @@ class Kart {
     return Math.hypot(this.#vx, this.#vz);
   }
 
+  get heldItem(): ItemKind | null {
+    return this.#heldItem;
+  }
+
   get yaw(): number {
     return this.#yaw;
   }
@@ -376,7 +437,36 @@ class Kart {
       speed: this.speed,
       trackAngle: this.#trackAngle,
       lap: this.#currentLap,
+      heldItem: this.#heldItem,
     };
+  }
+
+  consumeItemUseRequest(): boolean {
+    const requested = this.#itemUseQueued;
+    this.#itemUseQueued = false;
+    return requested;
+  }
+
+  takeHeldItem(): ItemKind | null {
+    const item = this.#heldItem;
+    this.#heldItem = null;
+    return item;
+  }
+
+  setHeldItem(item: ItemKind): boolean {
+    if (this.#heldItem !== null) return false;
+    this.#heldItem = item;
+    return true;
+  }
+
+  activateBoost(): void {
+    this.#itemBoostTimer = Math.max(this.#itemBoostTimer, ITEM_BOOST_DURATION);
+  }
+
+  applyShockwave(): void {
+    this.#itemSlowTimer = Math.max(this.#itemSlowTimer, ITEM_SHOCKWAVE_DURATION);
+    this.#vx *= ITEM_SHOCKWAVE_SPEED_FACTOR;
+    this.#vz *= ITEM_SHOCKWAVE_SPEED_FACTOR;
   }
 
   translate(dx: number, dz: number): void {
@@ -394,6 +484,17 @@ class Kart {
   }
 
   #currentTick = 0;
+
+  #stepItemEffects(dt: number): void {
+    this.#itemBoostTimer = Math.max(0, this.#itemBoostTimer - dt);
+    this.#itemSlowTimer = Math.max(0, this.#itemSlowTimer - dt);
+  }
+
+  #itemEffect(): KartState['itemEffect'] {
+    if (this.#itemBoostTimer > 0) return 'boost';
+    if (this.#itemSlowTimer > 0) return 'slow';
+    return 'none';
+  }
 
   #stepDriftState(dt: number): void {
     if (this.#driftState === 'none') {
@@ -588,10 +689,24 @@ class Kart {
       this.#vz *= scale;
     }
 
-    const speedLimit = this.#reverse ? surfaceReverseTopSpeed : surfaceForwardTopSpeed;
+    // Item boost is an independent acceleration source. It is intentionally
+    // applied after the normal engine target calculation and before the final
+    // speed cap, never through the drift mini-turbo kick.
+    if (this.#itemBoostTimer > 0 && !this.#reverse && !this.#brake) {
+      this.#vx += forwardX * ITEM_BOOST_ACCELERATION * dt;
+      this.#vz += forwardZ * ITEM_BOOST_ACCELERATION * dt;
+    }
+
+    const baseSpeedLimit = this.#reverse ? surfaceReverseTopSpeed : surfaceForwardTopSpeed;
+    const speedLimit = this.#reverse
+      ? baseSpeedLimit
+      : baseSpeedLimit + (this.#itemBoostTimer > 0 ? ITEM_BOOST_SPEED_BONUS : 0);
+    const effectSpeedLimit = this.#itemSlowTimer > 0
+      ? speedLimit * ITEM_SHOCKWAVE_SPEED_FACTOR
+      : speedLimit;
     const cappedGroundSpeed = Math.hypot(this.#vx, this.#vz);
-    if (cappedGroundSpeed > speedLimit) {
-      const scale = speedLimit / cappedGroundSpeed;
+    if (cappedGroundSpeed > effectSpeedLimit) {
+      const scale = effectSpeedLimit / cappedGroundSpeed;
       this.#vx *= scale;
       this.#vz *= scale;
     }
@@ -684,7 +799,9 @@ class Kart {
   #updateSurface(): void {
     const dx = this.#x - TRACK_GEOMETRY.centerX;
     const dz = this.#z - TRACK_CENTER_Z;
-    this.#surface = surfaceAtPosition(Math.atan2(dz, dx));
+    this.#surface = this.#itemBoostTimer > 0
+      ? 'boost'
+      : surfaceAtPosition(Math.atan2(dz, dx));
   }
 
   #updateLapState(dt: number, tick: number): void {
@@ -722,10 +839,23 @@ class World implements PhysicsWorld {
   readonly #karts: Kart[];
   readonly #aiDifficulties: number[];
   readonly #aiKarts: Kart[];
+  readonly #seed: number;
+  readonly #itemBoxes: ItemBoxRuntime[];
+  #events: SimEvent[] = [];
   #aiTelemetry: AiTelemetry[] = [];
 
   constructor(options: PhysicsWorldOptions = {}) {
     const internalOptions = options as InternalWorldOptions;
+    this.#seed = seedToUint32(options.seed);
+    this.#itemBoxes = ITEM_BOXES.map((definition, index) => ({
+      id: definition.id,
+      position: definition.position,
+      angle: definition.angle,
+      available: true,
+      respawnTicksRemaining: 0,
+      respawnCount: 0,
+      item: itemForBox(this.#seed, index, 0),
+    }));
     const totalLaps = resolveTotalLaps((options as { totalLaps?: number }).totalLaps);
     this.#karts = [new Kart(
       options.playerCharacterId ?? 'xiaohong',
@@ -772,6 +902,7 @@ class World implements PhysicsWorld {
     const fixedDt = this.#fixedDt;
 
     this.#tick += 1;
+    this.#events = [];
     const playerObservation = this.#karts[this.#playerIndex]!.aiObservation();
     this.#aiTelemetry = this.#aiKarts.map((kart, index) => {
       const decision = decideAiInput(this.#aiDifficulties[index]!, {
@@ -789,10 +920,12 @@ class World implements PhysicsWorld {
         radialError: decision.radialError,
       };
     });
+    this.#applyItemUses();
     for (const kart of this.#karts) {
       kart.step(fixedDt, this.#tick);
     }
     this.#resolveKartCollisions();
+    this.#resolveItemBoxes();
   }
 
   snapshot(): SimSnapshot {
@@ -804,7 +937,82 @@ class World implements PhysicsWorld {
       karts: snapshots.map(({ kart }) => kart),
       playerIndex: this.#playerIndex,
       laps: snapshots.map(({ lap }) => lap),
+      events: this.#events.map((event) => ({
+        ...event,
+        ...(event.type === 'item_use'
+          ? { targetKartIndices: [...event.targetKartIndices] }
+          : {}),
+      })),
+      itemBoxes: this.#itemBoxes.map((box): ItemBoxState => ({
+        id: box.id,
+        position: [...box.position] as [number, number, number],
+        available: box.available,
+        respawnTicksRemaining: box.respawnTicksRemaining,
+      })),
     };
+  }
+
+  #applyItemUses(): void {
+    const uses: Array<{ kartIndex: number; item: ItemKind }> = [];
+    for (const [kartIndex, kart] of this.#karts.entries()) {
+      if (!kart.consumeItemUseRequest()) continue;
+      const item = kart.takeHeldItem();
+      if (item !== null) uses.push({ kartIndex, item });
+    }
+
+    for (const use of uses) {
+      const targets: number[] = [];
+      if (use.item === 'boost') {
+        this.#karts[use.kartIndex]!.activateBoost();
+      } else {
+        for (const [targetIndex, target] of this.#karts.entries()) {
+          if (targetIndex === use.kartIndex) continue;
+          target.applyShockwave();
+          targets.push(targetIndex);
+        }
+      }
+      this.#events.push({
+        type: 'item_use',
+        tick: this.#tick,
+        kartIndex: use.kartIndex,
+        item: use.item,
+        effect: use.item,
+        targetKartIndices: targets,
+      });
+    }
+  }
+
+  #resolveItemBoxes(): void {
+    for (const [boxIndex, box] of this.#itemBoxes.entries()) {
+      if (!box.available) {
+        box.respawnTicksRemaining -= 1;
+        if (box.respawnTicksRemaining <= 0) {
+          box.available = true;
+          box.respawnTicksRemaining = 0;
+          box.respawnCount += 1;
+          box.item = itemForBox(this.#seed, boxIndex, box.respawnCount);
+        }
+      }
+      if (!box.available) continue;
+
+      const [boxX, , boxZ] = box.position;
+      for (const [kartIndex, kart] of this.#karts.entries()) {
+        if (kart.heldItem !== null) continue;
+        const distance = Math.hypot(kart.x - boxX, kart.z - boxZ);
+        if (distance > ITEM_BOX_PICKUP_RADIUS) continue;
+        if (!kart.setHeldItem(box.item)) continue;
+        box.available = false;
+        box.respawnTicksRemaining = ITEM_BOX_RESPAWN_TICKS;
+        this.#events.push({
+          type: 'item_pickup',
+          tick: this.#tick,
+          kartIndex,
+          item: box.item,
+          boxId: box.id,
+        });
+        break;
+      }
+    }
   }
 
   #resolveKartCollisions(): void {
@@ -845,4 +1053,10 @@ export function createWorld(options?: PhysicsWorldOptions): PhysicsWorld {
 }
 
 // Public physics API for renderers and headless tooling.
-export { BASE_TOP_SPEED, CAR_LENGTH, CAR_WIDTH, TRACK_GEOMETRY } from './constants.js';
+export {
+  BASE_TOP_SPEED,
+  CAR_LENGTH,
+  CAR_WIDTH,
+  ITEM_BOXES,
+  TRACK_GEOMETRY,
+} from './constants.js';

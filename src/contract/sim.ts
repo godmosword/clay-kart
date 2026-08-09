@@ -64,7 +64,37 @@ export interface WorldInput {
    * 這是 R4 之前補上的契約缺口。
    */
   drift?: boolean;
+  /** 一次性的道具使用請求；呼叫端應在按鍵邊緣送出一次。 */
+  useItem?: boolean;
 }
+
+/** 道具的公開種類。分配與效果都必須保持 deterministic。 */
+export type ItemKind = 'boost' | 'shockwave';
+
+/** 場上道具箱的唯讀狀態，位置定義在 `@physics/constants`。 */
+export interface ItemBoxState {
+  id: string;
+  position: [number, number, number];
+  available: boolean;
+  respawnTicksRemaining: number;
+}
+
+export type SimEvent =
+  | {
+      type: 'item_pickup';
+      tick: number;
+      kartIndex: number;
+      item: ItemKind;
+      boxId: string;
+    }
+  | {
+      type: 'item_use';
+      tick: number;
+      kartIndex: number;
+      item: ItemKind;
+      effect: ItemKind;
+      targetKartIndices: readonly number[];
+    };
 
 /**
  * 六位既有卡司的穩定識別碼（`CHARACTERS.md §2`）。用英文 slug 不用中文，
@@ -130,6 +160,8 @@ export interface WorldOptions {
    * 但先把碰撞／AI 邏輯在較小的數量上跑穩，之後要擴大不需要改架構。
    */
   aiOpponents?: readonly AiOpponentConfig[];
+  /** Fixture-derived seed used for deterministic item-box allocation. */
+  seed?: number | string;
 }
 
 export interface AiOpponentConfig {
@@ -160,6 +192,10 @@ export interface SimSnapshot {
   /** `karts` 的索引，指出哪一台是玩家車。預設情境（無 AI 對手）恆為 0。 */
   playerIndex: number;
   laps: readonly LapState[];
+  /** 本 tick 發生的離散模擬事件；沒有事件時為空陣列。 */
+  events: readonly SimEvent[];
+  /** 道具箱位置與冷卻狀態；索引與常數定義穩定對齊。 */
+  itemBoxes: readonly ItemBoxState[];
 }
 
 export interface KartState {
@@ -186,6 +222,10 @@ export interface KartState {
    * 做法一致（見 `tools/telemetry/ghost-replay.mjs` 的 `collisionData()`）。
    */
   collisionImpulse: number;
+  /** 尚未使用的道具；每台車最多持有一個。 */
+  heldItem: ItemKind | null;
+  /** 目前持續中的道具效果，供渲染與 probe 讀取。 */
+  itemEffect: 'none' | 'boost' | 'slow';
 }
 
 export interface LapState {

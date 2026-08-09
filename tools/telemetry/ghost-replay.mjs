@@ -41,6 +41,8 @@ function frameFromSnapshot(snapshot) {
     surface: kart.surface,
     collision_impulse: kart.collisionImpulse,
     wall_contact: kart.wallContact === true,
+    held_item: kart.heldItem,
+    item_effect: kart.itemEffect,
   };
 }
 
@@ -111,6 +113,30 @@ function eventsBetween(previous, current) {
   const tick = current.tick;
   const previousKart = playerKart(previous);
   const currentKart = playerKart(current);
+  for (const event of current.events ?? []) {
+    if (event.type === 'item_pickup') {
+      events.push({
+        tick: event.tick,
+        type: event.type,
+        data: {
+          kart_index: event.kartIndex,
+          item: event.item,
+          box_id: event.boxId,
+        },
+      });
+    } else if (event.type === 'item_use') {
+      events.push({
+        tick: event.tick,
+        type: event.type,
+        data: {
+          kart_index: event.kartIndex,
+          item: event.item,
+          effect: event.effect,
+          target_kart_indices: [...event.targetKartIndices],
+        },
+      });
+    }
+  }
   const kartKartEvents = [];
   for (let firstIndex = 0; firstIndex < current.karts.length; firstIndex += 1) {
     const first = current.karts[firstIndex];
@@ -261,7 +287,10 @@ function addReleaseDurations(events, frames) {
 }
 
 async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options = {}) {
-  const world = createWorld(options.worldOptions);
+  const world = createWorld({
+    ...(options.worldOptions ?? {}),
+    seed,
+  });
   const frames = [];
   const events = [];
   const inputTrace = options.captureInput ? [] : null;

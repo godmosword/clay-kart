@@ -1,5 +1,5 @@
 /** Deterministic, physics-facing decisions for AI opponents. */
-import type { WorldInput } from '@contract/sim';
+import type { ItemKind, WorldInput } from '@contract/sim';
 import {
   BASE_TOP_SPEED,
   TRACK_GEOMETRY,
@@ -27,6 +27,7 @@ export interface AiKartObservation {
   readonly speed: number;
   readonly trackAngle: number;
   readonly lap: number;
+  readonly heldItem: ItemKind | null;
 }
 
 export interface AiDecisionContext {
@@ -113,6 +114,10 @@ export function decideAiInput(
       reverse: false,
       drift: false,
       jump: false,
+      // AI uses the first item it gets on its next decision tick.  The
+      // controller has no world mutation authority; this is only an input
+      // request consumed by the shared Kart path.
+      useItem: self.heldItem !== null,
     },
     targetSpeed,
     maxSpeedRatio,
