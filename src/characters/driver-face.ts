@@ -122,7 +122,7 @@ export function createDriverFace(): DriverFace {
   // `segments` 也要拉高，`claySlab` 的預設段數只夠撐倒角，承不住表面位移。
   const panel = new Mesh(
     applyHandPressedRelief(
-      claySlab(0.78, 0.34, 0.08, { bevelRatio: 0.42, segments: 24 }),
+      claySlab(0.78, 0.34, 0.08, { bevelRatio: 0.42, segments: 8 }),
       { amplitude: 0.016, wavelength: 0.18 },
     ),
     panelClay,
