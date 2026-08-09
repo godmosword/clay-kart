@@ -581,9 +581,12 @@ def calculate_metrics(doc: dict[str, Any]) -> dict[str, float | bool]:
     wall_stick_speed_threshold = BASE_TOP_SPEED * WALL_STICK_SPEED_RATIO
     max_stick = 0
     current_stick = 0
+    # §6.5 measures sustained boundary contact at near-zero ground speed.  A
+    # stationary contact deliberately has no new collision impulse, so this
+    # must use direct wall-contact telemetry rather than impact telemetry.
     for frame in frames:
         if (
-            _finite(frame.get("collision_impulse")) > 0
+            frame.get("wall_contact") is True
             and _speed(frame) < wall_stick_speed_threshold
         ):
             current_stick += 1

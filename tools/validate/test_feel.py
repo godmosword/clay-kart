@@ -358,9 +358,52 @@ def test_wall_stick_ignores_fast_collision_scrapes() -> None:
             "drift_state": "none",
             "surface": "asphalt",
             "collision_impulse": impulse,
+            "wall_contact": True,
         })
     metrics = calculate_metrics({"meta": {"tick_hz": 120}, "frames": frames, "events": []})
     assert metrics["wall_stick_frames"] == 3.0
+
+
+def test_wall_stick_counts_stationary_contact_without_new_impact() -> None:
+    frames = []
+    for tick in range(1, 6):
+        frames.append({
+            "t": tick / 120,
+            "tick": tick,
+            "pos": [34.42, 0, 30],
+            "vel": [0, 0, 0],
+            "speed": 0,
+            "yaw": 0,
+            "yaw_rate": 0,
+            "steer_input": 0,
+            "throttle_input": 0,
+            "drift_state": "none",
+            "surface": "asphalt",
+            "collision_impulse": 0,
+            "wall_contact": True,
+        })
+    metrics = calculate_metrics({"meta": {"tick_hz": 120}, "frames": frames, "events": []})
+    assert metrics["wall_stick_frames"] == 5.0
+
+
+def test_wall_stick_does_not_infer_contact_from_impulse() -> None:
+    frames = [{
+        "t": 1 / 120,
+        "tick": 1,
+        "pos": [34.42, 0, 30],
+        "vel": [0, 0, 0],
+        "speed": 0,
+        "yaw": 0,
+        "yaw_rate": 0,
+        "steer_input": 0,
+        "throttle_input": 0,
+        "drift_state": "none",
+        "surface": "asphalt",
+        "collision_impulse": 4,
+        "wall_contact": False,
+    }]
+    metrics = calculate_metrics({"meta": {"tick_hz": 120}, "frames": frames, "events": []})
+    assert metrics["wall_stick_frames"] == 0.0
 
 
 def test_ai_metrics_use_named_deterministic_probe_records() -> None:

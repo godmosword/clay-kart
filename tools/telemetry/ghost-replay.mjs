@@ -40,6 +40,7 @@ function frameFromSnapshot(snapshot) {
     grounded: kart.grounded,
     surface: kart.surface,
     collision_impulse: kart.collisionImpulse,
+    wall_contact: kart.wallContact === true,
   };
 }
 
@@ -346,7 +347,7 @@ async function replayTicks(totalTicks, inputAtTick, fixtureName, seed, options =
       kart_count: previous.karts.length,
       player_index: previous.playerIndex,
       collision_recovery_definition: 'first two consecutive grounded, collision-free frames above 50% pre-impact ground speed with yaw-rate error <= max(0.05, 25% expected)',
-      wall_stick_definition: 'consecutive collision frames with ground speed below 10% of asphalt BASE_TOP_SPEED; fast wall scrapes are not stuck',
+      wall_stick_definition: 'consecutive direct wall-contact frames with ground speed below 10% of asphalt BASE_TOP_SPEED; independent of new collision impulses',
       kart_kart_collision_coverage: 'available: kart_kart_collision events include both participants and impulses',
       landing_angle_definition: 'angle between pre-landing ground velocity and downward vertical; >=45° smooth, <45° steep',
       landing_speed_retention_definition: 'post/pre ground speed, capped at 1 to exclude same-tick drive acceleration from landing impact loss',
@@ -380,6 +381,102 @@ async function collisionProbe(name, steer, ticks = 300) {
     name,
     steer,
     events: replay.events.filter((event) => event.type === 'collision'),
+  };
+}
+
+const WALL_ESCAPE_DRIVE_TICKS = 260;
+const WALL_ESCAPE_REST_SPEED = 0.01;
+const WALL_ESCAPE_MAX_TICKS = 700;
+
+function signedAngleDelta(from, to) {
+  const raw = to - from;
+  return Math.atan2(Math.sin(raw), Math.cos(raw));
+}
+
+async function wallEscapeProbe(name, action) {
+  const world = createWorld({ playerStartAngle: 0 });
+  const frames = [];
+  const baseInput = {
+    throttle: 0,
+    steer: 0,
+    brake: false,
+    reverse: false,
+    drift: false,
+    jump: false,
+  };
+  let impactTick = null;
+  let restTick = null;
+  let restFrame = null;
+  let firstMotion = null;
+  for (let tick = 1; tick <= WALL_ESCAPE_MAX_TICKS; tick += 1) {
+    const requestedInput = tick <= WALL_ESCAPE_DRIVE_TICKS
+      ? { ...baseInput, throttle: 1, steer: -0.2 }
+      : restTick === null
+        ? { ...baseInput, brake: true, steer: -0.5 }
+        : { ...baseInput, ...action };
+    advance(world, 1, () => requestedInput);
+    const frame = frameFromSnapshot(world.snapshot());
+    frames.push(frame);
+    if (impactTick === null && frame.collision_impulse > 0) impactTick = tick;
+    if (
+      restTick === null
+      && impactTick !== null
+      && frame.wall_contact
+      && groundSpeed(frame) < WALL_ESCAPE_REST_SPEED
+      && frame.collision_impulse <= 0
+    ) {
+      restTick = tick;
+      restFrame = frame;
+    }
+    if (restTick !== null && tick > restTick && firstMotion === null) {
+      const positionDelta = Math.hypot(
+        frame.pos[0] - restFrame.pos[0],
+        frame.pos[2] - restFrame.pos[2],
+      );
+      const yawDelta = Math.abs(signedAngleDelta(restFrame.yaw, frame.yaw));
+      const movedByDrive = groundSpeed(frame) > WALL_ESCAPE_REST_SPEED;
+      const turnedBySteer = yawDelta > 1e-4;
+      if ((name === 'reverse' && movedByDrive) || (name === 'steer' && turnedBySteer)) {
+        firstMotion = {
+          tick,
+          frames_after_rest: tick - restTick,
+          speed: groundSpeed(frame),
+          position_delta: positionDelta,
+          yaw_delta: yawDelta,
+          yaw_rate: frame.yaw_rate,
+          wall_contact: frame.wall_contact,
+          collision_impulse: frame.collision_impulse,
+          input: { ...action },
+        };
+      }
+    }
+  }
+  if (impactTick === null || restTick === null || firstMotion === null || !restFrame) {
+    throw new Error(`wall escape probe did not complete: ${name}`);
+  }
+  return {
+    name,
+    setup: {
+      player_start_angle: 0,
+      drive_ticks: WALL_ESCAPE_DRIVE_TICKS,
+      drive_input: { ...baseInput, throttle: 1, steer: -0.2 },
+      settle_input: { ...baseInput, brake: true, steer: -0.5 },
+      rest_definition: `direct wall_contact with ground speed < ${WALL_ESCAPE_REST_SPEED} and collision_impulse <= 0`,
+    },
+    collision_tick: impactTick,
+    rest_tick: restTick,
+    frames_from_collision_to_rest: restTick - impactTick,
+    rest_frame: {
+      tick: restFrame.tick,
+      pos: [...restFrame.pos],
+      speed: groundSpeed(restFrame),
+      yaw: restFrame.yaw,
+      yaw_rate: restFrame.yaw_rate,
+      wall_contact: restFrame.wall_contact,
+      collision_impulse: restFrame.collision_impulse,
+    },
+    first_motion: firstMotion,
+    result: 'PASS',
   };
 }
 
@@ -853,6 +950,10 @@ const collisionProbes = await Promise.all([
   collisionProbe('wall-30deg', -0.95),
   collisionProbe('wall-head-on', 1),
 ]);
+const wallEscapeProbes = await Promise.all([
+  wallEscapeProbe('reverse', { reverse: true }),
+  wallEscapeProbe('steer', { steer: -1 }),
+]);
 const landingProbes = await Promise.all([
   landingProbe('smooth', (tick) => ({
     throttle: 1,
@@ -967,6 +1068,7 @@ for (const replay of driftReplays) {
   replay.meta.drift_speed_retention = driftSpeedRetention;
   replay.meta.steering_radius_samples = steeringRadiusSamples;
   replay.meta.collision_probes = collisionProbes;
+  replay.meta.wall_escape_probes = wallEscapeProbes;
   replay.meta.landing_probes = landingProbes;
   replay.meta.surface_probes = surfaceProbes;
   replay.meta.input_feedback = inputFeedback;

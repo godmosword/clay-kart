@@ -21,10 +21,13 @@ import {
   BASE_TOP_SPEED,
   CAR_LENGTH,
   CAR_WIDTH,
+  REVERSE_MIN_THROTTLE,
   TRACK_CENTER_Z,
   TRACK_GEOMETRY,
   TRACK_HALF_WIDTH,
   TRACK_RADIUS,
+  WALL_CONTACT_EPSILON,
+  WALL_STEER_SPEED_RATIO,
 } from './constants.js';
 
 const TOTAL_LAPS = 3;
@@ -116,6 +119,11 @@ type PhysicsWorldOptions = WorldOptions & {
   totalLaps?: number;
 };
 
+type PhysicsKartState = KartState & {
+  /** Direct wall-boundary contact; independent of new-impact impulse telemetry. */
+  wallContact: boolean;
+};
+
 interface InternalWorldOptions extends PhysicsWorldOptions {
   /** Probe-only deterministic starting angles; not part of the shared contract. */
   playerStartAngle?: number;
@@ -183,6 +191,8 @@ class Kart {
   #yawRate = 0;
   #grounded = true;
   #collisionImpulse = 0;
+  #wallContact = false;
+  #wallContactLastStep = false;
   #surface: KartState['surface'] = 'asphalt';
   #speedLimitRatio = 1;
 
@@ -272,6 +282,8 @@ class Kart {
 
   step(dt: number, tick: number): void {
     this.#collisionImpulse = 0;
+    this.#wallContactLastStep = this.#wallContact;
+    this.#wallContact = false;
     this.#currentTick = tick;
     this.#stepDriftState(dt);
     this.#stepVertical(dt);
@@ -288,9 +300,9 @@ class Kart {
     this.#updateLapState(dt, tick);
   }
 
-  snapshot(fixedDt: number): { kart: KartState; lap: LapState } {
+  snapshot(fixedDt: number): { kart: PhysicsKartState; lap: LapState } {
     const speed = Math.hypot(this.#vx, this.#vy, this.#vz);
-    const kart: KartState = {
+    const kart: PhysicsKartState = {
       characterId: this.characterId,
       pos: [this.#x, this.#y, this.#z],
       vel: [this.#vx, this.#vy, this.#vz],
@@ -305,6 +317,7 @@ class Kart {
       grounded: this.#grounded,
       surface: this.#surface,
       collisionImpulse: this.#collisionImpulse,
+      wallContact: this.#wallContact,
     };
     const lapTime = this.#finished
       ? this.#splits[this.#splits.length - 1] ?? 0
@@ -492,6 +505,10 @@ class Kart {
 
   #stepYaw(dt: number, longitudinalSpeed: number): void {
     const speedRatio = clamp(Math.abs(longitudinalSpeed) / BASE_TOP_SPEED, 0, 1);
+    const effectiveSpeedRatio = Math.max(
+      speedRatio,
+      this.#wallContactLastStep && this.#grounded ? WALL_STEER_SPEED_RATIO : 0,
+    );
     const sameDirection = this.#steer === 0
       || this.#steerCommand === 0
       || Math.sign(this.#steer) === Math.sign(this.#steerCommand);
@@ -507,8 +524,8 @@ class Kart {
     const steeringInput = driftSteering ? this.#steer : this.#steerCommand;
     const steerMagnitude = Math.abs(steeringInput);
     const speedCurveBlend = clamp((steerMagnitude - 0.25) / 0.75, 0, 1);
-    const speedFactor = speedRatio * (1 - speedCurveBlend)
-      + Math.sqrt(speedRatio) * speedCurveBlend;
+    const speedFactor = effectiveSpeedRatio * (1 - speedCurveBlend)
+      + Math.sqrt(effectiveSpeedRatio) * speedCurveBlend;
     const steeringRate = steeringInput * MAX_STEER_YAW_RATE * speedFactor * controlRatio * driftRatio;
     // Prevent denormal-scale yaw rates at near-zero speed from becoming a
     // false one-tick "settle" event in telemetry.
@@ -532,15 +549,16 @@ class Kart {
 
     if (this.#brake) {
       longitudinalSpeed = moveTowardZero(longitudinalSpeed, BRAKE_DECELERATION * dt);
-    } else if (this.#throttle > 0) {
+    } else if (this.#reverse || this.#throttle > 0) {
       if (this.#reverse) {
+        const reverseThrottle = Math.max(this.#throttle, REVERSE_MIN_THROTTLE);
         const reverseRatio = clamp(Math.abs(Math.min(0, longitudinalSpeed)) / surfaceReverseTopSpeed, 0, 1);
         const reverseAcceleration = ENGINE_ACCELERATION * (1 - reverseRatio * reverseRatio);
-        longitudinalSpeed -= reverseAcceleration * this.#throttle * dt;
+        longitudinalSpeed -= reverseAcceleration * reverseThrottle * dt;
         longitudinalSpeed = Math.max(-surfaceReverseTopSpeed, longitudinalSpeed);
         targetGroundSpeed = Math.min(
           surfaceReverseTopSpeed,
-          previousGroundSpeed + reverseAcceleration * this.#throttle * dt,
+          previousGroundSpeed + reverseAcceleration * reverseThrottle * dt,
         );
       } else {
         const forwardRatio = clamp(Math.max(0, longitudinalSpeed) / surfaceForwardTopSpeed, 0, 1);
@@ -617,12 +635,14 @@ class Kart {
     const tangentX = -normalZ;
     const tangentZ = normalX;
 
-    if (radius > OUTER_COLLISION_RADIUS) {
+    if (radius >= OUTER_COLLISION_RADIUS - WALL_CONTACT_EPSILON) {
       boundary = OUTER_COLLISION_RADIUS;
       towardBoundary = this.#vx * normalX + this.#vz * normalZ;
-    } else if (radius < INNER_COLLISION_RADIUS) {
+      this.#wallContact = true;
+    } else if (radius <= INNER_COLLISION_RADIUS + WALL_CONTACT_EPSILON) {
       boundary = INNER_COLLISION_RADIUS;
       towardBoundary = -(this.#vx * normalX + this.#vz * normalZ);
+      this.#wallContact = true;
     } else {
       return;
     }
