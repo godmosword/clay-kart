@@ -1,0 +1,471 @@
+{
+  "round": 35,
+  "wave": "W2",
+  "element": "feel-validator",
+  "verdict": "FAIL",
+  "bar_ref": "BAR-FEEL.md §2–§8, §12",
+  "checks": [
+    {
+      "id": "2.1",
+      "metric": "tick_dt_variance",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        0.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "2.2",
+      "metric": "replay_byte_identical",
+      "actual": true,
+      "window": true,
+      "status": "PASS"
+    },
+    {
+      "id": "2.3",
+      "metric": "max_penetration_depth",
+      "actual": 1.4210854715202004e-14,
+      "window": [
+        0.0,
+        0.05
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "2.4",
+      "metric": "nan_or_inf_frames",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        0.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.1",
+      "metric": "time_to_50pct_topspeed_s",
+      "actual": 0.8166666666666667,
+      "window": [
+        0.55,
+        0.85
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.2",
+      "metric": "time_to_95pct_topspeed_s",
+      "actual": 3.25,
+      "window": [
+        2.6,
+        3.4
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.3",
+      "metric": "top_speed_flat_us",
+      "actual": 23.651129145415545,
+      "window": [
+        23.5,
+        24.5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.4",
+      "metric": "coast_decel_us2",
+      "actual": 5.356931114523,
+      "window": [
+        4.0,
+        6.5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "3.5",
+      "metric": "reverse_top_speed_ratio",
+      "actual": 0.39999647294493657,
+      "window": [
+        0.3,
+        0.42
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.1",
+      "metric": "drift_entry_min_speed_us",
+      "actual": 10.52464672825986,
+      "window": [
+        9.0,
+        12.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.2",
+      "metric": "tier1_charge_time_s",
+      "actual": 0.8583333333333334,
+      "window": [
+        0.75,
+        0.95
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.3",
+      "metric": "tier2_charge_time_s",
+      "actual": 2.0083333333333337,
+      "window": [
+        1.9,
+        2.1
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.4",
+      "metric": "tier3_charge_time_s",
+      "actual": 3.5083333333333333,
+      "window": [
+        3.3,
+        3.7
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.5",
+      "metric": "car_lengths_gained_tier2",
+      "actual": 1.8221872366182417,
+      "window": [
+        1.5,
+        2.5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.6",
+      "metric": "car_lengths_gained_tier1",
+      "actual": 1.0984294333667854,
+      "window": [
+        0.6,
+        1.1
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.7",
+      "metric": "car_lengths_gained_tier3",
+      "actual": 3.116356716110141,
+      "window": [
+        2.8,
+        4.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.8",
+      "metric": "miniturbo_duration_tier2_s",
+      "actual": 1.0583333333333333,
+      "window": [
+        0.9,
+        1.2
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.9",
+      "metric": "drift_yaw_rate_ratio",
+      "actual": 1.4383758542160103,
+      "window": [
+        1.25,
+        1.6
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "4.10",
+      "metric": "drift_speed_retention",
+      "actual": 0.9697186324532083,
+      "window": [
+        0.88,
+        0.97
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.1",
+      "metric": "steer_response_lag_ms",
+      "actual": 8.33333333333286,
+      "window": [
+        0.0,
+        50.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.2",
+      "metric": "turn_radius_at_95pct_u",
+      "actual": 8.43612105171371,
+      "window": [
+        7.0,
+        9.5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.3",
+      "metric": "yaw_settle_time_s",
+      "actual": 0.17499999999999982,
+      "window": [
+        0.15,
+        0.35
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.4",
+      "metric": "yaw_overshoot_ratio",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        0.12
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.5",
+      "metric": "grass_speed_penalty",
+      "actual": 0.6435420428806979,
+      "window": [
+        0.55,
+        0.7
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.6",
+      "metric": "dirt_speed_penalty",
+      "actual": 0.8794263054903919,
+      "window": [
+        0.8,
+        0.9
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.7",
+      "metric": "turn_radius_at_30pct_u",
+      "actual": 4.992102869181939,
+      "window": [
+        3.5,
+        5.5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.8",
+      "metric": "turn_radius_at_60pct_u",
+      "actual": 6.854127399677173,
+      "window": [
+        5.5,
+        7.5
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "5.9",
+      "metric": "turn_radius_monotonic",
+      "actual": true,
+      "window": true,
+      "status": "PASS"
+    },
+    {
+      "id": "6.1",
+      "metric": "wall_speed_retention",
+      "actual": 0.5906631456079496,
+      "window": [
+        0.55,
+        0.75
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "6.2",
+      "metric": "wall_head_on_retention",
+      "actual": 0.19588542742629103,
+      "window": [
+        0.05,
+        0.2
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "6.3",
+      "metric": "collision_recovery_time_s",
+      "actual": 0.1833333333333334,
+      "window": [
+        0.2,
+        0.45
+      ],
+      "status": "FAIL"
+    },
+    {
+      "id": "6.4",
+      "metric": "kart_kart_impulse_symmetry",
+      "actual": 1.0,
+      "window": [
+        0.92,
+        1.08
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "6.5",
+      "metric": "wall_stick_frames",
+      "actual": 2.0,
+      "window": [
+        0.0,
+        3.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "7.1",
+      "metric": "air_control_yaw_rate_ratio",
+      "actual": 0.24166038031670278,
+      "window": [
+        0.2,
+        0.4
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "7.2",
+      "metric": "gravity_us2",
+      "actual": 30.0,
+      "window": [
+        26.0,
+        34.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "7.3",
+      "metric": "landing_speed_retention",
+      "actual": 1.0,
+      "window": [
+        0.9,
+        1.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "7.4",
+      "metric": "hard_landing_retention",
+      "actual": 0.7645012038641997,
+      "window": [
+        0.7,
+        0.85
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "7.5",
+      "metric": "airborne_to_grounded_latency_ticks",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        2.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "8.1",
+      "metric": "input_to_sim_latency_ticks",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        1.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "8.2",
+      "metric": "input_buffer_window_ms",
+      "actual": 91.66666666666667,
+      "window": [
+        80.0,
+        130.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "8.3",
+      "metric": "throttle_deadzone",
+      "actual": 0.0,
+      "window": [
+        0.0,
+        0.08
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "8.4",
+      "metric": "steer_deadzone",
+      "actual": 0.07999999999999996,
+      "window": [
+        0.05,
+        0.15
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "12.1",
+      "metric": "ai_lap_completion",
+      "actual": true,
+      "window": true,
+      "status": "PASS"
+    },
+    {
+      "id": "12.2",
+      "metric": "ai_overtake_time_s",
+      "actual": 3.6333333333333333,
+      "window": [
+        1.0,
+        8.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "12.3",
+      "metric": "difficulty_lap_time_spread_s",
+      "actual": 3.0166666666666675,
+      "window": [
+        3.0,
+        20.0
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "12.4",
+      "metric": "rubberband_speed_bonus_ratio",
+      "actual": 1.0032181019026873,
+      "window": [
+        1.0,
+        1.15
+      ],
+      "status": "PASS"
+    }
+  ],
+  "largest_gap": {
+    "id": "6.3",
+    "delta": "actual=0.183333, below lower bound 0.2",
+    "priority_rank": 6
+  },
+  "artifacts": [
+    "loop/round-35/artifacts/lap-a-r35-clean.json"
+  ],
+  "next_owner": "claude-code",
+  "tokens_spent_on_element": 0,
+  "budget_remaining": 150000
+}
