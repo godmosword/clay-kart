@@ -158,6 +158,11 @@ assert(runSequence(3000, driven) === runSequence(3000, driven), 'steered replay 
 
 // 8. The loader owns the fixed-step value; the world locks the first value it receives.
 {
+  const defaultLaps = createWorld().snapshot().laps[0];
+  assert(defaultLaps.current === 1 && defaultLaps.total === 3, 'default lap count changed from 3');
+  const probeLaps = createWorld({ totalLaps: 5 }).snapshot().laps[0];
+  assert(probeLaps.current === 1 && probeLaps.total === 5, 'probe lap count did not accept 5');
+
   const multi = createWorld({
     playerCharacterId: 'xiaohong',
     aiOpponents: [
