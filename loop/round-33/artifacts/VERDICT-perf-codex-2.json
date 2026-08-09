@@ -8,7 +8,7 @@
     {
       "id": "4.1",
       "metric": "character_anim_hz",
-      "actual": 12.136397447440242,
+      "actual": 12.102520056998085,
       "window": [
         11.5,
         12.5
@@ -18,7 +18,7 @@
     {
       "id": "4.2",
       "metric": "vehicle_transform_hz",
-      "actual": 60.094742199421844,
+      "actual": 60.12219641218404,
       "window": [
         58.0,
         62.0
@@ -28,7 +28,7 @@
     {
       "id": "4.3",
       "metric": "camera_hz",
-      "actual": 60.094742199421844,
+      "actual": 60.12219641218404,
       "window": [
         58.0,
         62.0
@@ -38,7 +38,7 @@
     {
       "id": "2.1",
       "metric": "fps_p50",
-      "actual": 59.8802395202902,
+      "actual": 59.8802395236296,
       "window": [
         58.0,
         62.0
@@ -48,7 +48,7 @@
     {
       "id": "2.2",
       "metric": "fps_p05",
-      "actual": 57.142857142857146,
+      "actual": 56.179775281486755,
       "window": [
         55.0,
         62.0
@@ -68,7 +68,7 @@
     {
       "id": "2.3",
       "metric": "frame_time_p99_ms",
-      "actual": 18.100000000512228,
+      "actual": 18.693999999277292,
       "window": [
         0.0,
         22.0
@@ -88,7 +88,7 @@
     {
       "id": "2.5",
       "metric": "gc_pause_max_ms",
-      "actual": 1.577,
+      "actual": 1.365,
       "window": [
         0.0,
         8.0
@@ -98,7 +98,7 @@
     {
       "id": "3.1",
       "metric": "first_interactive_s",
-      "actual": 0.10640000000037253,
+      "actual": 0.112,
       "window": [
         0.0,
         3.0
@@ -128,7 +128,7 @@
     {
       "id": "3.4",
       "metric": "time_to_first_render_s",
-      "actual": 1.3219000000003724,
+      "actual": 1.3232999999998136,
       "window": [
         0.0,
         1.5
@@ -138,7 +138,7 @@
     {
       "id": "5.1",
       "metric": "heap_peak_mb",
-      "actual": 22.396618843078613,
+      "actual": 22.03926944732666,
       "window": [
         0.0,
         320.0
