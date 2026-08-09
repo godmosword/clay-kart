@@ -4,12 +4,12 @@
     "tick_hz": 120,
     "total_ticks": 7200,
     "measurement_seconds": 5,
-    "build_sha": "8ef87b5e4d996f81363f38f771dd85cd98e3db30",
+    "build_sha": "97e5ee7e3398989959e5555e10f3055c7832856d",
     "build": {
-      "sha": "8ef87b5e4d996f81363f38f771dd85cd98e3db30",
+      "sha": "97e5ee7e3398989959e5555e10f3055c7832856d",
       "assets": {
-        "initial_bundle_kb_gz": 153.7890625,
-        "total_assets_mb": 3.496975898742676
+        "initial_bundle_kb_gz": 153.8681640625,
+        "total_assets_mb": 3.4980907440185547
       }
     },
     "environment": {
@@ -40,10 +40,10 @@
       "conclusion": "headless hardware GL selected for this measurement"
     },
     "seed": 20260730,
-    "device": "proxy",
+    "device": "codex-hardware",
     "device_note": "Chrome headless hardware_gl (ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version))",
     "mode": "full",
-    "measurement_method": "External requestAnimationFrame and WebGL draw instrumentation; GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.",
+    "measurement_method": "External requestAnimationFrame and WebGL draw instrumentation (including drawElementsInstanced/drawArraysInstanced when exposed; TRIANGLES use count / 3 * instanceCount); GC duration from Chrome tracing v8.gc events; texture bytes from WebGL texture allocation calls.",
     "network_profile": {
       "name": "4g-4mbps-20ms",
       "offline": false,
@@ -64,20 +64,20 @@
         "status": "incomplete_five_lap_run",
         "targetLaps": 5,
         "completedLaps": 3,
-        "startedAt": 1542.6000000000931,
-        "endedAt": 54899.89999999991,
+        "startedAt": 1548.699999999255,
+        "endedAt": 54907.5,
         "initial_snapshot": {
           "current": 1,
           "total": 3,
-          "time": 1.43
+          "time": 1.41
         },
-        "heapStartBytes": 42044303,
-        "heapEndBytes": 24054212,
-        "heapPeakBytes": 48999812,
-        "heapDeltaBytesRaw": -17990091,
+        "heapStartBytes": 41123810,
+        "heapEndBytes": 32298567,
+        "heapPeakBytes": 55680199,
+        "heapDeltaBytesRaw": -8825243,
         "heapDeltaBytes": 0,
-        "heapStartMb": 40.096571922302246,
-        "heapEndMb": 22.939884185791016,
+        "heapStartMb": 39.21872138977051,
+        "heapEndMb": 30.802313804626465,
         "heapDeltaMb": 0,
         "heapSampleCount": 3203
       }
@@ -94,103 +94,343 @@
   },
   "metrics": {
     "canvas_count": 1,
-    "raf_callbacks": 307,
-    "rendered_frames": 307,
-    "gl_draw_calls": 28279,
-    "triangles": 13450808,
-    "elapsed_s": 5.108600000000093,
-    "fps_p50": 59.8802395219599,
-    "fps_p05": 58.8235294117647,
-    "frame_time_p99_ms": 17.595000000088476,
+    "raf_callbacks": 308,
+    "rendered_frames": 308,
+    "gl_draw_calls": 36437,
+    "triangles": 492776588,
+    "elapsed_s": 5.120200000000186,
+    "fps_p50": 59.8802395236296,
+    "fps_p05": 55.865921786546835,
+    "frame_time_p99_ms": 18.5,
     "long_frame_count": 0,
-    "vehicle_transform_hz": 60.094742199427316,
-    "camera_hz": 60.094742199427316,
-    "character_anim_hz": 12.136397447441347,
+    "vehicle_transform_hz": 60.153900238269756,
+    "camera_hz": 60.153900238269756,
+    "character_anim_hz": 12.10890199601534,
     "character_anim_status": "measured_render_telemetry",
     "character_anim_updates": 62,
     "character_anim_validation_mode": "hz_12_window",
     "character_anim_validation": {
       "mode": "hz_12_window",
       "conclusion": "12Hz frequency is resolvable at this sampling rate",
-      "fps_p05": 58.8235294117647,
-      "character_anim_hz": 12.136397447441347,
-      "character_animation_per_frame": 0.20195439739413681
+      "fps_p05": 55.865921786546835,
+      "character_anim_hz": 12.10890199601534,
+      "character_animation_per_frame": 0.2012987012987013
     },
     "character_anim_measurement": {
       "method": "window.__CLAY_RENDER_TELEMETRY__ counter deltas / measurement elapsed",
       "status": "measured",
-      "elapsed_s": 5.108600000000093,
+      "elapsed_s": 5.120200000000186,
       "character_instances": 1,
-      "character_animation_hz_per_instance": 12.136397447441347,
-      "character_animation_per_frame": 0.20195439739413681,
+      "character_animation_hz_per_instance": 12.10890199601534,
+      "character_animation_per_frame": 0.2012987012987013,
       "counters_start": {
-        "renderedFrames": 14,
-        "vehicleTransformUpdates": 14,
-        "cameraUpdates": 14,
+        "renderedFrames": 12,
+        "vehicleTransformUpdates": 12,
+        "cameraUpdates": 12,
         "characterAnimationInstances": 1,
         "characterAnimationFrames": 3
       },
       "counters_end": {
-        "renderedFrames": 321,
-        "vehicleTransformUpdates": 321,
-        "cameraUpdates": 321,
+        "renderedFrames": 320,
+        "vehicleTransformUpdates": 320,
+        "cameraUpdates": 320,
         "characterAnimationInstances": 1,
         "characterAnimationFrames": 65
       },
       "counter_deltas": {
-        "renderedFrames": 307,
-        "vehicleTransformUpdates": 307,
-        "cameraUpdates": 307,
+        "renderedFrames": 308,
+        "vehicleTransformUpdates": 308,
+        "cameraUpdates": 308,
         "characterAnimationFrames": 62
       }
     },
     "render_telemetry_status": "measured",
     "render_telemetry_counters": {
-      "renderedFrames": 307,
-      "vehicleTransformUpdates": 307,
-      "cameraUpdates": 307,
+      "renderedFrames": 308,
+      "vehicleTransformUpdates": 308,
+      "cameraUpdates": 308,
       "characterAnimationFrames": 62
     },
     "render_telemetry_ratios": {
       "vehicleTransformPerFrame": 1,
       "cameraPerFrame": 1,
-      "characterAnimationPerFrame": 0.20195439739413681,
-      "characterAnimationPerFrameRaw": 0.20195439739413681
+      "characterAnimationPerFrame": 0.2012987012987013,
+      "characterAnimationPerFrameRaw": 0.2012987012987013
     },
-    "first_interactive_s": 0.08609999999962747,
-    "time_to_first_render_s": 1.3152000000001862,
-    "heap_peak_mb": 15.917259216308594,
+    "first_interactive_s": 0.1105,
+    "time_to_first_render_s": 1.3187999999998137,
+    "heap_peak_mb": 22.53368854522705,
     "heap_growth_per_lap_mb": null,
-    "draw_calls": 148,
-    "triangles_k": 58.754,
+    "draw_calls": 174,
+    "triangles_k": 1614.818,
+    "draw_breakdown": [
+      {
+        "method": "drawElements",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 1848,
+        "instance_count": 1848,
+        "index_count": 1332408,
+        "triangles": 444136
+      },
+      {
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 2156,
+        "instance_count": 110880,
+        "index_count": 9391536,
+        "triangles": 160997760
+      },
+      {
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 1848,
+        "instance_count": 602448,
+        "index_count": 768768,
+        "triangles": 78636096
+      },
+      {
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 451,
+        "instance_count": 451,
+        "index_count": 253176,
+        "triangles": 84392
+      },
+      {
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-2",
+        "viewport": "0x0x512x512",
+        "calls": 308,
+        "instance_count": 308,
+        "index_count": 924,
+        "triangles": 308
+      },
+      {
+        "method": "drawElements",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 20596,
+        "instance_count": 20596,
+        "index_count": 16796448,
+        "triangles": 5598816
+      },
+      {
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 2156,
+        "instance_count": 110880,
+        "index_count": 9391536,
+        "triangles": 160997760
+      },
+      {
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 1848,
+        "instance_count": 602448,
+        "index_count": 768768,
+        "triangles": 78636096
+      },
+      {
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 5226,
+        "instance_count": 5226,
+        "index_count": 22143672,
+        "triangles": 7381224
+      }
+    ],
+    "instanced_draw_calls": 8008,
+    "instanced_triangles": 479267712,
+    "instanced_draw_breakdown": [
+      {
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 2156,
+        "instance_count": 110880,
+        "index_count": 9391536,
+        "triangles": 160997760
+      },
+      {
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 1848,
+        "instance_count": 602448,
+        "index_count": 768768,
+        "triangles": 78636096
+      },
+      {
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 2156,
+        "instance_count": 110880,
+        "index_count": 9391536,
+        "triangles": 160997760
+      },
+      {
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 1848,
+        "instance_count": 602448,
+        "index_count": 768768,
+        "triangles": 78636096
+      }
+    ],
+    "peak_frame_index": 0,
+    "peak_frame_draw_calls": 166,
+    "peak_frame_triangles": 1614818,
+    "peak_frame_draw_breakdown": [
+      {
+        "frame_index": 0,
+        "method": "drawElements",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 6,
+        "instance_count": 6,
+        "index_count": 4326,
+        "triangles": 1442
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 7,
+        "instance_count": 360,
+        "index_count": 30492,
+        "triangles": 522720
+      },
+      {
+        "frame_index": 0,
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 6,
+        "instance_count": 1956,
+        "index_count": 2496,
+        "triangles": 255312
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-1",
+        "viewport": "0x0x512x512",
+        "calls": 4,
+        "instance_count": 4,
+        "index_count": 5295,
+        "triangles": 1765
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "fbo-2",
+        "viewport": "0x0x512x512",
+        "calls": 1,
+        "instance_count": 1,
+        "index_count": 3,
+        "triangles": 1
+      },
+      {
+        "frame_index": 0,
+        "method": "drawElements",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 110,
+        "instance_count": 110,
+        "index_count": 91326,
+        "triangles": 30442
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArraysInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 7,
+        "instance_count": 360,
+        "index_count": 30492,
+        "triangles": 522720
+      },
+      {
+        "frame_index": 0,
+        "method": "drawElementsInstanced",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 6,
+        "instance_count": 1956,
+        "index_count": 2496,
+        "triangles": 255312
+      },
+      {
+        "frame_index": 0,
+        "method": "drawArrays",
+        "mode": "TRIANGLES",
+        "framebuffer": "default",
+        "viewport": "0x0x800x600",
+        "calls": 19,
+        "instance_count": 19,
+        "index_count": 75312,
+        "triangles": 25104
+      }
+    ],
     "texture_memory_mb": 4.9169158935546875,
     "frame_breakdown": {
       "method": "nearest_rank_p99_frame_interval",
-      "sample_count": 306,
+      "sample_count": 307,
       "p99_frame": {
-        "frame_ordinal": 67,
-        "interval_start_ms": 2685.1999999997206,
-        "interval_end_ms": 2702.7999999998137,
-        "frame_time_ms": 17.600000000093132,
-        "callback_start_ms": 2702.7999999998137,
-        "callback_end_ms": 2705.1999999997206,
+        "frame_ordinal": 77,
+        "interval_start_ms": 2863.0999999996275,
+        "interval_end_ms": 2881.5999999996275,
+        "frame_time_ms": 18.5,
+        "callback_start_ms": 2881.5999999996275,
+        "callback_end_ms": 2882.2999999998137,
         "draw_ms": 0,
-        "script_wall_ms": 2.3999999999068677,
-        "script_ms": 2.3999999999068677,
+        "script_wall_ms": 0.7000000001862645,
+        "script_ms": 0.7000000001862645,
         "gc_ms": 0,
-        "unattributed_ms": 15.200000000186265,
+        "unattributed_ms": 17.799999999813735,
         "shares_pct": {
           "draw": 0,
-          "script": 13.636363635762317,
+          "script": 3.783783784790619,
           "gc": 0,
-          "unattributed": 86.36363636423768
+          "unattributed": 96.21621621520939
         }
       },
-      "trace_gc_events": 206,
+      "trace_gc_events": 594,
       "trace_anchor": {
         "status": "aligned",
-        "page_now_ms": 1576.8999999999069,
-        "trace_ts_ms": 3676560.139
+        "page_now_ms": 1594.0999999996275,
+        "trace_ts_ms": 4761582.108
       },
       "attribution_note": "draw_ms is JS-side WebGL submission time; script_ms excludes draw and trace-aligned GC; unattributed includes browser/vsync/GPU wait."
     },
@@ -206,33 +446,33 @@
           "status": "incomplete_five_lap_run",
           "targetLaps": 5,
           "completedLaps": 3,
-          "startedAt": 1542.6000000000931,
-          "endedAt": 54899.89999999991,
+          "startedAt": 1548.699999999255,
+          "endedAt": 54907.5,
           "initial_snapshot": {
             "current": 1,
             "total": 3,
-            "time": 1.43
+            "time": 1.41
           },
-          "heapStartBytes": 42044303,
-          "heapEndBytes": 24054212,
-          "heapPeakBytes": 48999812,
-          "heapDeltaBytesRaw": -17990091,
+          "heapStartBytes": 41123810,
+          "heapEndBytes": 32298567,
+          "heapPeakBytes": 55680199,
+          "heapDeltaBytesRaw": -8825243,
           "heapDeltaBytes": 0,
-          "heapStartMb": 40.096571922302246,
-          "heapEndMb": 22.939884185791016,
+          "heapStartMb": 39.21872138977051,
+          "heapEndMb": 30.802313804626465,
           "heapDeltaMb": 0,
           "heapSampleCount": 3203
         }
       ]
     },
-    "gc_pause_max_ms": 0.938,
+    "gc_pause_max_ms": 1.439,
     "gc_pause_max_event": {
-      "name": "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED",
-      "startMs": 3676788.895,
-      "durationMs": 0.938
+      "name": "V8.GC_SCAVENGER",
+      "startMs": 4763037.195,
+      "durationMs": 1.439
     },
-    "trace_gc_event_count": 206,
-    "initial_bundle_kb_gz": 153.7890625,
-    "total_assets_mb": 3.496975898742676
+    "trace_gc_event_count": 594,
+    "initial_bundle_kb_gz": 153.8681640625,
+    "total_assets_mb": 3.4980907440185547
   }
 }
