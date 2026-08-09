@@ -1,0 +1,49 @@
+{
+  "draw_calls": 168,
+  "triangles_k": 1617.722,
+  "updated": "2026-08-09T02:04:58.969Z",
+  "note": "Committed baseline for scene-stats drift gate. Update only with --update-baseline after intentional scene growth.",
+  "thresholds": {
+    "draw_calls_abs": 5,
+    "triangles_k_rel": 0.1
+  },
+  "peak_breakdown_by_method": [
+    {
+      "method": "drawArraysInstanced",
+      "calls": 14,
+      "triangles": 1045440
+    },
+    {
+      "method": "drawElementsInstanced",
+      "calls": 12,
+      "triangles": 510624
+    },
+    {
+      "method": "drawElements",
+      "calls": 116,
+      "triangles": 31884
+    },
+    {
+      "method": "drawArrays",
+      "calls": 26,
+      "triangles": 29774
+    }
+  ],
+  "peak_breakdown_by_framebuffer": [
+    {
+      "framebuffer": "default",
+      "calls": 144,
+      "triangles": 836482
+    },
+    {
+      "framebuffer": "fbo-1",
+      "calls": 23,
+      "triangles": 781239
+    },
+    {
+      "framebuffer": "fbo-2",
+      "calls": 1,
+      "triangles": 1
+    }
+  ]
+}
