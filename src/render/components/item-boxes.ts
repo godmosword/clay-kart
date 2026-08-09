@@ -175,7 +175,19 @@ export function createItemBoxes(
 
   const meshes: InstancedMesh[] = CHUNK_OFFSETS.map(() => {
     const mesh = new InstancedMesh(geometry, material, Math.max(1, count));
-    mesh.castShadow = true;
+    // **不投影。** 箱子浮空，影子落在地上很遠、幾乎看不到，
+    // 而投影會讓成本翻倍（實測 +8 draw call / +111k 三角形，其中一半是
+    // 陰影 pass）。§5.3/§5.4 目前是 176/150 與 1731/400，已經超標 4 倍——
+    // 這個元件不該在明知的情況下再加碼。§5.9 也沒有要求箱子投影。
+    mesh.castShadow = false;
+    // **關掉視錐裁切。** `InstancedMesh` 的包圍球是從**幾何**算的（一塊約
+    // 0.65），不是從 instance 的實際位置——而這些 instance 散在半徑 30 的
+    // 環上。three.js 因此在原點不在視野裡時把整批裁掉，畫面上一個箱子都
+    // 沒有，而 draw call 統計又因為取樣到某些幀而顯示它們有在畫。
+    //
+    // 四個箱子的量體很小，不裁切的代價可以忽略；正確的替代做法是每次
+    // `setTime()` 後呼叫 `computeBoundingSphere()`，但那是每幀重算。
+    mesh.frustumCulled = false;
     mesh.name = 'item-box-chunk';
     group.add(mesh);
     return mesh;

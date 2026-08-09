@@ -21,7 +21,7 @@
  */
 import * as THREE from 'three';
 import type { Renderer, SimSnapshot } from '@loader/bootstrap';
-import { TRACK_GEOMETRY } from '@physics/constants';
+import { ITEM_BOXES, TRACK_GEOMETRY } from '@physics/constants';
 
 /**
  * 接地色塊擺在路面頂再往上一點點，避免與路面 z-fight。
@@ -37,6 +37,7 @@ import { applyClayRenderSettings, createClayLighting } from './clay/lighting.js'
 import { createTrackBarrierRings } from './components/track-barriers.js';
 import { createTrackSurfaceRing, ROAD_SURFACE_Y } from './components/track-surface.js';
 import { createFoliageScatter } from './components/foliage.js';
+import { createItemBoxes, type ItemBoxField } from './components/item-boxes.js';
 import { createClayMaterial } from './clay/material.js';
 import { CAR_PARK, TERRAIN, XIAOHONG } from './clay/palette.js';
 import { createClayAudio, type ClayAudio } from '@audio/index';
@@ -107,6 +108,14 @@ class ClayRenderer implements Renderer {
    */
   readonly #audio: ClayAudio = createClayAudio();
   /**
+   * 元件 #9 `item-boxes`。位置來自 `@physics/constants` 的 `ITEM_BOXES`
+   * ——**跟拾取判定同一份資料**，視覺與物理不會各自漂移。
+   */
+  #itemBoxes: ItemBoxField | null = null;
+  /** 上一幀每個箱子的 `available`，用來偵測拾取／重生這兩個邊緣事件。 */
+  #itemBoxAvailable: boolean[] = [];
+
+  /**
    * 每台車一塊接地色塊。**不只玩家車**——R32 有一版只給玩家，
    * 對手因此完全沒有接地感，看起來像浮在路面上。
    */
@@ -156,6 +165,7 @@ class ClayRenderer implements Renderer {
     this.#buildTrack();
     this.#buildBoundaryWalls();
     this.#buildFoliage();
+    this.#buildItemBoxes();
 
 
     this.#hud = document.createElement('div');
@@ -205,6 +215,20 @@ class ClayRenderer implements Renderer {
     );
     foliage.position.set(TRACK_GEOMETRY.centerX, 0, TRACK_GEOMETRY.centerZ);
     this.#scene.add(foliage);
+  }
+
+  /**
+   * **元件 #9 `item-boxes`。** 位置直接讀 `ITEM_BOXES`，不自己算——
+   * 那份常數同時是物理側 `#stepItemBoxes()` 的拾取判定來源，
+   * 兩邊共用才不會出現「看得到但撞不到」。
+   */
+  #buildItemBoxes(): void {
+    const field = createItemBoxes(
+      ITEM_BOXES.map((box) => [box.position[0], box.position[2]] as const),
+    );
+    this.#itemBoxes = field;
+    this.#itemBoxAvailable = ITEM_BOXES.map(() => true);
+    this.#scene.add(field.group);
   }
 
   /**
@@ -319,6 +343,20 @@ class ClayRenderer implements Renderer {
     let characterAnimationInstances = 0;
 
     // 本幀推進的模擬時間。輪子自轉吃距離、表情吃時間，兩者都要它。
+    // 道具箱：自轉與浮動吃連續時間（`§5.9` 明文 60fps 不抽格），
+    // 拾取／重生從 `snap.itemBoxes[].available` 的邊緣偵測。
+    if (this.#itemBoxes) {
+      const boxes = this.#itemBoxes;
+      for (let i = 0; i < snap.itemBoxes.length; i++) {
+        const available = snap.itemBoxes[i]?.available ?? true;
+        const was = this.#itemBoxAvailable[i] ?? true;
+        if (was && !available) boxes.pick(i, snap.t);
+        else if (!was && available) boxes.respawn(i);
+        this.#itemBoxAvailable[i] = available;
+      }
+      boxes.setTime(snap.t);
+    }
+
     const simDt = this.#prevSimTime === null ? 0 : Math.max(0, snap.t - this.#prevSimTime);
     this.#prevSimTime = snap.t;
 
