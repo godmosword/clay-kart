@@ -52,7 +52,7 @@ function hideForeignOverlays(mount: HTMLElement): void {
     if (!(child instanceof HTMLElement)) continue;
     if (child.tagName === 'CANVAS') continue;
     const role = child.dataset.role;
-    if (role === 'clay-hud' || role === 'touch-controls') continue;
+    if (role === 'clay-hud' || role === 'touch-controls' || role === 'race-result') continue;
     child.style.display = 'none';
     child.setAttribute('aria-hidden', 'true');
   }

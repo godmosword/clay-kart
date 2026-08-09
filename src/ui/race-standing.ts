@@ -53,3 +53,26 @@ export function playerStanding(snap: SimSnapshot): RaceStanding {
   }
   return { place: ahead + 1, field };
 }
+
+export interface StandingEntry {
+  index: number;
+  place: number;
+  characterId: string;
+  isPlayer: boolean;
+}
+
+/** 全場名次表（place 升序），結算畫面用。 */
+export function fieldStanding(snap: SimSnapshot): StandingEntry[] {
+  const field = snap.karts.length;
+  const ranked = Array.from({ length: field }, (_, index) => ({
+    index,
+    progress: trackProgress(snap, index),
+  })).sort((a, b) => b.progress - a.progress);
+
+  return ranked.map((entry, order) => ({
+    index: entry.index,
+    place: order + 1,
+    characterId: snap.karts[entry.index]?.characterId ?? `kart-${entry.index}`,
+    isPlayer: entry.index === snap.playerIndex,
+  }));
+}

@@ -16,11 +16,22 @@ import {
   type WorldInput,
 } from '@contract/sim';
 import { createClayHud } from '@ui/clay-hud';
+import { createRaceResult, isPlayerRaceFinished } from '@ui/race-result';
 import {
   createSteerProbeSample,
   writeFollowCam,
   type SteerProbeSample,
 } from '@ui/steer-screen-math';
+
+/** 完賽後必須送滿欄位 0／false——WorldInput 缺欄會保留前值。 */
+const BLOCKED_INPUT: WorldInput = {
+  throttle: 0,
+  steer: 0,
+  brake: false,
+  reverse: false,
+  jump: false,
+  drift: false,
+};
 
 /**
  * 場上 AI 對手（契約建議上限 3 台，共 4 車）。
@@ -150,13 +161,23 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
 
   const aiOpponents = resolveAiOpponents();
   const totalLaps = resolveTotalLaps();
-  const world: SimWorld = createWorld({
+  const worldOptions = {
     ...(aiOpponents.length > 0 ? { aiOpponents } : {}),
     ...(totalLaps !== undefined ? { totalLaps } : {}),
-  });
+  };
+  // 重新開始用重建 world（無 physics reset()）；見 R36 TASK。
+  let world: SimWorld = createWorld(worldOptions);
   const renderer: Renderer = createRenderer(mount);
   // ui-hud（§5.12）在 Cursor 範圍；render 裡的 W1 monospace HUD 會被 clay-hud 藏掉。
   const hud = createClayHud(mount);
+  const raceResult = createRaceResult(mount, {
+    onRestart: () => {
+      world = createWorld(worldOptions);
+      inputBlocked = false;
+      accumulator = 0;
+      raceResult.update(world.snapshot());
+    },
+  });
 
   const onResize = () => {
     renderer.resize(mount.clientWidth, mount.clientHeight);
@@ -167,6 +188,8 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
 
   let last = performance.now() / 1000;
   let accumulator = 0;
+  /** 玩家完賽後擋輸入；重開時清掉。 */
+  let inputBlocked = false;
 
   const timeStats: ClayTimeStats = {
     wallElapsed: 0,
@@ -194,7 +217,8 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
 
   // 綁在迴圈外：每幀 `() => inputSource.poll(i)` 會多一次閉包配置。
   // poll() 本身也必須重用緩衝（見 player-input.ts）。
-  const pollInput = (tickIndex: number): WorldInput => inputSource.poll(tickIndex);
+  const pollInput = (tickIndex: number): WorldInput =>
+    inputBlocked ? BLOCKED_INPUT : inputSource.poll(tickIndex);
 
   const frame = () => {
     const now = performance.now() / 1000;
@@ -235,11 +259,13 @@ export async function bootstrap(mount: HTMLElement, inputSource: InputSource = N
       timeStats.wallElapsed > 0 ? timeStats.simElapsed / timeStats.wallElapsed : 1;
 
     const snap: SimSnapshot = world.snapshot();
+    inputBlocked = isPlayerRaceFinished(snap);
     // accumulator 在 catch-up 殘留時可超過一個 TICK_DT（最大約 6）；
     // alpha > 1 會讓 renderer 外插，長幀時車被畫超前再彈回——正好破壞這次修正。
     const alpha = Math.min(1, accumulator / TICK_DT);
     renderer.draw(snap, alpha);
     hud.update(snap);
+    raceResult.update(snap);
 
     // 其餘每幀配置：
     // - world.snapshot()：物理層契約，不在本檔可改範圍

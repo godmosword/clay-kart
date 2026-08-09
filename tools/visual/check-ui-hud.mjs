@@ -284,7 +284,8 @@ async function main() {
             .filter((el) => el.tagName !== 'CANVAS')
             .filter((el) => {
               const role = el.dataset.role;
-              return role !== 'clay-hud' && role !== 'touch-controls';
+              // race-result 是 Cursor 的結算層（§2.1）；未完賽時必須 display:none。
+              return role !== 'clay-hud' && role !== 'touch-controls' && role !== 'race-result';
             })
             .map((el) => ({
               role: el.dataset.role || null,
